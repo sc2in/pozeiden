@@ -6,6 +6,11 @@ pub const DiagramType = enum {
     flowchart,
     sequence,
     gitgraph,
+    class,
+    state,
+    er,
+    gantt,
+    timeline,
     unknown,
 };
 
@@ -31,6 +36,16 @@ pub fn detect(text: []const u8) DiagramType {
         if (std.mem.startsWith(u8, line, "sequenceDiagram")) return .sequence;
 
         if (std.mem.startsWith(u8, line, "gitGraph")) return .gitgraph;
+
+        if (std.mem.startsWith(u8, line, "classDiagram")) return .class;
+
+        if (std.mem.startsWith(u8, line, "stateDiagram")) return .state;
+
+        if (std.mem.startsWith(u8, line, "erDiagram")) return .er;
+
+        if (std.mem.startsWith(u8, line, "gantt")) return .gantt;
+
+        if (std.mem.startsWith(u8, line, "timeline")) return .timeline;
 
         return .unknown;
     }

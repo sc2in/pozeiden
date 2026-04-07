@@ -111,6 +111,86 @@ pub fn build(b: *std.Build) void {
             \\
             ,
         },
+        .{
+            .name = "class",
+            .mmd =
+            \\classDiagram
+            \\    class Animal {
+            \\        +String name
+            \\        +makeSound() void
+            \\    }
+            \\    class Duck {
+            \\        +swim() void
+            \\    }
+            \\    class Fish
+            \\    Animal <|-- Duck
+            \\    Animal <|-- Fish
+            \\    Duck --> Fish : chases
+            \\
+            ,
+        },
+        .{
+            .name = "state",
+            .mmd =
+            \\stateDiagram-v2
+            \\    [*] --> Idle
+            \\    Idle --> Running : start
+            \\    Running --> Idle : stop
+            \\    Running --> Error : fail
+            \\    Error --> Idle : reset
+            \\    Idle --> [*]
+            \\
+            ,
+        },
+        .{
+            .name = "er",
+            .mmd =
+            \\erDiagram
+            \\    CUSTOMER ||--o{ ORDER : "places"
+            \\    ORDER ||--|{ LINE-ITEM : "contains"
+            \\    CUSTOMER {
+            \\        string name PK
+            \\        string email
+            \\    }
+            \\    ORDER {
+            \\        int orderNumber PK
+            \\        string status
+            \\    }
+            \\
+            ,
+        },
+        .{
+            .name = "gantt",
+            .mmd =
+            \\gantt
+            \\    title Project Timeline
+            \\    dateFormat YYYY-MM-DD
+            \\    section Design
+            \\        Research        : done, 3d
+            \\        Wireframes      : done, 2d
+            \\    section Development
+            \\        Backend         : crit, 5d
+            \\        Frontend        : 4d
+            \\    section Testing
+            \\        QA              : 3d
+            \\        Bug fixes       : 2d
+            \\
+            ,
+        },
+        .{
+            .name = "timeline",
+            .mmd =
+            \\timeline
+            \\    title History of Social Media
+            \\    2002 : LinkedIn
+            \\    2004 : Facebook
+            \\    2005 : YouTube
+            \\    2006 : Twitter
+            \\    2010 : Instagram
+            \\    2016 : TikTok
+            \\
+            ,
+        },
     };
 
     const examples_step = b.step("examples", "Render example SVGs to zig-out/examples/");

@@ -1,0 +1,353 @@
+//! Class diagram SVG renderer.
+const std = @import("std");
+const Value = @import("../diagram/value.zig").Value;
+const SvgWriter = @import("../svg/writer.zig").SvgWriter;
+const theme = @import("../svg/theme.zig");
+
+const CLASS_W: f32 = 160;
+const CLASS_HEADER_H: f32 = 32;
+const MEMBER_H: f32 = 20;
+const GRID_COLS: usize = 3;
+const COL_GAP: f32 = 80;
+const ROW_GAP: f32 = 80;
+const MARGIN: f32 = 40;
+
+const Visibility = enum { public, private, protected, package, none };
+const Member = struct {
+    visibility: Visibility,
+    name: []const u8,
+    type_str: []const u8,
+    is_method: bool,
+};
+
+const Class = struct {
+    name: []const u8,
+    members: []Member,
+    col: usize,
+    row: usize,
+};
+
+// Relationship terminators
+const RelKind = enum {
+    inheritance,   // --|>  open triangle
+    composition,   // --*   filled diamond
+    aggregation,   // --o   open diamond
+    association,   // -->   open arrow
+    dependency,    // ..>   dashed open arrow
+    realization,   // ..|>  dashed open triangle
+    link,          // --    plain line
+    link_dashed,   // ..    plain dashed
+};
+
+const Relation = struct {
+    from: []const u8,
+    to: []const u8,
+    kind: RelKind,
+    label: []const u8,
+};
+
+pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
+    const node = value.asNode() orelse return renderFallback(allocator);
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var classes: std.ArrayList(Class) = .empty;
+    var relations: std.ArrayList(Relation) = .empty;
+
+    // Collect classes
+    for (node.getList("classes")) |cv| {
+        const cn = cv.asNode() orelse continue;
+        const name = cn.getString("name") orelse continue;
+
+        const raw_members = cn.getList("members");
+        var members: std.ArrayList(Member) = .empty;
+        for (raw_members) |mv| {
+            const ms = mv.asString() orelse continue;
+            const m = parseMember(ms);
+            try members.append(a, m);
+        }
+
+        const idx = classes.items.len;
+        try classes.append(a, Class{
+            .name = name,
+            .members = try members.toOwnedSlice(a),
+            .col = idx % GRID_COLS,
+            .row = idx / GRID_COLS,
+        });
+    }
+
+    // Collect relations
+    for (node.getList("relations")) |rv| {
+        const rn = rv.asNode() orelse continue;
+        const from = rn.getString("from") orelse continue;
+        const to = rn.getString("to") orelse continue;
+        const kind_str = rn.getString("kind") orelse "association";
+        const label = rn.getString("label") orelse "";
+        try relations.append(a, Relation{
+            .from = from,
+            .to = to,
+            .kind = parseRelKind(kind_str),
+            .label = label,
+        });
+    }
+
+    if (classes.items.len == 0) return renderFallback(allocator);
+
+    const n_rows = (classes.items.len + GRID_COLS - 1) / GRID_COLS;
+    // Find max members per row
+    var max_members_per_row = [_]usize{0} ** 64;
+    for (classes.items) |cl| {
+        if (cl.row < 64 and cl.members.len > max_members_per_row[cl.row])
+            max_members_per_row[cl.row] = cl.members.len;
+    }
+
+    // Compute row Y offsets
+    var row_y = [_]f32{0} ** 65;
+    row_y[0] = MARGIN;
+    for (0..n_rows) |r| {
+        const h = CLASS_HEADER_H + @as(f32, @floatFromInt(max_members_per_row[r])) * MEMBER_H + 10;
+        row_y[r + 1] = row_y[r] + h + ROW_GAP;
+    }
+
+    const total_w: u32 = @intFromFloat(
+        MARGIN * 2 + @as(f32, @floatFromInt(GRID_COLS)) * (CLASS_W + COL_GAP) - COL_GAP
+    );
+    const total_h: u32 = @intFromFloat(row_y[n_rows] + MARGIN);
+
+    var svg = SvgWriter.init(allocator);
+    defer svg.deinit();
+
+    try svg.header(total_w, total_h);
+    try svg.rect(0, 0, @floatFromInt(total_w), @floatFromInt(total_h), 0, theme.background, theme.background, 0);
+
+    // Helper: get class box top-left
+    const classX = struct {
+        fn get(col: usize) f32 {
+            return MARGIN + @as(f32, @floatFromInt(col)) * (CLASS_W + COL_GAP);
+        }
+    }.get;
+
+    // Draw relations first (behind boxes)
+    for (relations.items) |rel| {
+        const fi = classIndex(classes.items, rel.from) orelse continue;
+        const ti = classIndex(classes.items, rel.to) orelse continue;
+        const fc = classes.items[fi];
+        const tc = classes.items[ti];
+
+        const fh = CLASS_HEADER_H + @as(f32, @floatFromInt(fc.members.len)) * MEMBER_H + 10;
+        const th = CLASS_HEADER_H + @as(f32, @floatFromInt(tc.members.len)) * MEMBER_H + 10;
+
+        const fcx_left = classX(fc.col);
+        const fcx_right = classX(fc.col) + CLASS_W;
+        const fcy_mid = row_y[fc.row] + fh / 2;
+        const fcy_bot = row_y[fc.row] + fh;
+
+        const tcx_left = classX(tc.col);
+        const tcx_right = classX(tc.col) + CLASS_W;
+        const tcy_mid = row_y[tc.row] + th / 2;
+        const tcy_bot = row_y[tc.row] + th;
+
+        // Choose connection points: side edges for same row, top/bottom for different rows
+        const from_x: f32, const from_y: f32, const to_x: f32, const to_y: f32 = blk: {
+            if (fc.row == tc.row) {
+                // Same row: connect right→left or left→right
+                if (fc.col < tc.col) {
+                    break :blk .{ fcx_right, fcy_mid, tcx_left, tcy_mid };
+                } else {
+                    break :blk .{ fcx_left, fcy_mid, tcx_right, tcy_mid };
+                }
+            } else if (fc.row < tc.row) {
+                // From is above to: bottom of from → top of to
+                break :blk .{ classX(fc.col) + CLASS_W / 2, fcy_bot,
+                               classX(tc.col) + CLASS_W / 2, row_y[tc.row] };
+            } else {
+                // From is below to: top of from → bottom of to
+                break :blk .{ classX(fc.col) + CLASS_W / 2, row_y[fc.row],
+                               classX(tc.col) + CLASS_W / 2, tcy_bot };
+            }
+        };
+
+        const dotted = rel.kind == .dependency or rel.kind == .realization or rel.kind == .link_dashed;
+        if (dotted) {
+            try svg.dashedLine(from_x, from_y, to_x, to_y, theme.line_color, 1.5, "6,3");
+        } else {
+            try svg.line(from_x, from_y, to_x, to_y, theme.line_color, 1.5);
+        }
+
+        // Terminator at `to` end
+        try drawTerminator(&svg, to_x, to_y, from_x, from_y, rel.kind);
+
+        // Label at midpoint
+        if (rel.label.len > 0) {
+            const mx = (from_x + to_x) / 2;
+            const my = (from_y + to_y) / 2;
+            try svg.text(mx, my - 6, rel.label, theme.text_color, theme.font_size_small, .middle, "normal");
+        }
+    }
+
+    // Draw class boxes
+    for (classes.items) |cl| {
+        const bx = classX(cl.col);
+        const by = row_y[cl.row];
+        const bh = CLASS_HEADER_H + @as(f32, @floatFromInt(cl.members.len)) * MEMBER_H + 10;
+
+        // Box outline
+        try svg.rect(bx, by, CLASS_W, bh, 4.0, theme.node_fill, theme.node_stroke, 1.5);
+        // Header separator
+        try svg.line(bx, by + CLASS_HEADER_H, bx + CLASS_W, by + CLASS_HEADER_H, theme.node_stroke, 1.0);
+        // Class name
+        try svg.text(bx + CLASS_W / 2, by + CLASS_HEADER_H / 2 + 5, cl.name, theme.text_color, theme.font_size, .middle, "bold");
+
+        // Members
+        for (cl.members, 0..) |m, mi| {
+            const my = by + CLASS_HEADER_H + 6 + @as(f32, @floatFromInt(mi)) * MEMBER_H + MEMBER_H / 2;
+            var buf: [256]u8 = undefined;
+            const vis = visibilityChar(m.visibility);
+            const label = if (m.type_str.len > 0)
+                std.fmt.bufPrint(&buf, "{s}{s} : {s}", .{ vis, m.name, m.type_str }) catch m.name
+            else
+                std.fmt.bufPrint(&buf, "{s}{s}", .{ vis, m.name }) catch m.name;
+            try svg.text(bx + 8, my, label, theme.text_color, theme.font_size_small, .start, "normal");
+        }
+    }
+
+    try svg.footer();
+    return svg.toOwnedSlice();
+}
+
+fn drawTerminator(svg: *SvgWriter, tip_x: f32, tip_y: f32, from_x: f32, from_y: f32, kind: RelKind) !void {
+    const dx = from_x - tip_x;
+    const dy = from_y - tip_y;
+    const len = @sqrt(dx * dx + dy * dy);
+    if (len < 1.0) return;
+    const ux = dx / len;
+    const uy = dy / len;
+    const perp_x = -uy;
+    const perp_y = ux;
+    const arr: f32 = 10.0;
+    const half: f32 = 6.0;
+
+    switch (kind) {
+        .inheritance, .realization => {
+            // Open triangle pointing at tip
+            const b1x = tip_x + ux * arr + perp_x * half;
+            const b1y = tip_y + uy * arr + perp_y * half;
+            const b2x = tip_x + ux * arr - perp_x * half;
+            const b2y = tip_y + uy * arr - perp_y * half;
+            var pts_buf: [192]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ tip_x, tip_y, b1x, b1y, b2x, b2y });
+            try svg.polygon(pts, theme.background, theme.line_color, 1.5);
+        },
+        .composition => {
+            // Filled diamond (two triangles)
+            const mid_x = tip_x + ux * arr;
+            const mid_y = tip_y + uy * arr;
+            const b1x = mid_x + perp_x * half;
+            const b1y = mid_y + perp_y * half;
+            const b2x = mid_x - perp_x * half;
+            const b2y = mid_y - perp_y * half;
+            const bx = tip_x + ux * arr * 2;
+            const by = tip_y + uy * arr * 2;
+            var pts_buf: [256]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ tip_x, tip_y, b1x, b1y, bx, by, b2x, b2y });
+            try svg.polygon(pts, theme.node_stroke, theme.line_color, 1.5);
+        },
+        .aggregation => {
+            // Open diamond
+            const mid_x = tip_x + ux * arr;
+            const mid_y = tip_y + uy * arr;
+            const b1x = mid_x + perp_x * half;
+            const b1y = mid_y + perp_y * half;
+            const b2x = mid_x - perp_x * half;
+            const b2y = mid_y - perp_y * half;
+            const bx = tip_x + ux * arr * 2;
+            const by = tip_y + uy * arr * 2;
+            var pts_buf: [256]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ tip_x, tip_y, b1x, b1y, bx, by, b2x, b2y });
+            try svg.polygon(pts, theme.background, theme.line_color, 1.5);
+        },
+        .association, .dependency => {
+            // Open arrowhead
+            const b1x = tip_x + ux * arr + perp_x * half;
+            const b1y = tip_y + uy * arr + perp_y * half;
+            const b2x = tip_x + ux * arr - perp_x * half;
+            const b2y = tip_y + uy * arr - perp_y * half;
+            var pts_buf: [192]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ b1x, b1y, tip_x, tip_y, b2x, b2y });
+            try svg.polygon(pts, "none", theme.line_color, 1.5);
+        },
+        .link, .link_dashed => {
+            // No terminator
+        },
+    }
+}
+
+fn classIndex(classes: []const Class, name: []const u8) ?usize {
+    for (classes, 0..) |c, i| if (std.mem.eql(u8, c.name, name)) return i;
+    return null;
+}
+
+fn parseMember(s: []const u8) Member {
+    const trimmed = std.mem.trim(u8, s, " \t");
+    var vis = Visibility.none;
+    var rest = trimmed;
+    if (rest.len > 0) {
+        switch (rest[0]) {
+            '+' => { vis = .public; rest = rest[1..]; },
+            '-' => { vis = .private; rest = rest[1..]; },
+            '#' => { vis = .protected; rest = rest[1..]; },
+            '~' => { vis = .package; rest = rest[1..]; },
+            else => {},
+        }
+    }
+    const is_method = std.mem.indexOf(u8, rest, "(") != null;
+    // Mermaid syntax: `Type name` — first token is type, second is name.
+    // Display convention (UML): `+name : Type`.
+    var name = rest;
+    var type_str: []const u8 = "";
+    if (std.mem.indexOf(u8, rest, " ")) |sp| {
+        type_str = rest[0..sp];          // first token = type
+        name = std.mem.trim(u8, rest[sp + 1..], " \t"); // second token = name
+    }
+    return Member{ .visibility = vis, .name = name, .type_str = type_str, .is_method = is_method };
+}
+
+fn visibilityChar(v: Visibility) []const u8 {
+    return switch (v) {
+        .public => "+",
+        .private => "-",
+        .protected => "#",
+        .package => "~",
+        .none => "",
+    };
+}
+
+fn parseRelKind(s: []const u8) RelKind {
+    if (std.mem.eql(u8, s, "inheritance") or std.mem.eql(u8, s, "extension")) return .inheritance;
+    if (std.mem.eql(u8, s, "composition")) return .composition;
+    if (std.mem.eql(u8, s, "aggregation")) return .aggregation;
+    if (std.mem.eql(u8, s, "dependency")) return .dependency;
+    if (std.mem.eql(u8, s, "realization")) return .realization;
+    if (std.mem.eql(u8, s, "link_dashed")) return .link_dashed;
+    if (std.mem.eql(u8, s, "link")) return .link;
+    return .association;
+}
+
+fn renderFallback(allocator: std.mem.Allocator) ![]const u8 {
+    var svg = SvgWriter.init(allocator);
+    defer svg.deinit();
+    try svg.header(400, 200);
+    try svg.text(200, 100, "classDiagram", theme.text_color, theme.font_size, .middle, "normal");
+    try svg.footer();
+    return svg.toOwnedSlice();
+}
