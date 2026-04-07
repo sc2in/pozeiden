@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
             .mmd =
             \\pie title Pets adopted by volunteers
             \\"Dogs" : 386
-            \\"Cats" : 85
+            \\"Cats" : 200
             \\"Rats" : 15
             \\
             ,
