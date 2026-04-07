@@ -9,6 +9,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const mecha = b.dependency("mecha", .{});
+    const zigmark = b.dependency("zigmark", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const mod = b.addModule("pozeiden", .{
         .root_source_file = b.path("src/root.zig"),
@@ -17,6 +21,7 @@ pub fn build(b: *std.Build) void {
     });
     mod.addImport("mvzr", mvzr.module("mvzr"));
     mod.addImport("mecha", mecha.module("mecha"));
+    mod.addImport("zigmark", zigmark.module("zigmark"));
 
     const exe = b.addExecutable(.{
         .name = "pozeiden",

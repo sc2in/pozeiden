@@ -1,0 +1,1 @@
+../../grammars/gitGraph.langium

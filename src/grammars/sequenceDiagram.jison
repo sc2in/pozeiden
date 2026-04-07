@@ -1,0 +1,1 @@
+../../grammars/sequenceDiagram.jison
