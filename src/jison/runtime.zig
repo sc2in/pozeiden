@@ -352,3 +352,138 @@ fn isTerminalName(s: []const u8) bool {
     }
     return true;
 }
+
+// ── Test helpers ──────────────────────────────────────────────────────────────
+
+const jison_parser = @import("parser.zig");
+
+/// Parse `grammar_src` and lex `input` using the Jison runtime.
+/// All allocations go into `arena`; caller owns the returned token slice.
+fn testLexDiagram(arena: std.mem.Allocator, grammar_src: []const u8, input: []const u8) ![]Token {
+    const grammar = try jison_parser.parse(arena, grammar_src);
+    var rt = try Runtime.init(arena, &grammar);
+    return rt.lex(input);
+}
+
+/// Returns true if any token in `tokens` has kind equal to `kind`.
+fn hasToken(tokens: []const Token, kind: []const u8) bool {
+    for (tokens) |t| if (std.mem.eql(u8, t.kind, kind)) return true;
+    return false;
+}
+
+// ── Jison flowchart lexer tests (inputs derived from mermaid documentation) ───
+
+const flow_src = @embedFile("../grammars/flow.jison");
+
+test "jison flow lex: graph keyword" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), flow_src, "graph TD\n");
+    try std.testing.expect(tokens.len > 0);
+    try std.testing.expect(hasToken(tokens, "GRAPH"));
+    try std.testing.expect(hasToken(tokens, "DIR"));
+}
+
+test "jison flow lex: basic edge" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), flow_src,
+        \\graph TD
+        \\A-->B
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "GRAPH"));
+    try std.testing.expect(hasToken(tokens, "LINK"));
+}
+
+test "jison flow lex: labeled edge" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    // "graph LR\nA-->|label|B\n" — after the LINK token the lexer enters edgeText
+    // state; "|" delimiters produce PIPE tokens and the label text an EDGE_TEXT token.
+    const tokens = try testLexDiagram(arena.allocator(), flow_src,
+        \\graph LR
+        \\A-->|label|B
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "GRAPH"));
+    try std.testing.expect(hasToken(tokens, "LINK"));
+}
+
+test "jison flow lex: node with brackets" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    // A[Start] — SQS is "[" token, SQE is "]" token (in vertex state)
+    const tokens = try testLexDiagram(arena.allocator(), flow_src,
+        \\graph TD
+        \\A[Start]-->B
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "GRAPH"));
+    try std.testing.expect(hasToken(tokens, "SQS"));
+    try std.testing.expect(hasToken(tokens, "SQE"));
+}
+
+// ── Jison sequence lexer tests (inputs derived from mermaid documentation) ────
+
+const seq_src = @embedFile("../grammars/sequenceDiagram.jison");
+
+test "jison seq lex: diagram header" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), seq_src, "sequenceDiagram\n");
+    try std.testing.expect(tokens.len > 0);
+    try std.testing.expect(hasToken(tokens, "SD"));
+}
+
+test "jison seq lex: basic message" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    // Alice->>Bob: Hello  →  SD, ACTOR(Alice), SOLID_ARROW, ACTOR(Bob), TXT(Hello)
+    const tokens = try testLexDiagram(arena.allocator(), seq_src,
+        \\sequenceDiagram
+        \\Alice->>Bob: Hello
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "SD"));
+    try std.testing.expect(hasToken(tokens, "SOLID_ARROW"));
+}
+
+test "jison seq lex: participant declaration" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), seq_src,
+        \\sequenceDiagram
+        \\participant Alice
+        \\Alice->>Bob: hi
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "SD"));
+    try std.testing.expect(hasToken(tokens, "participant"));
+    try std.testing.expect(hasToken(tokens, "SOLID_ARROW"));
+}
+
+test "jison seq lex: loop block" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), seq_src,
+        \\sequenceDiagram
+        \\Alice->>Bob: hi
+        \\loop every minute
+        \\  Bob-->>Alice: ok
+        \\end
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "SD"));
+    try std.testing.expect(hasToken(tokens, "loop"));
+    try std.testing.expect(hasToken(tokens, "DOTTED_ARROW"));
+    try std.testing.expect(hasToken(tokens, "end"));
+}
