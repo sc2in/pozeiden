@@ -19,22 +19,28 @@ pub const RuntimeError = error{
 /// Convert a JS-style regex (from Langium grammar) to a format mvzr can compile.
 /// Strips lookaheads, converts non-capturing groups, handles \u escapes.
 pub fn jsToMvzr(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
-    var buf = std.ArrayList(u8).init(allocator);
+    var buf: std.ArrayList(u8) = .empty;
     var i: usize = 0;
     while (i < pattern.len) {
         if (i + 2 < pattern.len and pattern[i] == '(' and pattern[i + 1] == '?') {
             switch (pattern[i + 2]) {
                 ':' => {
                     // Non-capturing group (?:...) → (...)
-                    try buf.append('(');
+                    try buf.append(allocator, '(');
                     i += 3;
                 },
                 '=', '!' => {
                     // Lookahead — skip the entire (?...) group
                     i = skipParenGroup(pattern, i);
+                    // Also skip any quantifier following the removed lookahead
+                    if (i < pattern.len) switch (pattern[i]) {
+                        '*', '+', '?' => i += 1,
+                        '{' => { while (i < pattern.len and pattern[i] != '}') i += 1; if (i < pattern.len) i += 1; },
+                        else => {},
+                    };
                 },
                 else => {
-                    try buf.append(pattern[i]);
+                    try buf.append(allocator, pattern[i]);
                     i += 1;
                 },
             }
@@ -46,14 +52,14 @@ pub fn jsToMvzr(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
             i + 3 < pattern.len and pattern[i + 3] == ']')
         {
             // [\S\s] → .* (any char including newline workaround)
-            try buf.appendSlice("(.|\\n)");
+            try buf.appendSlice(allocator, "(.|\\n)");
             i += 4;
         } else {
-            try buf.append(pattern[i]);
+            try buf.append(allocator, pattern[i]);
             i += 1;
         }
     }
-    return buf.toOwnedSlice();
+    return buf.toOwnedSlice(allocator);
 }
 
 fn skipParenGroup(pattern: []const u8, start: usize) usize {
@@ -125,16 +131,15 @@ fn compileTerminal(arena: std.mem.Allocator, term: ast.Terminal) !CompiledTermin
         },
         .alternatives => |refs| {
             // Build list of referenced names
-            var names = std.ArrayList([]const u8).init(arena);
+            var names: std.ArrayList([]const u8) = .empty;
             for (refs) |ref| {
                 switch (ref) {
-                    .name => |n| try names.append(n),
+                    .name => |n| try names.append(arena, n),
                     .literal => |lit| {
                         // Compile literal as exact match regex
                         const escaped = try escapeLiteralForRegex(arena, lit);
                         const anchored = try std.fmt.allocPrint(arena, "^{s}", .{escaped});
-                        try names.append(anchored); // marker: anchored literal
-                        _ = escaped;
+                        try names.append(arena, anchored); // marker: anchored literal
                     },
                 }
             }
@@ -142,22 +147,22 @@ fn compileTerminal(arena: std.mem.Allocator, term: ast.Terminal) !CompiledTermin
                 .name = term.name,
                 .hidden = term.hidden,
                 .regex = null,
-                .composed = try names.toOwnedSlice(),
+                .composed = try names.toOwnedSlice(arena),
             };
         },
     }
 }
 
 fn escapeLiteralForRegex(arena: std.mem.Allocator, lit: []const u8) ![]const u8 {
-    var buf = std.ArrayList(u8).init(arena);
+    var buf: std.ArrayList(u8) = .empty;
     const special = "^$.|?*+()[]{}\\";
     for (lit) |c| {
         if (std.mem.indexOfScalar(u8, special, c) != null) {
-            try buf.append('\\');
+            try buf.append(arena, '\\');
         }
-        try buf.append(c);
+        try buf.append(arena, c);
     }
-    return buf.toOwnedSlice();
+    return buf.toOwnedSlice(arena);
 }
 
 // ── Token ─────────────────────────────────────────────────────────────────────
@@ -185,7 +190,7 @@ const ParseCtx = struct {
         // Try all compiled terminals; pick the longest non-hidden match.
         // Hidden terminals are consumed but not returned.
         for (self.runtime.compiled) |ct| {
-            if (self.matchTerminal(ct, self.pos)) |text| {
+            if (self.matchTerminalAt(ct, self.pos)) |text| {
                 if (ct.hidden) {
                     // Skip hidden token and recurse
                     self.pos += text.len;
@@ -206,7 +211,7 @@ const ParseCtx = struct {
     }
 
     /// Check if the terminal matches at `pos`. Returns matched slice or null.
-    fn matchTerminal(self: *ParseCtx, ct: CompiledTerminal, pos: usize) ?[]const u8 {
+    fn matchTerminalAt(self: *ParseCtx, ct: CompiledTerminal, pos: usize) ?[]const u8 {
         if (pos >= self.input.len) {
             // Check for EOF terminal
             if (std.mem.eql(u8, ct.name, "EOF")) return "";
@@ -232,7 +237,7 @@ const ParseCtx = struct {
             // Look up the referenced terminal
             for (self.runtime.compiled) |other| {
                 if (std.mem.eql(u8, other.name, ref_name)) {
-                    if (self.matchTerminal(other, pos)) |text| return text;
+                    if (self.matchTerminalAt(other, pos)) |text| return text;
                     break;
                 }
             }
@@ -242,7 +247,7 @@ const ParseCtx = struct {
 
     // ── Rule parsing ───────────────────────────────────────────────────
 
-    fn parseRule(self: *ParseCtx, rule: *const ast.Rule) !?Value {
+    fn parseRule(self: *ParseCtx, rule: *const ast.Rule) std.mem.Allocator.Error!?Value {
         var node = Value.Node{
             .type_name = rule.name,
             .fields = .{},
@@ -292,7 +297,7 @@ const ParseCtx = struct {
         }
     }
 
-    fn parseGrouped(self: *ParseCtx, inner: *const ast.Expr, card: ast.Cardinality, node: *Value.Node) !bool {
+    fn parseGrouped(self: *ParseCtx, inner: *const ast.Expr, card: ast.Cardinality, node: *Value.Node) std.mem.Allocator.Error!bool {
         switch (card) {
             .once => return self.parseExpr(inner, node),
             .optional => {
@@ -334,7 +339,7 @@ const ParseCtx = struct {
         return true;
     }
 
-    fn matchRef(self: *ParseCtx, name: []const u8, _result_field: ?*Value, node: *Value.Node) !bool {
+    fn matchRef(self: *ParseCtx, name: []const u8, _result_field: ?*Value, node: *Value.Node) std.mem.Allocator.Error!bool {
         _ = _result_field;
         self.skipHidden();
         // Try parser rule first
@@ -344,6 +349,13 @@ const ParseCtx = struct {
                 // Merge fragment fields into node, or store as sub-node
                 switch (child_val) {
                     .node => |cn| {
+                        // Propagate child type_name (e.g. Statement→Commit keeps "Commit" type).
+                        // Do NOT propagate when the child rule has a scalar returns_type
+                        // (e.g. EOL returns string) or is a fragment, as those aren't type
+                        // delegation.
+                        if (cn.type_name.len > 0 and !rule.is_fragment and rule.returns_type == null) {
+                            node.type_name = cn.type_name;
+                        }
                         var it = cn.fields.iterator();
                         while (it.next()) |entry| {
                             try node.fields.put(self.runtime.arena, entry.key_ptr.*, entry.value_ptr.*);
@@ -399,38 +411,8 @@ const ParseCtx = struct {
         return null;
     }
 
-    fn matchTerminalAt(self: *ParseCtx, ct: CompiledTerminal, pos: usize) ?[]const u8 {
-        return self.matchTerminalCtx(ct, pos);
-    }
 
-    fn matchTerminalCtx(self: *ParseCtx, ct: CompiledTerminal, pos: usize) ?[]const u8 {
-        if (pos >= self.input.len) return null;
-        const sub = self.input[pos..];
-        if (ct.regex) |*re| {
-            const m = re.match(sub) orelse return null;
-            if (m.start != 0) return null;
-            return m.slice;
-        }
-        for (ct.composed) |ref_name| {
-            if (ref_name.len > 0 and ref_name[0] == '^') {
-                if (Regex.compile(ref_name)) |*re| {
-                    const m = re.match(sub) orelse continue;
-                    if (m.start != 0) continue;
-                    return m.slice;
-                }
-                continue;
-            }
-            for (self.runtime.compiled) |other| {
-                if (std.mem.eql(u8, other.name, ref_name)) {
-                    if (self.matchTerminalCtx(other, pos)) |text| return text;
-                    break;
-                }
-            }
-        }
-        return null;
-    }
-
-    fn parseAssign(self: *ParseCtx, a: ast.Expr.Assign, node: *Value.Node) !bool {
+    fn parseAssign(self: *ParseCtx, a: ast.Expr.Assign, node: *Value.Node) std.mem.Allocator.Error!bool {
         self.skipHidden();
         switch (a.cardinality) {
             .once => {
@@ -479,11 +461,11 @@ const ParseCtx = struct {
                 return true;
             },
             .zero_or_more, .one_or_more => {
-                var list = std.ArrayList(Value).init(self.runtime.arena);
+                var list: std.ArrayList(Value) = .empty;
                 if (node.fields.get(a.field)) |ex| {
                     switch (ex) {
-                        .list => |l| try list.appendSlice(l),
-                        else => try list.append(ex),
+                        .list => |l| try list.appendSlice(self.runtime.arena, l),
+                        else => try list.append(self.runtime.arena, ex),
                     }
                 }
                 const min: usize = if (a.cardinality == .one_or_more) 1 else 0;
@@ -491,7 +473,7 @@ const ParseCtx = struct {
                 while (true) {
                     const saved = self.pos;
                     if (try self.evalExprValue(a.inner)) |val| {
-                        try list.append(val);
+                        try list.append(self.runtime.arena, val);
                         count += 1;
                     } else {
                         self.pos = saved;
@@ -499,14 +481,14 @@ const ParseCtx = struct {
                     }
                 }
                 if (count < min) return false;
-                try node.fields.put(self.runtime.arena, a.field, Value{ .list = try list.toOwnedSlice() });
+                try node.fields.put(self.runtime.arena, a.field, Value{ .list = try list.toOwnedSlice(self.runtime.arena) });
                 return true;
             },
         }
     }
 
     /// Evaluate an expression and return the matched value (string for terminals, node for rules).
-    fn evalExprValue(self: *ParseCtx, expr: *const ast.Expr) !?Value {
+    fn evalExprValue(self: *ParseCtx, expr: *const ast.Expr) std.mem.Allocator.Error!?Value {
         self.skipHidden();
         switch (expr.*) {
             .keyword => |kw| {
@@ -523,10 +505,6 @@ const ParseCtx = struct {
                 if (self.matchTerminal(name)) |text| {
                     return Value{ .string = text };
                 }
-                return null;
-            },
-            .string_lit => |s| {
-                if (self.matchKeyword(s)) return Value{ .string = s };
                 return null;
             },
             .alternative => |alts| {
@@ -562,7 +540,7 @@ const ParseCtx = struct {
         }
     }
 
-    fn evalGroupedValue(self: *ParseCtx, inner: *const ast.Expr, card: ast.Cardinality) !?Value {
+    fn evalGroupedValue(self: *ParseCtx, inner: *const ast.Expr, card: ast.Cardinality) std.mem.Allocator.Error!?Value {
         switch (card) {
             .once => return self.evalExprValue(inner),
             .optional => {
@@ -572,18 +550,18 @@ const ParseCtx = struct {
                 return v orelse Value{ .null = {} };
             },
             .zero_or_more, .one_or_more => {
-                var list = std.ArrayList(Value).init(self.runtime.arena);
+                var list: std.ArrayList(Value) = .empty;
                 while (true) {
                     const saved = self.pos;
                     if (try self.evalExprValue(inner)) |v| {
-                        try list.append(v);
+                        try list.append(self.runtime.arena, v);
                     } else {
                         self.pos = saved;
                         break;
                     }
                 }
                 if (card == .one_or_more and list.items.len == 0) return null;
-                return Value{ .list = try list.toOwnedSlice() };
+                return Value{ .list = try list.toOwnedSlice(self.runtime.arena) };
             },
         }
     }
@@ -593,7 +571,7 @@ const ParseCtx = struct {
             var matched = false;
             for (self.runtime.compiled) |ct| {
                 if (!ct.hidden) continue;
-                if (self.matchTerminalCtx(ct, self.pos)) |text| {
+                if (self.matchTerminalAt(ct, self.pos)) |text| {
                     if (text.len > 0) {
                         self.pos += text.len;
                         matched = true;

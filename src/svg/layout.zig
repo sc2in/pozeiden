@@ -94,11 +94,11 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
     defer allocator.free(layers);
     @memset(layers, 0);
 
-    var queue = std.ArrayList(usize).init(allocator);
-    defer queue.deinit();
+    var queue: std.ArrayList(usize) = .empty;
+    defer queue.deinit(allocator);
 
     for (in_degree, 0..) |d, i| {
-        if (d == 0) try queue.append(i);
+        if (d == 0) try queue.append(allocator, i);
     }
 
     var head: usize = 0;
@@ -117,7 +117,7 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
                 if (layers[to_idx] > max_layer) max_layer = layers[to_idx];
             }
             in_degree[to_idx] -= 1;
-            if (in_degree[to_idx] == 0) try queue.append(to_idx);
+            if (in_degree[to_idx] == 0) try queue.append(allocator, to_idx);
         }
     }
 

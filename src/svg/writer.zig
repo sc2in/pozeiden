@@ -3,44 +3,45 @@ const std = @import("std");
 
 pub const SvgWriter = struct {
     buf: std.ArrayList(u8),
+    allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) SvgWriter {
-        return .{ .buf = std.ArrayList(u8).init(allocator) };
+        return .{ .buf = .empty, .allocator = allocator };
     }
 
     pub fn deinit(self: *SvgWriter) void {
-        self.buf.deinit();
+        self.buf.deinit(self.allocator);
     }
 
     pub fn toOwnedSlice(self: *SvgWriter) ![]u8 {
-        return self.buf.toOwnedSlice();
+        return self.buf.toOwnedSlice(self.allocator);
     }
 
     pub fn header(self: *SvgWriter, width: u32, height: u32) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{d}\" height=\"{d}\" viewBox=\"0 0 {d} {d}\">\n",
             .{ width, height, width, height },
         );
     }
 
     pub fn footer(self: *SvgWriter) !void {
-        try self.buf.writer().writeAll("</svg>\n");
+        try self.buf.writer(self.allocator).writeAll("</svg>\n");
     }
 
     pub fn openGroup(self: *SvgWriter, attrs: []const u8) !void {
         if (attrs.len > 0) {
-            try self.buf.writer().print("<g {s}>\n", .{attrs});
+            try self.buf.writer(self.allocator).print("<g {s}>\n", .{attrs});
         } else {
-            try self.buf.writer().writeAll("<g>\n");
+            try self.buf.writer(self.allocator).writeAll("<g>\n");
         }
     }
 
     pub fn closeGroup(self: *SvgWriter) !void {
-        try self.buf.writer().writeAll("</g>\n");
+        try self.buf.writer(self.allocator).writeAll("</g>\n");
     }
 
     pub fn defs(self: *SvgWriter, content: []const u8) !void {
-        try self.buf.writer().print("<defs>\n{s}</defs>\n", .{content});
+        try self.buf.writer(self.allocator).print("<defs>\n{s}</defs>\n", .{content});
     }
 
     pub fn rect(
@@ -54,7 +55,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" rx=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ x, y, width, height, rx, fill, stroke, stroke_width },
         );
@@ -69,7 +70,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<circle cx=\"{d:.2}\" cy=\"{d:.2}\" r=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ cx, cy, r, fill, stroke, stroke_width },
         );
@@ -84,7 +85,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ x1, y1, x2, y2, stroke, stroke_width },
         );
@@ -99,12 +100,12 @@ pub const SvgWriter = struct {
         extra_attrs: []const u8,
     ) !void {
         if (extra_attrs.len > 0) {
-            try self.buf.writer().print(
+            try self.buf.writer(self.allocator).print(
                 "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" {s}/>\n",
                 .{ d, fill, stroke, stroke_width, extra_attrs },
             );
         } else {
-            try self.buf.writer().print(
+            try self.buf.writer(self.allocator).print(
                 "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
                 .{ d, fill, stroke, stroke_width },
             );
@@ -128,12 +129,12 @@ pub const SvgWriter = struct {
             .middle => "middle",
             .end => "end",
         };
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<text x=\"{d:.2}\" y=\"{d:.2}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
             .{ x, y, fill, font_size, anchor_str, font_weight },
         );
-        try xmlEscape(self.buf.writer(), content);
-        try self.buf.writer().writeAll("</text>\n");
+        try xmlEscape(self.buf.writer(self.allocator), content);
+        try self.buf.writer(self.allocator).writeAll("</text>\n");
     }
 
     pub fn polygon(
@@ -143,7 +144,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<polygon points=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ points, fill, stroke, stroke_width },
         );
@@ -159,14 +160,14 @@ pub const SvgWriter = struct {
         stroke_width: f32,
         dasharray: []const u8,
     ) !void {
-        try self.buf.writer().print(
+        try self.buf.writer(self.allocator).print(
             "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" stroke-dasharray=\"{s}\"/>\n",
             .{ x1, y1, x2, y2, stroke, stroke_width, dasharray },
         );
     }
 
     pub fn raw(self: *SvgWriter, fragment: []const u8) !void {
-        try self.buf.writer().writeAll(fragment);
+        try self.buf.writer(self.allocator).writeAll(fragment);
     }
 };
 

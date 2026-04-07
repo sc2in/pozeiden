@@ -16,23 +16,31 @@ pub const RuntimeError = error{
 // ── Regex preprocessing (same as Langium runtime) ─────────────────────────────
 
 fn jsToMvzr(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
-    var buf = std.ArrayList(u8).init(allocator);
+    var buf: std.ArrayList(u8) = .empty;
     var i: usize = 0;
     while (i < pattern.len) {
         if (i + 2 < pattern.len and pattern[i] == '(' and pattern[i + 1] == '?') {
             switch (pattern[i + 2]) {
-                ':' => { try buf.append('('); i += 3; },
-                '=', '!' => { i = skipParenGroup(pattern, i); },
-                else => { try buf.append(pattern[i]); i += 1; },
+                ':' => { try buf.append(allocator, '('); i += 3; },
+                '=', '!' => {
+                    i = skipParenGroup(pattern, i);
+                    // Skip any quantifier following the removed lookahead
+                    if (i < pattern.len) switch (pattern[i]) {
+                        '*', '+', '?' => i += 1,
+                        '{' => { while (i < pattern.len and pattern[i] != '}') i += 1; if (i < pattern.len) i += 1; },
+                        else => {},
+                    };
+                },
+                else => { try buf.append(allocator, pattern[i]); i += 1; },
             }
         } else if (i + 1 < pattern.len and pattern[i] == '\\' and pattern[i + 1] == 'u') {
             i += 6; // skip \uXXXX
         } else {
-            try buf.append(pattern[i]);
+            try buf.append(allocator, pattern[i]);
             i += 1;
         }
     }
-    return buf.toOwnedSlice();
+    return buf.toOwnedSlice(allocator);
 }
 
 fn skipParenGroup(pattern: []const u8, start: usize) usize {
@@ -80,10 +88,10 @@ pub const Runtime = struct {
 
     /// Lex the entire input into a token list, applying state transitions.
     pub fn lex(self: *Runtime, input: []const u8) RuntimeError![]Token {
-        var tokens = std.ArrayList(Token).init(self.arena);
+        var tokens: std.ArrayList(Token) = .empty;
         var pos: usize = 0;
-        var state_stack = std.ArrayList([]const u8).init(self.arena);
-        try state_stack.append("INITIAL");
+        var state_stack: std.ArrayList([]const u8) = .empty;
+        try state_stack.append(self.arena, "INITIAL");
 
         while (pos <= input.len) {
             // Skip whitespace (spaces/tabs — but NOT newlines, which may be tokens)
@@ -107,7 +115,7 @@ pub const Runtime = struct {
             }
 
             if (pos >= input.len) {
-                try tokens.append(Token{ .kind = "EOF", .text = "", .start = pos, .end = pos });
+                try tokens.append(self.arena, Token{ .kind = "EOF", .text = "", .start = pos, .end = pos });
                 break;
             }
 
@@ -131,11 +139,11 @@ pub const Runtime = struct {
                         .begin => {
                             if (tr.state) |s| {
                                 state_stack.clearRetainingCapacity();
-                                try state_stack.append(s);
+                                try state_stack.append(self.arena, s);
                             }
                         },
                         .push => {
-                            if (tr.state) |s| try state_stack.append(s);
+                            if (tr.state) |s| try state_stack.append(self.arena, s);
                         },
                         .pop => {
                             if (state_stack.items.len > 1) _ = state_stack.pop();
@@ -145,7 +153,7 @@ pub const Runtime = struct {
 
                 // Emit token if rule has one
                 if (rule.token) |tok| {
-                    try tokens.append(Token{
+                    try tokens.append(self.arena, Token{
                         .kind = tok,
                         .text = text,
                         .start = pos,
@@ -164,7 +172,7 @@ pub const Runtime = struct {
             }
         }
 
-        return tokens.toOwnedSlice();
+        return tokens.toOwnedSlice(self.arena);
     }
 
     /// Parse `tokens` using the grammar's BNF rules starting from `start_rule`.
@@ -186,8 +194,45 @@ pub const Runtime = struct {
     }
 };
 
+/// Expand Jison's "literal" quoting: "text" → escaped regex for text.
+/// In Jison lex rules, a "quoted" portion is a literal match, not a regex.
+fn expandJisonLiterals(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
+    var buf: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    var in_bracket: bool = false;
+    while (i < pattern.len) {
+        const c = pattern[i];
+        // Track character classes to avoid treating " inside [...] as a quote
+        if (c == '\\' and i + 1 < pattern.len) {
+            try buf.append(allocator, c);
+            try buf.append(allocator, pattern[i + 1]);
+            i += 2;
+            continue;
+        }
+        if (c == '[' and !in_bracket) { in_bracket = true; try buf.append(allocator, c); i += 1; continue; }
+        if (c == ']' and in_bracket) { in_bracket = false; try buf.append(allocator, c); i += 1; continue; }
+        if (c == '"' and !in_bracket) {
+            // Quoted literal: expand content with regex escaping
+            i += 1;
+            while (i < pattern.len and pattern[i] != '"') {
+                const lc = pattern[i];
+                const special = "^$.|?*+()[]{}\\";
+                if (std.mem.indexOfScalar(u8, special, lc) != null) try buf.append(allocator, '\\');
+                try buf.append(allocator, lc);
+                i += 1;
+            }
+            if (i < pattern.len) i += 1; // skip closing "
+        } else {
+            try buf.append(allocator, c);
+            i += 1;
+        }
+    }
+    return buf.toOwnedSlice(allocator);
+}
+
 fn compileLexRule(arena: std.mem.Allocator, rule: *const ast.LexRule) !CompiledLexRule {
-    const anchored = try std.fmt.allocPrint(arena, "^{s}", .{rule.pattern});
+    const unquoted = try expandJisonLiterals(arena, rule.pattern);
+    const anchored = try std.fmt.allocPrint(arena, "^{s}", .{unquoted});
     const pat = try jsToMvzr(arena, anchored);
     const regex = Regex.compile(pat);
     return CompiledLexRule{ .source = rule, .regex = regex };
@@ -233,7 +278,7 @@ const ParseCtx = struct {
         return null;
     }
 
-    fn parseRule(self: *ParseCtx, rule: *const ast.BnfRule) !?Value {
+    fn parseRule(self: *ParseCtx, rule: *const ast.BnfRule) std.mem.Allocator.Error!?Value {
         var node = Value.Node{
             .type_name = rule.name,
             .fields = .{},
@@ -248,7 +293,7 @@ const ParseCtx = struct {
         return null;
     }
 
-    fn parseAlternative(self: *ParseCtx, alt: ast.Alternative, node: *Value.Node) !bool {
+    fn parseAlternative(self: *ParseCtx, alt: ast.Alternative, node: *Value.Node) std.mem.Allocator.Error!bool {
         if (alt.symbols.len == 0) return true; // empty production
 
         for (alt.symbols) |sym| {
@@ -261,7 +306,7 @@ const ParseCtx = struct {
         return true;
     }
 
-    fn parseSym(self: *ParseCtx, sym: []const u8, node: *Value.Node) !bool {
+    fn parseSym(self: *ParseCtx, sym: []const u8, node: *Value.Node) std.mem.Allocator.Error!bool {
         // Quoted string = literal token match
         if (sym.len >= 2 and (sym[0] == '\'' or sym[0] == '"')) {
             const inner = sym[1 .. sym.len - 1];

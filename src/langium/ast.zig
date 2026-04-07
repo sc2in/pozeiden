@@ -104,12 +104,12 @@ pub const MergedGrammar = struct {
 
     /// All terminals in priority order: primary own terminals, then imports.
     pub fn allTerminals(self: MergedGrammar, arena: std.mem.Allocator) ![]Terminal {
-        var list = std.ArrayList(Terminal).init(arena);
-        for (self.primary.terminals) |t| try list.append(t);
+        var list: std.ArrayList(Terminal) = .empty;
+        for (self.primary.terminals) |t| try list.append(arena, t);
         for (self.imports) |imp| {
-            for (imp.terminals) |t| try list.append(t);
+            for (imp.terminals) |t| try list.append(arena, t);
         }
-        return list.toOwnedSlice();
+        return list.toOwnedSlice(arena);
     }
 
     pub fn findRule(self: MergedGrammar, name: []const u8) ?*const Rule {

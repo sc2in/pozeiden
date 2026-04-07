@@ -18,21 +18,21 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 
     // Collect actors in order of first appearance
-    var actors = std.ArrayList([]const u8).init(allocator);
-    defer actors.deinit();
-    var messages = std.ArrayList(Message).init(allocator);
-    defer messages.deinit();
-    var blocks = std.ArrayList(Block).init(allocator);
-    defer blocks.deinit();
+    var actors: std.ArrayList([]const u8) = .empty;
+    defer actors.deinit(allocator);
+    var messages: std.ArrayList(Message) = .empty;
+    defer messages.deinit(allocator);
+    var blocks: std.ArrayList(Block) = .empty;
+    defer blocks.deinit(allocator);
 
     // Parse participants
     const parts = node.getList("participants");
     for (parts) |pv| {
         if (pv.asNode()) |pn| {
             const name = pn.getString("actor") orelse continue;
-            if (!hasActor(actors.items, name)) try actors.append(name);
+            if (!hasActor(actors.items, name)) try actors.append(allocator, name);
         } else if (pv.asString()) |s| {
-            if (!hasActor(actors.items, s)) try actors.append(s);
+            if (!hasActor(actors.items, s)) try actors.append(allocator, s);
         }
     }
 
@@ -46,9 +46,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const to = sn.getString("to") orelse continue;
             const text = sn.getString("msg") orelse "";
             const signal_type = sn.getString("signalType") orelse "0";
-            if (!hasActor(actors.items, from)) try actors.append(from);
-            if (!hasActor(actors.items, to)) try actors.append(to);
-            try messages.append(Message{
+            if (!hasActor(actors.items, from)) try actors.append(allocator, from);
+            if (!hasActor(actors.items, to)) try actors.append(allocator, to);
+            try messages.append(allocator, Message{
                 .from = from,
                 .to = to,
                 .text = text,
@@ -57,7 +57,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             });
         } else if (std.mem.eql(u8, msg_type, "loopStart")) {
             const lbl = sn.getString("loopText") orelse "";
-            try blocks.append(Block{ .kind = .loop, .label = lbl, .start_row = messages.items.len });
+            try blocks.append(allocator, Block{ .kind = .loop, .label = lbl, .start_row = messages.items.len });
         } else if (std.mem.eql(u8, msg_type, "loopEnd")) {
             for (blocks.items) |*b| {
                 if (b.kind == .loop and b.end_row == null) {
@@ -67,7 +67,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             }
         } else if (std.mem.eql(u8, msg_type, "altStart")) {
             const lbl = sn.getString("altText") orelse "";
-            try blocks.append(Block{ .kind = .alt, .label = lbl, .start_row = messages.items.len });
+            try blocks.append(allocator, Block{ .kind = .alt, .label = lbl, .start_row = messages.items.len });
         } else if (std.mem.eql(u8, msg_type, "altEnd")) {
             for (blocks.items) |*b| {
                 if (b.kind == .alt and b.end_row == null) {

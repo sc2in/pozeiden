@@ -21,9 +21,9 @@ const JisonParser = struct {
     }
 
     fn parse(self: *JisonParser) ParseError!ast.JisonGrammar {
-        var states = std.ArrayList([]const u8).init(self.arena);
-        var lex_rules = std.ArrayList(ast.LexRule).init(self.arena);
-        var bnf_rules = std.ArrayList(ast.BnfRule).init(self.arena);
+        var states: std.ArrayList([]const u8) = .empty;
+        var lex_rules: std.ArrayList(ast.LexRule) = .empty;
+        var bnf_rules: std.ArrayList(ast.BnfRule) = .empty;
         var start_rule: []const u8 = "start";
 
         // 1. Find %lex...%% section
@@ -58,8 +58,8 @@ const JisonParser = struct {
 
         // 3. Find the BNF section: last %% in file
         const grammar_sep = findLastStr(self.src, "%%") orelse return ast.JisonGrammar{
-            .states = try states.toOwnedSlice(),
-            .lex_rules = try lex_rules.toOwnedSlice(),
+            .states = try states.toOwnedSlice(self.arena),
+            .lex_rules = try lex_rules.toOwnedSlice(self.arena),
             .bnf_rules = &.{},
             .start_rule = start_rule,
         };
@@ -69,9 +69,9 @@ const JisonParser = struct {
         try self.parseBnfRules(bnf_body[0..bnf_end], &bnf_rules);
 
         return ast.JisonGrammar{
-            .states = try states.toOwnedSlice(),
-            .lex_rules = try lex_rules.toOwnedSlice(),
-            .bnf_rules = try bnf_rules.toOwnedSlice(),
+            .states = try states.toOwnedSlice(self.arena),
+            .lex_rules = try lex_rules.toOwnedSlice(self.arena),
+            .bnf_rules = try bnf_rules.toOwnedSlice(self.arena),
             .start_rule = start_rule,
         };
     }
@@ -87,7 +87,7 @@ const JisonParser = struct {
                 if (header[i] == ' ' or header[i] == '\t') continue;
                 const start = i;
                 while (i < header.len and header[i] != ' ' and header[i] != '\t' and header[i] != '\n') i += 1;
-                if (i > start) try states.append(header[start..i]);
+                if (i > start) try states.append(self.arena, header[start..i]);
             }
         }
     }
@@ -132,14 +132,14 @@ const JisonParser = struct {
             const token = extractReturnToken(action);
 
             // Extract state transitions
-            var transitions = std.ArrayList(ast.Transition).init(self.arena);
-            try extractTransitions(action, &transitions);
+            var transitions: std.ArrayList(ast.Transition) = .empty;
+            try extractTransitions(self.arena, action, &transitions);
 
-            try rules.append(ast.LexRule{
+            try rules.append(self.arena, ast.LexRule{
                 .state = rule_state,
                 .pattern = pattern,
                 .token = token,
-                .transitions = try transitions.toOwnedSlice(),
+                .transitions = try transitions.toOwnedSlice(self.arena),
             });
         }
     }
@@ -164,8 +164,8 @@ const JisonParser = struct {
             i += 1; // consume ':'
 
             // Collect alternatives until ';' or next top-level rule
-            var alts = std.ArrayList(ast.Alternative).init(self.arena);
-            var current_alt = std.ArrayList([]const u8).init(self.arena);
+            var alts: std.ArrayList(ast.Alternative) = .empty;
+            var current_alt: std.ArrayList([]const u8) = .empty;
 
             while (i < body.len) {
                 while (i < body.len and isWs(body[i]) and body[i] != '\n') i += 1;
@@ -181,10 +181,10 @@ const JisonParser = struct {
                 // Alternative separator
                 if (body[i] == '|') {
                     if (current_alt.items.len > 0 or true) {
-                        try alts.append(ast.Alternative{
-                            .symbols = try current_alt.toOwnedSlice(),
+                        try alts.append(self.arena, ast.Alternative{
+                            .symbols = try current_alt.toOwnedSlice(self.arena),
                         });
-                        current_alt = std.ArrayList([]const u8).init(self.arena);
+                        current_alt = .empty;
                     }
                     i += 1;
                     continue;
@@ -219,18 +219,18 @@ const JisonParser = struct {
                 }
                 const sym = std.mem.trim(u8, body[sym_start..i], " \t\r\n");
                 if (sym.len > 0 and !std.mem.eql(u8, sym, "/*") and !std.mem.eql(u8, sym, "//")) {
-                    try current_alt.append(sym);
+                    try current_alt.append(self.arena, sym);
                 }
             }
 
             if (current_alt.items.len > 0) {
-                try alts.append(ast.Alternative{ .symbols = try current_alt.toOwnedSlice() });
+                try alts.append(self.arena, ast.Alternative{ .symbols = try current_alt.toOwnedSlice(self.arena) });
             }
 
             if (alts.items.len > 0) {
-                try rules.append(ast.BnfRule{
+                try rules.append(self.arena, ast.BnfRule{
                     .name = rule_name,
-                    .alternatives = try alts.toOwnedSlice(),
+                    .alternatives = try alts.toOwnedSlice(self.arena),
                 });
             }
         }
@@ -267,6 +267,16 @@ fn extractPattern(line: []const u8) struct { []const u8, []const u8 } {
     while (i < line.len) {
         const c = line[i];
         if (c == '\\' and i + 1 < line.len) { i += 2; continue; }
+        // Jison quoted literal: "..." — skip without depth tracking
+        if (c == '"' and depth_bracket == 0) {
+            i += 1;
+            while (i < line.len and line[i] != '"') {
+                if (line[i] == '\\' and i + 1 < line.len) i += 1;
+                i += 1;
+            }
+            if (i < line.len) i += 1; // skip closing "
+            continue;
+        }
         if (c == '[') depth_bracket += 1;
         if (c == ']' and depth_bracket > 0) depth_bracket -= 1;
         if (c == '(' and depth_bracket == 0) depth_paren += 1;
@@ -296,7 +306,7 @@ fn extractReturnToken(action: []const u8) ?[]const u8 {
 }
 
 /// Extract state transitions: this.begin/pushState/popState.
-fn extractTransitions(action: []const u8, list: *std.ArrayList(ast.Transition)) !void {
+fn extractTransitions(allocator: std.mem.Allocator, action: []const u8, list: *std.ArrayList(ast.Transition)) !void {
     var i: usize = 0;
     while (i < action.len) {
         if (std.mem.indexOf(u8, action[i..], "this.begin(")) |off| {
@@ -306,7 +316,7 @@ fn extractTransitions(action: []const u8, list: *std.ArrayList(ast.Transition)) 
                 const start = p + 1;
                 var end = start;
                 while (end < action.len and action[end] != q) end += 1;
-                try list.append(ast.Transition{ .kind = .begin, .state = action[start..end] });
+                try list.append(allocator, ast.Transition{ .kind = .begin, .state = action[start..end] });
                 i = p;
             } else { i += off + 1; }
         } else if (std.mem.indexOf(u8, action[i..], "this.pushState(")) |off| {
@@ -316,11 +326,11 @@ fn extractTransitions(action: []const u8, list: *std.ArrayList(ast.Transition)) 
                 const start = p + 1;
                 var end = start;
                 while (end < action.len and action[end] != q) end += 1;
-                try list.append(ast.Transition{ .kind = .push, .state = action[start..end] });
+                try list.append(allocator, ast.Transition{ .kind = .push, .state = action[start..end] });
                 i = p;
             } else { i += off + 1; }
         } else if (std.mem.indexOf(u8, action[i..], "this.popState(")) |off| {
-            try list.append(ast.Transition{ .kind = .pop, .state = null });
+            try list.append(allocator, ast.Transition{ .kind = .pop, .state = null });
             i += off + 14;
         } else {
             break;
@@ -346,7 +356,7 @@ fn skipBraceBlock(src: []const u8, start: usize) usize {
 }
 
 test "parse flow.jison" {
-    const src = @embedFile("../../grammars/flow.jison");
+    const src = @embedFile("../grammars/flow.jison");
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const g = try parse(arena.allocator(), src);

@@ -202,9 +202,9 @@ const Parser = struct {
     // ── Grammar-level parsing ──────────────────────────────────────────
 
     fn parseGrammar(self: *Parser) ParseError!ast.Grammar {
-        var imports = std.ArrayList([]const u8).init(self.arena);
-        var rules = std.ArrayList(ast.Rule).init(self.arena);
-        var terminals = std.ArrayList(ast.Terminal).init(self.arena);
+        var imports: std.ArrayList([]const u8) = .empty;
+        var rules: std.ArrayList(ast.Rule) = .empty;
+        var terminals: std.ArrayList(ast.Terminal) = .empty;
 
         // Optionally consume "grammar Name"
         var name: []const u8 = "unnamed";
@@ -224,7 +224,7 @@ const Parser = struct {
                     const path_tok = try self.expect(.string_lit);
                     // Strip quotes
                     const raw = path_tok.text[1 .. path_tok.text.len - 1];
-                    try imports.append(raw);
+                    try imports.append(self.arena, raw);
                     _ = try self.tryConsume(.semicolon);
                 },
                 .kw_hidden => {
@@ -232,17 +232,17 @@ const Parser = struct {
                     const kw = try self.peek();
                     if (kw.kind == .kw_terminal) {
                         const term = try self.parseTerminal(true);
-                        try terminals.append(term);
+                        try terminals.append(self.arena, term);
                     }
                     // else ignore
                 },
                 .kw_terminal => {
                     const term = try self.parseTerminal(false);
-                    try terminals.append(term);
+                    try terminals.append(self.arena, term);
                 },
                 .kw_entry, .kw_fragment, .ident => {
                     const rule = try self.parseRule();
-                    try rules.append(rule);
+                    try rules.append(self.arena, rule);
                 },
                 else => {
                     _ = try self.consume(); // skip unknown tokens
@@ -252,9 +252,9 @@ const Parser = struct {
 
         return ast.Grammar{
             .name = name,
-            .imports = try imports.toOwnedSlice(),
-            .rules = try rules.toOwnedSlice(),
-            .terminals = try terminals.toOwnedSlice(),
+            .imports = try imports.toOwnedSlice(self.arena),
+            .rules = try rules.toOwnedSlice(self.arena),
+            .terminals = try terminals.toOwnedSlice(self.arena),
         };
     }
 
@@ -294,22 +294,22 @@ const Parser = struct {
             return ast.TerminalBody{ .regex = inner };
         }
         // Alternatives: Name | 'lit' | ...
-        var alts = std.ArrayList(ast.TerminalRef).init(self.arena);
+        var alts: std.ArrayList(ast.TerminalRef) = .empty;
         while (true) {
             const item = try self.peek();
             if (item.kind == .ident) {
                 _ = try self.consume();
-                try alts.append(ast.TerminalRef{ .name = item.text });
+                try alts.append(self.arena, ast.TerminalRef{ .name = item.text });
             } else if (item.kind == .string_lit) {
                 _ = try self.consume();
                 const inner = stripQuotes(item.text);
-                try alts.append(ast.TerminalRef{ .literal = inner });
+                try alts.append(self.arena, ast.TerminalRef{ .literal = inner });
             } else {
                 break;
             }
             if (try self.tryConsume(.pipe) == null) break;
         }
-        return ast.TerminalBody{ .alternatives = try alts.toOwnedSlice() };
+        return ast.TerminalBody{ .alternatives = try alts.toOwnedSlice(self.arena) };
     }
 
     fn parseRule(self: *Parser) ParseError!ast.Rule {
@@ -355,34 +355,34 @@ const Parser = struct {
     }
 
     fn parseAlternative(self: *Parser) ParseError!ast.Expr {
-        var items = std.ArrayList(ast.Expr).init(self.arena);
-        try items.append(try self.parseSequence());
+        var items: std.ArrayList(ast.Expr) = .empty;
+        try items.append(self.arena, try self.parseSequence());
 
         while (true) {
             const t = try self.peek();
             if (t.kind != .pipe) break;
             _ = try self.consume();
-            try items.append(try self.parseSequence());
+            try items.append(self.arena, try self.parseSequence());
         }
 
         if (items.items.len == 1) return items.items[0];
-        return ast.Expr{ .alternative = try items.toOwnedSlice() };
+        return ast.Expr{ .alternative = try items.toOwnedSlice(self.arena) };
     }
 
     fn parseSequence(self: *Parser) ParseError!ast.Expr {
-        var items = std.ArrayList(ast.Expr).init(self.arena);
+        var items: std.ArrayList(ast.Expr) = .empty;
 
         while (true) {
             const t = try self.peek();
             // Sequence ends at: | ) ; eof
             if (t.kind == .pipe or t.kind == .rparen or t.kind == .semicolon or t.kind == .eof) break;
             const atom = try self.parseAtomWithCard() orelse break;
-            try items.append(atom);
+            try items.append(self.arena, atom);
         }
 
         if (items.items.len == 0) return ast.Expr{ .sequence = &.{} };
         if (items.items.len == 1) return items.items[0];
-        return ast.Expr{ .sequence = try items.toOwnedSlice() };
+        return ast.Expr{ .sequence = try items.toOwnedSlice(self.arena) };
     }
 
     fn parseAtomWithCard(self: *Parser) ParseError!?ast.Expr {
@@ -485,7 +485,7 @@ fn stripQuotes(s: []const u8) []const u8 {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test "parse pie grammar" {
-    const src = @embedFile("../../grammars/pie.langium");
+    const src = @embedFile("../grammars/pie.langium");
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const g = try parse(arena.allocator(), src);
@@ -495,7 +495,7 @@ test "parse pie grammar" {
 }
 
 test "parse common grammar" {
-    const src = @embedFile("../../grammars/common.langium");
+    const src = @embedFile("../grammars/common.langium");
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const g = try parse(arena.allocator(), src);

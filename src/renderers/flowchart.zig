@@ -15,10 +15,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator, "flowchart");
 
     // Collect nodes
-    var graph_nodes = std.ArrayList(layout.GraphNode).init(allocator);
-    defer graph_nodes.deinit();
-    var graph_edges = std.ArrayList(layout.GraphEdge).init(allocator);
-    defer graph_edges.deinit();
+    var graph_nodes: std.ArrayList(layout.GraphNode) = .empty;
+    defer graph_nodes.deinit(allocator);
+    var graph_edges: std.ArrayList(layout.GraphEdge) = .empty;
+    defer graph_edges.deinit(allocator);
 
     const nodes_val = node.getList("nodes");
     for (nodes_val) |nv| {
@@ -27,7 +27,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const label = nn.getString("label") orelse id;
         const shape_str = nn.getString("shape") orelse "rect";
         const shape = parseShape(shape_str);
-        try graph_nodes.append(layout.GraphNode{
+        try graph_nodes.append(allocator, layout.GraphNode{
             .id = id,
             .label = label,
             .shape = shape,
@@ -42,7 +42,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const label = en.getString("label");
         const style_str = en.getString("style") orelse "solid";
         const style = parseEdgeStyle(style_str);
-        try graph_edges.append(layout.GraphEdge{
+        try graph_edges.append(allocator, layout.GraphEdge{
             .from = from,
             .to = to,
             .label = label,

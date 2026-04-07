@@ -30,6 +30,7 @@ pub const Value = union(enum) {
             const v = self.fields.get(key) orelse return null;
             return switch (v) {
                 .number => |n| n,
+                .string => |s| std.fmt.parseFloat(f64, std.mem.trim(u8, s, " \t\r\n")) catch null,
                 else => null,
             };
         }
@@ -61,6 +62,7 @@ pub const Value = union(enum) {
     pub fn asNumber(self: Value) ?f64 {
         return switch (self) {
             .number => |n| n,
+            .string => |s| std.fmt.parseFloat(f64, std.mem.trim(u8, s, " \t\r\n")) catch null,
             else => null,
         };
     }
