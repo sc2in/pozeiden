@@ -1,0 +1,9 @@
+.zig-cache/
+zig-out/
+*.o
+result/
+result
+.direnv/
+.claude/
+*.pdf
+*.typ
