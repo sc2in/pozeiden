@@ -101,22 +101,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // Background
     try svg.rect(0, 0, @floatFromInt(total_w), @floatFromInt(total_h), 0, theme.background, theme.background, 0);
 
-    // Draw actors at top and bottom
-    for (actors.items, 0..) |actor, i| {
-        const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
-        const ly_top = ACTOR_TOP_Y;
-        // Top actor box
-        try drawActorBox(&svg, lx, ly_top, actor);
-        // Vertical lifeline
-        const line_x = lx + ACTOR_W / 2;
-        const line_top = ly_top + ACTOR_H;
-        const line_bot = @as(f32, @floatFromInt(total_h)) - ACTOR_H - MARGIN_Y;
-        try svg.dashedLine(line_x, line_top, line_x, line_bot, theme.signal_color, 1.0, "4,4");
-        // Bottom actor box
-        try drawActorBox(&svg, lx, line_bot, actor);
-    }
-
-    // Draw loop/alt blocks
+    // 1. Loop/alt blocks first — behind everything
     for (blocks.items) |b| {
         const end = b.end_row orelse n_msgs;
         const by = FIRST_MSG_Y + @as(f32, @floatFromInt(b.start_row)) * ROW_H - 10;
@@ -130,7 +115,24 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.text(bx + 4, by + 14, kind_label, theme.text_color, theme.font_size_small, .start, "normal");
     }
 
-    // Draw messages
+    // 2. Lifelines — on top of blocks, behind actor boxes and messages
+    for (actors.items, 0..) |_, i| {
+        const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
+        const line_x = lx + ACTOR_W / 2;
+        const line_top = ACTOR_TOP_Y + ACTOR_H;
+        const line_bot = @as(f32, @floatFromInt(total_h)) - ACTOR_H - MARGIN_Y;
+        try svg.dashedLine(line_x, line_top, line_x, line_bot, theme.signal_color, 1.0, "4,4");
+    }
+
+    // 3. Actor boxes — on top of lifelines and blocks
+    for (actors.items, 0..) |actor, i| {
+        const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
+        const line_bot = @as(f32, @floatFromInt(total_h)) - ACTOR_H - MARGIN_Y;
+        try drawActorBox(&svg, lx, ACTOR_TOP_Y, actor);
+        try drawActorBox(&svg, lx, line_bot, actor);
+    }
+
+    // 4. Messages — topmost layer
     for (messages.items, 0..) |msg, mi| {
         const my = FIRST_MSG_Y + @as(f32, @floatFromInt(mi)) * ROW_H + ROW_H / 2;
 
@@ -140,32 +142,55 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const fx = MARGIN_X + @as(f32, @floatFromInt(from_idx)) * LANE_GAP + ACTOR_W / 2;
         const tx = MARGIN_X + @as(f32, @floatFromInt(to_idx)) * LANE_GAP + ACTOR_W / 2;
 
-        // Draw arrow line
-        if (msg.dotted) {
-            try svg.dashedLine(fx, my, tx, my, theme.signal_color, 1.5, "5,3");
+        if (from_idx == to_idx) {
+            // Self-message: right-bracket shape — out, down, back with arrowhead
+            const loop_w: f32 = 40;
+            const loop_h: f32 = ROW_H * 0.6;
+            const arr: f32 = 8.0;
+
+            try svg.line(fx, my, fx + loop_w, my, theme.signal_color, 1.5);
+            try svg.line(fx + loop_w, my, fx + loop_w, my + loop_h, theme.signal_color, 1.5);
+            if (msg.dotted) {
+                try svg.dashedLine(fx + loop_w, my + loop_h, fx, my + loop_h, theme.signal_color, 1.5, "5,3");
+            } else {
+                try svg.line(fx + loop_w, my + loop_h, fx, my + loop_h, theme.signal_color, 1.5);
+            }
+            // Arrowhead pointing left at return end
+            var pts_buf: [128]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ fx + arr, my + loop_h - arr / 2, fx, my + loop_h, fx + arr, my + loop_h + arr / 2 });
+            try svg.polygon(pts, theme.signal_color, theme.signal_color, 1.0);
+            // Label above outgoing segment
+            try svg.text(fx + loop_w / 2, my - 6, msg.text, theme.text_color, theme.font_size_small, .start, "normal");
         } else {
-            try svg.line(fx, my, tx, my, theme.signal_color, 1.5);
+            // Normal arrow between two different actors
+            if (msg.dotted) {
+                try svg.dashedLine(fx, my, tx, my, theme.signal_color, 1.5, "5,3");
+            } else {
+                try svg.line(fx, my, tx, my, theme.signal_color, 1.5);
+            }
+
+            // Arrowhead
+            const dir: f32 = if (tx > fx) 1.0 else -1.0;
+            const arr: f32 = 8.0;
+            var pts_buf: [128]u8 = undefined;
+            const pts = switch (msg.arrow_kind) {
+                .open => try std.fmt.bufPrint(&pts_buf,
+                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                    .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
+                .filled => try std.fmt.bufPrint(&pts_buf,
+                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                    .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
+                .cross => try std.fmt.bufPrint(&pts_buf,
+                    "{d:.1},{d:.1} {d:.1},{d:.1}",
+                    .{ tx - dir * arr, my - arr / 2, tx, my }),
+            };
+            try svg.polygon(pts, theme.signal_color, theme.signal_color, 1.0);
+
+            // Message text above arrow
+            try svg.text((fx + tx) / 2, my - 6, msg.text, theme.text_color, theme.font_size_small, .middle, "normal");
         }
-
-        // Arrowhead
-        const dir: f32 = if (tx > fx) 1.0 else -1.0;
-        const arr: f32 = 8.0;
-        var pts_buf: [128]u8 = undefined;
-        const pts = switch (msg.arrow_kind) {
-            .open => try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
-            .filled => try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
-            .cross => try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ tx - dir * arr, my - arr / 2, tx, my }),
-        };
-        try svg.polygon(pts, theme.signal_color, theme.signal_color, 1.0);
-
-        // Message text above arrow
-        try svg.text((fx + tx) / 2, my - 6, msg.text, theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
     try svg.footer();

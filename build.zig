@@ -51,4 +51,74 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_mod_tests.step);
+
+    // ── examples step ─────────────────────────────────────────────────────────
+    // Renders one mermaid diagram of each supported type and installs the
+    // resulting SVGs to zig-out/examples/.
+    //
+    //   zig build examples
+    //   open zig-out/examples/pie.svg
+
+    const Example = struct { name: []const u8, mmd: []const u8 };
+    const examples = [_]Example{
+        .{
+            .name = "pie",
+            .mmd =
+            \\pie title Pets adopted by volunteers
+            \\"Dogs" : 386
+            \\"Cats" : 85
+            \\"Rats" : 15
+            \\
+            ,
+        },
+        .{
+            .name = "flowchart",
+            .mmd =
+            \\graph TD
+            \\    A[Start] --> B{Decision}
+            \\    B -->|Yes| C[Process]
+            \\    B -->|No| D[End]
+            \\    C --> D
+            \\
+            ,
+        },
+        .{
+            .name = "sequence",
+            .mmd =
+            \\sequenceDiagram
+            \\    participant Alice
+            \\    participant Bob
+            \\    Alice->>Bob: Hello Bob!
+            \\    Bob-->>Alice: Hi Alice!
+            \\    loop every minute
+            \\        Bob->>Bob: health check
+            \\    end
+            \\
+            ,
+        },
+        .{
+            .name = "gitgraph",
+            .mmd =
+            \\gitGraph
+            \\    commit
+            \\    branch develop
+            \\    checkout develop
+            \\    commit
+            \\    commit
+            \\    checkout main
+            \\    merge develop
+            \\    commit
+            \\
+            ,
+        },
+    };
+
+    const examples_step = b.step("examples", "Render example SVGs to zig-out/examples/");
+    for (examples) |ex| {
+        const run = b.addRunArtifact(exe);
+        run.setStdIn(.{ .bytes = ex.mmd });
+        const svg = run.captureStdOut();
+        const install = b.addInstallFile(svg, b.fmt("examples/{s}.svg", .{ex.name}));
+        examples_step.dependOn(&install.step);
+    }
 }
