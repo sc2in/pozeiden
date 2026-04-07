@@ -1,0 +1,26 @@
+.{
+    .name = .pozeiden,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.15.2",
+    .fingerprint = 0xf497aca75da20a34,
+    .dependencies = .{
+        .mvzr = .{
+            .url = "git+https://github.com/mnemnion/mvzr#17a44b46cfe48ef46818d51bdf1161783dfe66e1",
+            .hash = "mvzr-0.3.7-ZSOky5FtAQB2VrFQPNbXHQCFJxWTMAYEK7ljYEaMR6jt",
+        },
+        .mecha = .{
+            .url = "git+https://github.com/Hejsil/mecha#4ee15ea13107bc504a5c17291a7de1d3bf909a32",
+            .hash = "mecha-0.11.0-dVGaSNuLAQDk3kihQu0WAoRKEOaR1KUF7z55Mj33DQ6A",
+        },
+        .zigmark = .{
+            .url = "https://github.com/sc2in/zigmark/archive/refs/tags/v0.5.2.tar.gz",
+            .hash = "zigmark-0.5.0-cwOiyHzQCQBz8SXqL4pV4shRF5KG4kZxvbps1fpHygGg",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "grammars",
+    },
+}
