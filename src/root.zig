@@ -19,6 +19,10 @@ const state_renderer = @import("renderers/state.zig");
 const er_renderer = @import("renderers/er.zig");
 const gantt_renderer = @import("renderers/gantt.zig");
 const timeline_renderer = @import("renderers/timeline.zig");
+const xychart_renderer = @import("renderers/xychart.zig");
+const quadrant_renderer = @import("renderers/quadrant.zig");
+const mindmap_renderer = @import("renderers/mindmap.zig");
+const sankey_renderer = @import("renderers/sankey.zig");
 
 // Embedded grammar files (compiled into the binary)
 const common_langium = @embedFile("grammars/common.langium");
@@ -48,6 +52,10 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
         .er => return renderErDirect(allocator, mermaid_text),
         .gantt => return renderGanttDirect(allocator, mermaid_text),
         .timeline => return renderTimelineDirect(allocator, mermaid_text),
+        .xychart => return renderXyChartDirect(allocator, mermaid_text),
+        .quadrant => return renderQuadrantDirect(allocator, mermaid_text),
+        .mindmap => return renderMindmapDirect(allocator, mermaid_text),
+        .sankey => return renderSankeyDirect(allocator, mermaid_text),
         .unknown => {
             // Emit a simple fallback SVG for unrecognised diagram types
             return renderUnknown(allocator, mermaid_text);
@@ -882,6 +890,305 @@ fn renderTimelineDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     return timeline_renderer.render(allocator, Value{ .node = root });
 }
 
+// ─── xychart parser ───────────────────────────────────────────────────────────
+
+fn renderXyChartDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var title: []const u8 = "";
+    var y_min: f64 = 0;
+    var y_max: f64 = 100;
+    var x_labels: std.ArrayList(Value) = .empty;
+    var series: std.ArrayList(Value) = .empty;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) { first = false; continue; }
+
+        if (std.mem.startsWith(u8, line, "title ") or std.mem.startsWith(u8, line, "title\t")) {
+            title = std.mem.trim(u8, line[6..], " \t\"");
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "x-axis ") or std.mem.startsWith(u8, line, "x-axis\t")) {
+            const rest = std.mem.trim(u8, line[7..], " \t");
+            // Extract bracket content [a, b, c]
+            if (std.mem.indexOf(u8, rest, "[")) |lb| {
+                const rb = std.mem.lastIndexOf(u8, rest, "]") orelse rest.len;
+                var iter = std.mem.splitScalar(u8, rest[lb + 1..rb], ',');
+                while (iter.next()) |tok| {
+                    const t = std.mem.trim(u8, tok, " \t");
+                    if (t.len > 0) try x_labels.append(a, Value{ .string = t });
+                }
+            }
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "y-axis ") or std.mem.startsWith(u8, line, "y-axis\t")) {
+            const rest = std.mem.trim(u8, line[7..], " \t");
+            // Find --> separator for range
+            if (std.mem.indexOf(u8, rest, "-->")) |arrow| {
+                const rhs = std.mem.trim(u8, rest[arrow + 3..], " \t");
+                y_max = std.fmt.parseFloat(f64, rhs) catch 100;
+                // Left of --> may be: "label" min or just min
+                var lhs = std.mem.trim(u8, rest[0..arrow], " \t");
+                if (lhs.len > 0 and lhs[0] == '"') {
+                    // Strip quoted label
+                    const qend = std.mem.indexOf(u8, lhs[1..], "\"") orelse lhs.len - 1;
+                    lhs = std.mem.trim(u8, lhs[qend + 2..], " \t");
+                }
+                y_min = std.fmt.parseFloat(f64, lhs) catch 0;
+            }
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "bar ") or std.mem.startsWith(u8, line, "bar\t") or
+            std.mem.startsWith(u8, line, "line ") or std.mem.startsWith(u8, line, "line\t"))
+        {
+            const is_line = std.mem.startsWith(u8, line, "line");
+            const kind: []const u8 = if (is_line) "line" else "bar";
+            const rest = std.mem.trim(u8, line[if (is_line) 5 else 4..], " \t");
+            var vals: std.ArrayList(Value) = .empty;
+            if (std.mem.indexOf(u8, rest, "[")) |lb| {
+                const rb = std.mem.lastIndexOf(u8, rest, "]") orelse rest.len;
+                var iter = std.mem.splitScalar(u8, rest[lb + 1..rb], ',');
+                while (iter.next()) |tok| {
+                    const t = std.mem.trim(u8, tok, " \t");
+                    const v = std.fmt.parseFloat(f64, t) catch continue;
+                    try vals.append(a, Value{ .number = v });
+                }
+            }
+            if (vals.items.len > 0) {
+                var sn = Value.Node{ .type_name = "series", .fields = .{} };
+                try sn.fields.put(a, "kind", Value{ .string = kind });
+                try sn.fields.put(a, "values", Value{ .list = try vals.toOwnedSlice(a) });
+                try series.append(a, Value{ .node = sn });
+            }
+            continue;
+        }
+    }
+
+    var root = Value.Node{ .type_name = "xychart", .fields = .{} };
+    try root.fields.put(a, "title", Value{ .string = title });
+    try root.fields.put(a, "y_min", Value{ .number = y_min });
+    try root.fields.put(a, "y_max", Value{ .number = y_max });
+    try root.fields.put(a, "x_labels", Value{ .list = try x_labels.toOwnedSlice(a) });
+    try root.fields.put(a, "series", Value{ .list = try series.toOwnedSlice(a) });
+    return xychart_renderer.render(allocator, Value{ .node = root });
+}
+
+// ─── quadrantChart parser ─────────────────────────────────────────────────────
+
+fn renderQuadrantDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var title: []const u8 = "";
+    var x_left: []const u8 = "";
+    var x_right: []const u8 = "";
+    var y_bottom: []const u8 = "";
+    var y_top: []const u8 = "";
+    var q = [4][]const u8{ "", "", "", "" };
+    var points: std.ArrayList(Value) = .empty;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) { first = false; continue; }
+
+        if (std.mem.startsWith(u8, line, "title ") or std.mem.startsWith(u8, line, "title\t")) {
+            title = std.mem.trim(u8, line[6..], " \t");
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "x-axis ") or std.mem.startsWith(u8, line, "x-axis\t")) {
+            const rest = std.mem.trim(u8, line[7..], " \t");
+            if (std.mem.indexOf(u8, rest, " --> ")) |arrow| {
+                x_left = std.mem.trim(u8, rest[0..arrow], " \t");
+                x_right = std.mem.trim(u8, rest[arrow + 5..], " \t");
+            }
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "y-axis ") or std.mem.startsWith(u8, line, "y-axis\t")) {
+            const rest = std.mem.trim(u8, line[7..], " \t");
+            if (std.mem.indexOf(u8, rest, " --> ")) |arrow| {
+                y_bottom = std.mem.trim(u8, rest[0..arrow], " \t");
+                y_top = std.mem.trim(u8, rest[arrow + 5..], " \t");
+            }
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, line, "quadrant-")) {
+            const num_char = if (line.len > 9) line[9] else '0';
+            const num = num_char - '0';
+            if (num >= 1 and num <= 4) {
+                q[num - 1] = std.mem.trim(u8, line[10..], " \t");
+            }
+            continue;
+        }
+
+        // Point: "Label: [x, y]"
+        if (std.mem.indexOf(u8, line, ": [")) |colon_bracket| {
+            const lbl = std.mem.trim(u8, line[0..colon_bracket], " \t");
+            const bracket_start = colon_bracket + 2;
+            const bracket_end = std.mem.indexOf(u8, line[bracket_start..], "]") orelse continue;
+            var coord_iter = std.mem.splitScalar(u8, line[bracket_start + 1..bracket_start + bracket_end], ',');
+            const xv = std.fmt.parseFloat(f64, std.mem.trim(u8, coord_iter.next() orelse "0", " \t")) catch 0.5;
+            const yv = std.fmt.parseFloat(f64, std.mem.trim(u8, coord_iter.next() orelse "0", " \t")) catch 0.5;
+            var pn = Value.Node{ .type_name = "point", .fields = .{} };
+            try pn.fields.put(a, "label", Value{ .string = lbl });
+            try pn.fields.put(a, "x", Value{ .number = xv });
+            try pn.fields.put(a, "y", Value{ .number = yv });
+            try points.append(a, Value{ .node = pn });
+            continue;
+        }
+    }
+
+    var root = Value.Node{ .type_name = "quadrantChart", .fields = .{} };
+    try root.fields.put(a, "title", Value{ .string = title });
+    try root.fields.put(a, "x_left", Value{ .string = x_left });
+    try root.fields.put(a, "x_right", Value{ .string = x_right });
+    try root.fields.put(a, "y_bottom", Value{ .string = y_bottom });
+    try root.fields.put(a, "y_top", Value{ .string = y_top });
+    try root.fields.put(a, "q1", Value{ .string = q[0] });
+    try root.fields.put(a, "q2", Value{ .string = q[1] });
+    try root.fields.put(a, "q3", Value{ .string = q[2] });
+    try root.fields.put(a, "q4", Value{ .string = q[3] });
+    try root.fields.put(a, "points", Value{ .list = try points.toOwnedSlice(a) });
+    return quadrant_renderer.render(allocator, Value{ .node = root });
+}
+
+// ─── mindmap parser ───────────────────────────────────────────────────────────
+
+fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    const MmItem = struct { indent: usize, label: []const u8, shape: []const u8 };
+    var flat: std.ArrayList(MmItem) = .empty;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const trimmed_right = std.mem.trimRight(u8, raw, " \t\r");
+        if (trimmed_right.len == 0 or
+            std.mem.startsWith(u8, std.mem.trim(u8, trimmed_right, " \t"), "%%")) continue;
+        if (first) { first = false; continue; }
+
+        var indent: usize = 0;
+        for (trimmed_right) |ch| {
+            if (ch == ' ') { indent += 1; }
+            else if (ch == '\t') { indent += 2; }
+            else break;
+        }
+        const content = std.mem.trim(u8, trimmed_right, " \t");
+        if (content.len == 0) continue;
+
+        var label: []const u8 = content;
+        var shape: []const u8 = "ellipse";
+        if (std.mem.startsWith(u8, content, "((") and std.mem.endsWith(u8, content, "))")) {
+            label = content[2..content.len - 2];
+            shape = "circle";
+        } else if (std.mem.startsWith(u8, content, "{{") and std.mem.endsWith(u8, content, "}}")) {
+            label = content[2..content.len - 2];
+            shape = "hexagon";
+        } else if (std.mem.startsWith(u8, content, "[") and std.mem.endsWith(u8, content, "]")) {
+            label = content[1..content.len - 1];
+            shape = "rect";
+        } else if (std.mem.startsWith(u8, content, "(") and std.mem.endsWith(u8, content, ")")) {
+            label = content[1..content.len - 1];
+            shape = "rounded";
+        }
+        try flat.append(a, .{ .indent = indent, .label = label, .shape = shape });
+    }
+
+    if (flat.items.len == 0) return mindmap_renderer.render(allocator, Value{ .null = {} });
+
+    // Build Value tree bottom-up using a value stack.
+    // Process items in reverse: each node collects children with indent > own indent.
+    const VEntry = struct { indent: usize, value: Value };
+    var value_stack: std.ArrayList(VEntry) = .empty;
+
+    var i: usize = flat.items.len;
+    while (i > 0) {
+        i -= 1;
+        const item = flat.items[i];
+        // Pop children: entries with strictly greater indent
+        var children: std.ArrayList(Value) = .empty;
+        while (value_stack.items.len > 0 and
+               value_stack.items[value_stack.items.len - 1].indent > item.indent)
+        {
+            const child = value_stack.pop().?;
+            try children.append(a, child.value);
+        }
+        // Children were collected in reverse; reverse to restore order
+        std.mem.reverse(Value, children.items);
+
+        var n = Value.Node{ .type_name = "mmnode", .fields = .{} };
+        try n.fields.put(a, "label", Value{ .string = item.label });
+        try n.fields.put(a, "shape", Value{ .string = item.shape });
+        try n.fields.put(a, "children", Value{ .list = try children.toOwnedSlice(a) });
+        try value_stack.append(a, .{ .indent = item.indent, .value = Value{ .node = n } });
+    }
+
+    const root_value = if (value_stack.items.len > 0)
+        value_stack.items[value_stack.items.len - 1].value
+    else
+        Value{ .null = {} };
+
+    var root_node = Value.Node{ .type_name = "mindmap", .fields = .{} };
+    const nodes_list = try a.alloc(Value, 1);
+    nodes_list[0] = root_value;
+    try root_node.fields.put(a, "nodes", Value{ .list = nodes_list });
+    return mindmap_renderer.render(allocator, Value{ .node = root_node });
+}
+
+// ─── sankey parser ────────────────────────────────────────────────────────────
+
+fn renderSankeyDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var flows: std.ArrayList(Value) = .empty;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) { first = false; continue; }
+
+        // CSV: from,to,value
+        var parts = std.mem.splitScalar(u8, line, ',');
+        const from = std.mem.trim(u8, parts.next() orelse continue, " \t");
+        const to = std.mem.trim(u8, parts.next() orelse continue, " \t");
+        const val_str = std.mem.trim(u8, parts.next() orelse continue, " \t");
+        if (from.len == 0 or to.len == 0) continue;
+        const val = std.fmt.parseFloat(f64, val_str) catch continue;
+
+        var fn2 = Value.Node{ .type_name = "flow", .fields = .{} };
+        try fn2.fields.put(a, "from", Value{ .string = from });
+        try fn2.fields.put(a, "to", Value{ .string = to });
+        try fn2.fields.put(a, "value", Value{ .number = val });
+        try flows.append(a, Value{ .node = fn2 });
+    }
+
+    var root = Value.Node{ .type_name = "sankey", .fields = .{} };
+    try root.fields.put(a, "flows", Value{ .list = try flows.toOwnedSlice(a) });
+    return sankey_renderer.render(allocator, Value{ .node = root });
+}
+
 fn renderUnknown(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     const writer_mod = @import("svg/writer.zig");
     const theme = @import("svg/theme.zig");
@@ -1000,4 +1307,66 @@ test "detect and render timeline" {
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
     try std.testing.expect(std.mem.indexOf(u8, svg, "iPhone") != null);
+}
+
+test "detect and render xychart" {
+    const input =
+        \\xychart-beta
+        \\    title "Revenue"
+        \\    x-axis [Q1, Q2, Q3, Q4]
+        \\    y-axis 0 --> 10000
+        \\    bar [2000, 4000, 6000, 8000]
+        \\    line [3000, 3500, 5000, 7000]
+        \\
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "detect and render quadrantChart" {
+    const input =
+        \\quadrantChart
+        \\    title Effort vs Impact
+        \\    x-axis Low Effort --> High Effort
+        \\    y-axis Low Impact --> High Impact
+        \\    quadrant-1 Quick Wins
+        \\    Campaign A: [0.3, 0.7]
+        \\    Campaign B: [0.8, 0.4]
+        \\
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<circle") != null);
+}
+
+test "detect and render mindmap" {
+    const input =
+        \\mindmap
+        \\  root((Main Topic))
+        \\    Branch A
+        \\      Leaf A1
+        \\    Branch B
+        \\
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Main Topic") != null);
+}
+
+test "detect and render sankey" {
+    const input =
+        \\sankey-beta
+        \\A,B,40
+        \\B,C,30
+        \\A,C,10
+        \\
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<path") != null);
 }

@@ -11,6 +11,10 @@ pub const DiagramType = enum {
     er,
     gantt,
     timeline,
+    xychart,
+    quadrant,
+    mindmap,
+    sankey,
     unknown,
 };
 
@@ -46,6 +50,14 @@ pub fn detect(text: []const u8) DiagramType {
         if (std.mem.startsWith(u8, line, "gantt")) return .gantt;
 
         if (std.mem.startsWith(u8, line, "timeline")) return .timeline;
+
+        if (std.mem.startsWith(u8, line, "xychart-beta")) return .xychart;
+
+        if (std.mem.startsWith(u8, line, "quadrantChart")) return .quadrant;
+
+        if (std.mem.startsWith(u8, line, "mindmap")) return .mindmap;
+
+        if (std.mem.startsWith(u8, line, "sankey-beta")) return .sankey;
 
         return .unknown;
     }

@@ -191,6 +191,70 @@ pub fn build(b: *std.Build) void {
             \\
             ,
         },
+        .{
+            .name = "xychart",
+            .mmd =
+            \\xychart-beta
+            \\    title "Monthly Revenue"
+            \\    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+            \\    y-axis "Revenue ($k)" 0 --> 120
+            \\    bar [42, 55, 78, 90, 105, 115]
+            \\    line [50, 60, 70, 85, 100, 110]
+            \\
+            ,
+        },
+        .{
+            .name = "quadrant",
+            .mmd =
+            \\quadrantChart
+            \\    title Feature Prioritization
+            \\    x-axis Low Effort --> High Effort
+            \\    y-axis Low Value --> High Value
+            \\    quadrant-1 Schedule
+            \\    quadrant-2 Do Now
+            \\    quadrant-3 Deprioritize
+            \\    quadrant-4 Delegate
+            \\    Search: [0.3, 0.8]
+            \\    Analytics: [0.7, 0.9]
+            \\    Dark Mode: [0.2, 0.4]
+            \\    Export CSV: [0.8, 0.3]
+            \\    Onboarding: [0.5, 0.7]
+            \\
+            ,
+        },
+        .{
+            .name = "mindmap",
+            .mmd =
+            \\mindmap
+            \\  root((Software\nArchitecture))
+            \\    Frontend
+            \\      React
+            \\      CSS
+            \\    Backend
+            \\      API
+            \\      Database
+            \\    DevOps
+            \\      CI/CD
+            \\      Monitoring
+            \\
+            ,
+        },
+        .{
+            .name = "sankey",
+            .mmd =
+            \\sankey-beta
+            \\Electricity,Lighting,25
+            \\Electricity,Heating,40
+            \\Electricity,Cooling,20
+            \\Gas,Heating,60
+            \\Gas,Cooking,15
+            \\Heating,House,100
+            \\Lighting,House,25
+            \\Cooling,House,20
+            \\Cooking,House,15
+            \\
+            ,
+        },
     };
 
     const examples_step = b.step("examples", "Render example SVGs to zig-out/examples/");
