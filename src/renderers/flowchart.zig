@@ -80,30 +80,92 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const from_node = findNode(graph.nodes, e.from) orelse continue;
         const to_node = findNode(graph.nodes, e.to) orelse continue;
 
-        const fx = from_node.x + from_node.w / 2;
-        const fy = from_node.y + from_node.h;
-        const tx = to_node.x + to_node.w / 2;
-        const ty = to_node.y;
+        // Connection points: exit bottom-center / enter top-center for TB,
+        // exit right-center / enter left-center for LR, etc.
+        const fx: f32, const fy: f32, const tx: f32, const ty: f32 = switch (direction) {
+            .lr => .{
+                from_node.x + from_node.w,
+                from_node.y + from_node.h / 2,
+                to_node.x,
+                to_node.y + to_node.h / 2,
+            },
+            .rl => .{
+                from_node.x,
+                from_node.y + from_node.h / 2,
+                to_node.x + to_node.w,
+                to_node.y + to_node.h / 2,
+            },
+            .bt => .{
+                from_node.x + from_node.w / 2,
+                from_node.y,
+                to_node.x + to_node.w / 2,
+                to_node.y + to_node.h,
+            },
+            .tb => .{
+                from_node.x + from_node.w / 2,
+                from_node.y + from_node.h,
+                to_node.x + to_node.w / 2,
+                to_node.y,
+            },
+        };
+
+        // Cubic Bezier control points pull the curve away from the straight-line path.
+        // For TB/BT: control points extend vertically from the exit/entry points.
+        // For LR/RL: control points extend horizontally.
+        const ctrl: f32 = switch (direction) {
+            .tb, .bt => layout.V_GAP * 0.6,
+            .lr, .rl => layout.H_GAP,
+        };
+        const cx1: f32, const cy1: f32, const cx2: f32, const cy2: f32 = switch (direction) {
+            .tb  => .{ fx,        fy + ctrl, tx,        ty - ctrl },
+            .bt  => .{ fx,        fy - ctrl, tx,        ty + ctrl },
+            .lr  => .{ fx + ctrl, fy,        tx - ctrl, ty },
+            .rl  => .{ fx - ctrl, fy,        tx + ctrl, ty },
+        };
 
         const stroke = theme.edge_color;
         const sw = theme.edge_stroke_width;
 
+        var path_buf: [256]u8 = undefined;
+        const path_d = try std.fmt.bufPrint(&path_buf,
+            "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+            .{ fx, fy, cx1, cy1, cx2, cy2, tx, ty });
+
         if (e.style == .dotted) {
-            try svg.dashedLine(fx, fy, tx, ty, stroke, sw, "5,5");
+            try svg.path(path_d, "none", stroke, sw, "stroke-dasharray=\"5,5\"");
+        } else if (e.style == .thick) {
+            try svg.path(path_d, "none", stroke, sw + 1.5, "");
         } else {
-            try svg.line(fx, fy, tx, ty, stroke, sw);
+            try svg.path(path_d, "none", stroke, sw, "");
         }
 
-        // Arrowhead: draw a small triangle at (tx, ty)
-        const arr_size: f32 = 8;
-        var pts_buf: [128]u8 = undefined;
-        const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-            .{ tx - arr_size / 2, ty - arr_size, tx + arr_size / 2, ty - arr_size, tx, ty });
-        try svg.polygon(pts, stroke, stroke, 0);
+        // Direction-aware arrowhead: tangent at Bezier t=1 is (P3 - C2)
+        const tang_x = tx - cx2;
+        const tang_y = ty - cy2;
+        const tang_len = @sqrt(tang_x * tang_x + tang_y * tang_y);
+        if (tang_len > 0.5) {
+            const ux = tang_x / tang_len;
+            const uy = tang_y / tang_len;
+            const arr: f32 = 8.0;
+            const half: f32 = 4.5;
+            var pts_buf: [128]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{
+                    tx - ux * arr - uy * half,
+                    ty - uy * arr + ux * half,
+                    tx, ty,
+                    tx - ux * arr + uy * half,
+                    ty - uy * arr - ux * half,
+                });
+            try svg.polygon(pts, stroke, stroke, 0);
+        }
 
-        // Edge label
+        // Edge label at Bezier midpoint (t=0.5)
         if (e.label) |lbl| {
-            try svg.text((fx + tx) / 2, (fy + ty) / 2 - 5, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+            const mid_x = 0.125 * fx + 0.375 * cx1 + 0.375 * cx2 + 0.125 * tx;
+            const mid_y = 0.125 * fy + 0.375 * cy1 + 0.375 * cy2 + 0.125 * ty;
+            try svg.text(mid_x, mid_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
 

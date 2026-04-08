@@ -671,18 +671,24 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
 
         // Relationship: ENTITY_A rel ENTITY_B : "label"
         // rel pattern contains -- or ..
-        if (std.mem.indexOf(u8, line, "--") orelse std.mem.indexOf(u8, line, "..")) |rel_start| {
-            // Find end of rel (first space after rel start)
-            const after_left = line[rel_start..];
-            var rel_end_offset: usize = 0;
-            // Rel token ends at first space
-            for (after_left, 0..) |c, i| {
-                if (c == ' ') { rel_end_offset = i; break; }
+        if (std.mem.indexOf(u8, line, "--") orelse std.mem.indexOf(u8, line, "..")) |connector_pos| {
+            // The full rel token includes cardinality chars before and after the connector.
+            // Walk backward from connector_pos to find where the rel token starts (first space or start of line).
+            var rel_token_start = connector_pos;
+            while (rel_token_start > 0 and line[rel_token_start - 1] != ' ' and line[rel_token_start - 1] != '\t') {
+                rel_token_start -= 1;
             }
-            if (rel_end_offset == 0) rel_end_offset = after_left.len;
-            const rel_str = after_left[0..rel_end_offset];
-            const from = std.mem.trimRight(u8, std.mem.trim(u8, line[0..rel_start], " \t"), "|o{}< \t");
-            const rest = std.mem.trim(u8, after_left[rel_end_offset..], " \t");
+            // Walk forward from connector_pos to find where the rel token ends (next space).
+            const after_connector = line[connector_pos..];
+            var rel_token_len: usize = after_connector.len;
+            for (after_connector, 0..) |c, i| {
+                if (c == ' ') { rel_token_len = i; break; }
+            }
+            const rel_str = line[rel_token_start..connector_pos + rel_token_len];
+            const from = std.mem.trimRight(u8, std.mem.trim(u8, line[0..rel_token_start], " \t"), "|o{}< \t");
+            // Everything after the rel token
+            const after_rel = line[connector_pos + rel_token_len..];
+            const rest = std.mem.trim(u8, after_rel, " \t");
             // rest: "ENTITY_B : label" or just "ENTITY_B"
             const colon = std.mem.indexOf(u8, rest, " : ") orelse rest.len;
             const to = std.mem.trim(u8, rest[0..colon], " \t");
@@ -1565,4 +1571,340 @@ test "detect and render C4Context" {
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
     try std.testing.expect(std.mem.indexOf(u8, svg, "Web App") != null);
+}
+
+// ─── Flowchart feature tests ──────────────────────────────────────────────────
+
+test "flowchart LR direction" {
+    const input = "graph LR\nStart --> Process --> End\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Process") != null);
+}
+
+test "flowchart diamond and circle shapes" {
+    const input =
+        \\graph TD
+        \\A{Decision}
+        \\B((Circle))
+        \\A --> B
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<polygon") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<circle") != null);
+}
+
+test "flowchart edge label and dotted style" {
+    const input =
+        \\graph TD
+        \\A --> |yes| B
+        \\B -.-> C
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "yes") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "stroke-dasharray") != null);
+}
+
+test "flowchart multi-node chain" {
+    const input = "graph TD\nA[Start] --> B[Middle] --> C[End]\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Start") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Middle") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "End") != null);
+}
+
+test "flowchart BT direction" {
+    const input = "graph BT\nA --> B\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "flowchart bezier path connector" {
+    // Bezier routing: edges use <path> with cubic curve data
+    const input = "graph TD\nA --> B\nB --> C\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<path") != null);
+    // Cubic bezier uses 'C' command
+    try std.testing.expect(std.mem.indexOf(u8, svg, " C ") != null);
+}
+
+// ─── Sequence feature tests ───────────────────────────────────────────────────
+
+test "sequence self-message" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Alice: Think
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Think") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<line") != null);
+}
+
+test "sequence dotted return arrow" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Bob: request
+        \\Bob-->>Alice: response
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "request") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "stroke-dasharray") != null);
+}
+
+test "sequence loop block" {
+    const input =
+        \\sequenceDiagram
+        \\loop Retry
+        \\Alice->>Bob: ping
+        \\end
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Retry") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "sequence alt block" {
+    const input =
+        \\sequenceDiagram
+        \\alt success
+        \\Alice->>Bob: ok
+        \\end
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "success") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "sequence participants declared explicitly" {
+    const input =
+        \\sequenceDiagram
+        \\participant Server
+        \\participant Client
+        \\Server->>Client: data
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Server") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Client") != null);
+}
+
+// ─── ClassDiagram feature tests ───────────────────────────────────────────────
+
+test "classDiagram inheritance terminator" {
+    const input =
+        \\classDiagram
+        \\class Vehicle
+        \\class Car
+        \\Vehicle <|-- Car
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Vehicle") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<polygon") != null);
+}
+
+test "classDiagram composition terminator" {
+    const input =
+        \\classDiagram
+        \\class Engine
+        \\class Car
+        \\Car *-- Engine
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<polygon") != null);
+}
+
+test "classDiagram visibility modifiers rendered" {
+    const input =
+        \\classDiagram
+        \\class BankAccount {
+        \\    +String owner
+        \\    -float balance
+        \\    +deposit(amount) void
+        \\}
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "BankAccount") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "owner") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "balance") != null);
+}
+
+test "classDiagram dependency dashed line" {
+    const input =
+        \\classDiagram
+        \\class Logger
+        \\class Service
+        \\Service ..> Logger
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "stroke-dasharray") != null);
+}
+
+test "classDiagram relation label" {
+    const input =
+        \\classDiagram
+        \\class Driver
+        \\class Car
+        \\Driver --> Car : drives
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "drives") != null);
+}
+
+// ─── StateDiagram feature tests ───────────────────────────────────────────────
+
+test "stateDiagram entry and exit star" {
+    const input =
+        \\stateDiagram-v2
+        \\[*] --> Active
+        \\Active --> [*]
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<circle") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Active") != null);
+}
+
+test "stateDiagram transition labels" {
+    const input =
+        \\stateDiagram-v2
+        \\Idle --> Running : start
+        \\Running --> Idle : stop
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "start") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "stop") != null);
+}
+
+test "stateDiagram multiple states" {
+    const input =
+        \\stateDiagram-v2
+        \\[*] --> Idle
+        \\Idle --> Processing
+        \\Processing --> Done
+        \\Done --> [*]
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Idle") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Processing") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Done") != null);
+}
+
+// ─── ER Diagram feature tests ──────────────────────────────────────────────────
+
+test "erDiagram one-to-many relation" {
+    const input =
+        \\erDiagram
+        \\CUSTOMER ||--o{ ORDER : "places"
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "CUSTOMER") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "ORDER") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "places") != null);
+}
+
+test "erDiagram zero-or-one cardinality circle" {
+    const input =
+        \\erDiagram
+        \\PERSON o|--|| PASSPORT : "has"
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<circle") != null);
+}
+
+test "erDiagram attribute PK marker" {
+    const input =
+        \\erDiagram
+        \\PRODUCT {
+        \\    int id PK
+        \\    string name
+        \\}
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "PRODUCT") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "PK") != null);
+}
+
+test "erDiagram dashed relationship line" {
+    const input =
+        \\erDiagram
+        \\EMPLOYEE }o..o{ PROJECT : "works on"
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "stroke-dasharray") != null);
+}
+
+// ─── Gantt feature tests ───────────────────────────────────────────────────────
+
+test "gantt crit task color" {
+    const input =
+        \\gantt
+        \\title Sprint
+        \\section Dev
+        \\Critical path : crit, 3d
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#e55039") != null);
+}
+
+test "gantt done task color" {
+    const input =
+        \\gantt
+        \\title Project
+        \\section Phase 1
+        \\Finished task : done, 2d
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#95a5a6") != null);
+}
+
+test "gantt multiple sections" {
+    const input =
+        \\gantt
+        \\title Roadmap
+        \\section Alpha
+        \\Feature A : 2d
+        \\section Beta
+        \\Feature B : 3d
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Alpha") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Beta") != null);
+}
+
+test "gantt title in SVG" {
+    const input =
+        \\gantt
+        \\title My Timeline
+        \\section Work
+        \\Task : 1d
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "My Timeline") != null);
 }

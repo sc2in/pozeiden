@@ -66,8 +66,8 @@ pub fn layout(allocator: std.mem.Allocator, graph: *Graph) !void {
 
 const NODE_W: f32 = 140;
 const NODE_H: f32 = 44;
-const H_GAP: f32 = 60;
-const V_GAP: f32 = 80;
+pub const H_GAP: f32 = 60;
+pub const V_GAP: f32 = 80;
 const MARGIN: f32 = 40;
 
 fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
