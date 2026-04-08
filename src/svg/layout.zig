@@ -43,6 +43,8 @@ pub const NodeShape = enum {
     cylinder,
     hexagon,
     ellipse,
+    parallelogram,
+    asymmetric,
 };
 
 /// A directed edge between two nodes.

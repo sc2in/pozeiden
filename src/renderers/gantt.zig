@@ -46,6 +46,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const a = arena.allocator();
 
     const title = node.getString("title") orelse "gantt";
+    const show_today = std.mem.eql(u8, node.getString("show_today") orelse "0", "1");
     var tasks: std.ArrayList(Task) = .empty;
     var sections: std.ArrayList(Section) = .empty;
 
@@ -103,6 +104,19 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const bar_bot = bar_top + @as(f32, @floatFromInt(n_rows)) * ROW_H;
     try svg.rect(bar_x, bar_top, BAR_AREA_W, bar_bot - bar_top, 0, "#f8f9fa", "#dee2e6", 1.0);
 
+    // Alternating section background bands
+    {
+        var r_idx: usize = 0;
+        for (sections.items, 0..) |sec, si| {
+            const band_y = bar_top + @as(f32, @floatFromInt(r_idx)) * ROW_H;
+            const band_rows = 1 + (sec.task_end - sec.task_start); // header + tasks
+            const band_h = @as(f32, @floatFromInt(band_rows)) * ROW_H;
+            const band_fill = if (si % 2 == 0) "#f1f3f5" else "#ffffff";
+            try svg.rect(bar_x, band_y, BAR_AREA_W, band_h, 0, band_fill, "none", 0);
+            r_idx += band_rows;
+        }
+    }
+
     // Grid lines (5 vertical divisions)
     const divisions: usize = 5;
     for (0..divisions + 1) |gi| {
@@ -156,6 +170,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             cursor += t.duration;
             row_idx += 1;
         }
+    }
+
+    // Today marker: red dashed vertical line at 40% through the timeline
+    // (since we don't parse actual dates, we place it at a visually reasonable position)
+    if (show_today) {
+        const today_x = bar_x + BAR_AREA_W * 0.4;
+        try svg.dashedLine(today_x, bar_top, today_x, bar_bot, "#e03131", 2.0, "6,3");
+        try svg.text(today_x + 3, bar_top - 4, "Today", "#e03131", theme.font_size_small, .start, "normal");
     }
 
     try svg.footer();

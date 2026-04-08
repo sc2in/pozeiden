@@ -1,0 +1,10 @@
+block-beta
+    columns 3
+    A["Frontend"] B["API Gateway"] C["Auth Service"]
+    D["User DB"] E["Cache"] F["Email Service"]
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> D
+    B --> F

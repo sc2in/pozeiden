@@ -37,6 +37,12 @@ pub const DiagramType = enum {
     sankey,
     /// `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment`
     c4,
+    /// `block-beta`
+    block,
+    /// `requirementDiagram`
+    requirement,
+    /// `kanban`
+    kanban,
     /// The opening keyword was not recognised.
     unknown,
 };
@@ -89,6 +95,12 @@ pub fn detect(text: []const u8) DiagramType {
             std.mem.startsWith(u8, line, "C4Dynamic") or
             std.mem.startsWith(u8, line, "C4Deployment"))
             return .c4;
+
+        if (std.mem.startsWith(u8, line, "block-beta")) return .block;
+
+        if (std.mem.startsWith(u8, line, "requirementDiagram")) return .requirement;
+
+        if (std.mem.startsWith(u8, line, "kanban")) return .kanban;
 
         return .unknown;
     }

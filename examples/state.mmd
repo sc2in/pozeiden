@@ -4,4 +4,15 @@ stateDiagram-v2
     Running --> Idle : stop
     Running --> Error : fail
     Error --> Idle : reset
-    Idle --> [*]
+    state fork1 <<fork>>
+    state join1 <<join>>
+    state choice1 <<choice>>
+    Running --> fork1
+    fork1 --> Logging
+    fork1 --> Metrics
+    Logging --> join1
+    Metrics --> join1
+    join1 --> Done
+    Done --> choice1
+    choice1 --> Idle : retry
+    choice1 --> [*] : exit

@@ -63,6 +63,7 @@ const Relation = struct {
 const Boundary = struct {
     alias: []const u8,
     label: []const u8,
+    is_enterprise: bool,
     members: []const []const u8,
 };
 
@@ -112,6 +113,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const bn = bv.asNode() orelse continue;
         const alias = bn.getString("alias") orelse continue;
         const lbl = bn.getString("label") orelse alias;
+        const is_ent = bn.getString("enterprise") != null;
         const ml = bn.getList("members");
         var members: std.ArrayList([]const u8) = .empty;
         for (ml) |mv| {
@@ -120,6 +122,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try bounds.append(a, Boundary{
             .alias = alias,
             .label = lbl,
+            .is_enterprise = is_ent,
             .members = try members.toOwnedSlice(a),
         });
     }
@@ -204,13 +207,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const by = row_y[min_row] - BOUNDARY_PAD;
         const bw = elemX(max_col) + BOX_W + BOUNDARY_PAD - bx;
         const bh = row_y[max_row] + boxHeightAtRow(max_row, &max_desc_per_row) + BOUNDARY_PAD - by;
-        try svg.rect(bx, by, bw, bh, 6, "#fafafa", BOUNDARY_STROKE, 1.0);
+        const bstroke = if (bnd.is_enterprise) "#333333" else BOUNDARY_STROKE;
+        const bstroke_w: f32 = if (bnd.is_enterprise) 2.5 else 1.0;
+        const bfill = if (bnd.is_enterprise) "#f5f5f5" else "#fafafa";
+        try svg.rect(bx, by, bw, bh, 6, bfill, bstroke, bstroke_w);
         // dashed overlay
-        try svg.dashedLine(bx, by, bx + bw, by, BOUNDARY_STROKE, 1.0, "8,4");
-        try svg.dashedLine(bx, by, bx, by + bh, BOUNDARY_STROKE, 1.0, "8,4");
-        try svg.dashedLine(bx + bw, by, bx + bw, by + bh, BOUNDARY_STROKE, 1.0, "8,4");
-        try svg.dashedLine(bx, by + bh, bx + bw, by + bh, BOUNDARY_STROKE, 1.0, "8,4");
-        try svg.text(bx + BOUNDARY_PAD, by - 6, bnd.label, BOUNDARY_STROKE, theme.font_size_small, .start, "normal");
+        try svg.dashedLine(bx, by, bx + bw, by, bstroke, bstroke_w, "8,4");
+        try svg.dashedLine(bx, by, bx, by + bh, bstroke, bstroke_w, "8,4");
+        try svg.dashedLine(bx + bw, by, bx + bw, by + bh, bstroke, bstroke_w, "8,4");
+        try svg.dashedLine(bx, by + bh, bx + bw, by + bh, bstroke, bstroke_w, "8,4");
+        const blbl_style = if (bnd.is_enterprise) "bold" else "normal";
+        try svg.text(bx + BOUNDARY_PAD, by - 6, bnd.label, bstroke, theme.font_size_small, .start, blbl_style);
     }
 
     // Draw relations (behind boxes)
@@ -272,8 +279,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const text_col = if (isLightText(el.kind)) TEXT_LIGHT else TEXT_DARK;
         const stroke = elemStroke(el.kind);
 
-        // Outer box
-        try svg.rect(bx, by, BOX_W, bh, 4.0, fill, stroke, 1.5);
+        // Outer box — ext variants get a dashed border
+        if (isExt(el.kind)) {
+            var raw_buf: [256]u8 = undefined;
+            const raw_str = try std.fmt.bufPrint(&raw_buf,
+                "<rect x=\"{d:.1}\" y=\"{d:.1}\" width=\"{d:.1}\" height=\"{d:.1}\" rx=\"4\" " ++
+                "fill=\"{s}\" stroke=\"{s}\" stroke-width=\"1.5\" stroke-dasharray=\"5,3\"/>\n",
+                .{ bx, by, BOX_W, bh, fill, stroke });
+            try svg.raw(raw_str);
+        } else {
+            try svg.rect(bx, by, BOX_W, bh, 4.0, fill, stroke, 1.5);
+        }
 
         // Person: draw head circle above box
         if (el.kind == .person or el.kind == .person_ext) {
@@ -436,6 +452,14 @@ fn isLightText(k: ElemKind) bool {
 fn isDb(k: ElemKind) bool {
     return switch (k) {
         .system_db, .system_db_ext, .container_db, .container_db_ext => true,
+        else => false,
+    };
+}
+
+fn isExt(k: ElemKind) bool {
+    return switch (k) {
+        .person_ext, .system_ext, .system_db_ext,
+        .container_ext, .container_db_ext, .component_ext, .node_ext => true,
         else => false,
     };
 }

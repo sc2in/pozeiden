@@ -1,8 +1,15 @@
 sequenceDiagram
+    autonumber
     participant Alice
     participant Bob
-    Alice->>Bob: Hello Bob!
-    Bob-->>Alice: Hi Alice!
-    loop every minute
-        Bob->>Bob: health check
-    end
+    participant Server
+    Alice->>Bob: request
+    activate Bob
+    Note right of Bob: processing
+    Bob->>Server: forward
+    activate Server
+    Server-->>Bob: data
+    deactivate Server
+    Bob-->>Alice: response
+    deactivate Bob
+    Note over Alice,Bob: done

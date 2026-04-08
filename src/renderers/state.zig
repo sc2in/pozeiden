@@ -18,6 +18,7 @@ const START_R: f32 = 10;
 const State = struct {
     id: []const u8,
     label: []const u8,
+    shape: []const u8, // "" = normal rect, "fork"/"join" = bar, "choice" = diamond
     depth: usize,
     col: usize, // column within its depth row
 };
@@ -43,12 +44,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     var transitions: std.ArrayList(Transition) = .empty;
     var seen = std.StringHashMap(void).init(a);
 
-    // Helper: ensure state exists
+    // Helper: ensure state exists (shape = "" for normal states)
     const ensureState = struct {
         fn run(sl: *std.ArrayList(State), s_map: *std.StringHashMap(void), alloc: std.mem.Allocator, id: []const u8, lbl: []const u8) !void {
             if (s_map.get(id) != null) return;
             try s_map.put(id, {});
-            try sl.append(alloc, State{ .id = id, .label = lbl, .depth = 0, .col = 0 });
+            try sl.append(alloc, State{ .id = id, .label = lbl, .shape = "", .depth = 0, .col = 0 });
         }
     }.run;
 
@@ -56,7 +57,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const sn = sv.asNode() orelse continue;
         const id = sn.getString("id") orelse continue;
         const lbl = sn.getString("label") orelse id;
-        try ensureState(&states, &seen, a, id, lbl);
+        const shp = sn.getString("shape") orelse "";
+        if (seen.get(id) != null) continue;
+        try seen.put(id, {});
+        try states.append(a, State{ .id = id, .label = lbl, .shape = shp, .depth = 0, .col = 0 });
     }
 
     for (node.getList("transitions")) |tv| {
@@ -190,6 +194,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         if (std.mem.eql(u8, s.id, "[*]")) {
             // Start/end: filled circle
             try svg.circle(cx, cy, START_R, theme.edge_color, theme.edge_color, 0);
+        } else if (std.mem.eql(u8, s.shape, "fork") or std.mem.eql(u8, s.shape, "join")) {
+            // Fork/join: filled horizontal bar (wide, short)
+            const bar_w: f32 = STATE_W * 0.8;
+            const bar_h: f32 = 8;
+            try svg.rect(cx - bar_w / 2, cy - bar_h / 2, bar_w, bar_h, 0, theme.edge_color, theme.edge_color, 0);
+        } else if (std.mem.eql(u8, s.shape, "choice")) {
+            // Choice: diamond
+            const hw: f32 = STATE_W * 0.35;
+            const hh: f32 = STATE_H * 0.55;
+            var pts_buf: [192]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy });
+            try svg.polygon(pts, theme.node_fill, theme.node_stroke, 1.5);
         } else {
             try svg.rect(cx - STATE_W / 2, cy - STATE_H / 2, STATE_W, STATE_H, 18.0, theme.node_fill, theme.node_stroke, 1.5);
             try svg.text(cx, cy + 5, s.label, theme.text_color, theme.font_size, .middle, "normal");

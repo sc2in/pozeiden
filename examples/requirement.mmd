@@ -1,0 +1,23 @@
+requirementDiagram
+    requirement auth_req {
+        id: 1
+        text: "Users must authenticate"
+        risk: high
+        verifyMethod: test
+    }
+    requirement perf_req {
+        id: 2
+        text: "Response under 200ms"
+        risk: medium
+        verifyMethod: analysis
+    }
+    element auth_service {
+        type: software
+        docRef: /docs/auth
+    }
+    element load_balancer {
+        type: hardware
+    }
+    auth_service - satisfies -> auth_req
+    load_balancer - satisfies -> perf_req
+    auth_service - refines -> perf_req

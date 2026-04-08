@@ -62,6 +62,7 @@ pub fn build(b: *std.Build) void {
         "pie", "flowchart", "sequence", "gitgraph", "class",
         "state", "er", "gantt", "timeline", "xychart",
         "quadrant", "mindmap", "sankey", "c4",
+        "block", "requirement", "kanban",
     };
 
     const examples_step = b.step("examples", "Render example SVGs to zig-out/examples/");

@@ -25,6 +25,7 @@ const Member = struct {
 
 const Class = struct {
     name: []const u8,
+    stereotype: []const u8, // empty string if none, else "<<interface>>" etc.
     members: []Member,
     col: usize,
     row: usize,
@@ -70,8 +71,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
         const raw_members = cn.getList("members");
         var members: std.ArrayList(Member) = .empty;
+        var stereotype: []const u8 = "";
         for (raw_members) |mv| {
             const ms = mv.asString() orelse continue;
+            // Stereotype line: <<interface>>, <<abstract>>, etc.
+            if (std.mem.startsWith(u8, ms, "<<") and std.mem.indexOf(u8, ms, ">>") != null) {
+                stereotype = ms;
+                continue;
+            }
             const m = parseMember(ms);
             try members.append(a, m);
         }
@@ -79,6 +86,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const idx = classes.items.len;
         try classes.append(a, Class{
             .name = name,
+            .stereotype = stereotype,
             .members = try members.toOwnedSlice(a),
             .col = idx % GRID_COLS,
             .row = idx / GRID_COLS,
@@ -103,11 +111,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     if (classes.items.len == 0) return renderFallback(allocator);
 
     const n_rows = (classes.items.len + GRID_COLS - 1) / GRID_COLS;
-    // Find max members per row
+    // Find max members per row (stereotype row counts as +1 if present)
     var max_members_per_row = [_]usize{0} ** 64;
     for (classes.items) |cl| {
-        if (cl.row < 64 and cl.members.len > max_members_per_row[cl.row])
-            max_members_per_row[cl.row] = cl.members.len;
+        const effective = cl.members.len + (if (cl.stereotype.len > 0) @as(usize, 1) else 0);
+        if (cl.row < 64 and effective > max_members_per_row[cl.row])
+            max_members_per_row[cl.row] = effective;
     }
 
     // Compute row Y offsets
@@ -198,24 +207,39 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (classes.items) |cl| {
         const bx = classX(cl.col);
         const by = row_y[cl.row];
-        const bh = CLASS_HEADER_H + @as(f32, @floatFromInt(cl.members.len)) * MEMBER_H + 10;
+        const ste_h: f32 = if (cl.stereotype.len > 0) MEMBER_H else 0;
+        const bh = CLASS_HEADER_H + ste_h + @as(f32, @floatFromInt(cl.members.len)) * MEMBER_H + 10;
 
         // Box outline
         try svg.rect(bx, by, CLASS_W, bh, 4.0, theme.node_fill, theme.node_stroke, 1.5);
-        // Header separator
-        try svg.line(bx, by + CLASS_HEADER_H, bx + CLASS_W, by + CLASS_HEADER_H, theme.node_stroke, 1.0);
+
+        // Stereotype (italic, above class name)
+        if (cl.stereotype.len > 0) {
+            var ste_buf: [128]u8 = undefined;
+            const ste_raw = try std.fmt.bufPrint(&ste_buf, "{s}", .{cl.stereotype});
+            try svg.text(bx + CLASS_W / 2, by + MEMBER_H / 2 + 4,
+                ste_raw, "#666666", theme.font_size_small, .middle, "normal");
+        }
+
         // Class name
-        try svg.text(bx + CLASS_W / 2, by + CLASS_HEADER_H / 2 + 5, cl.name, theme.text_color, theme.font_size, .middle, "bold");
+        const name_y = by + ste_h + CLASS_HEADER_H / 2 + 5;
+        try svg.text(bx + CLASS_W / 2, name_y, cl.name, theme.text_color, theme.font_size, .middle, "bold");
+
+        // Header separator
+        try svg.line(bx, by + ste_h + CLASS_HEADER_H, bx + CLASS_W, by + ste_h + CLASS_HEADER_H, theme.node_stroke, 1.0);
 
         // Members
+        const members_top = by + ste_h + CLASS_HEADER_H;
         for (cl.members, 0..) |m, mi| {
-            const my = by + CLASS_HEADER_H + 6 + @as(f32, @floatFromInt(mi)) * MEMBER_H + MEMBER_H / 2;
-            var buf: [256]u8 = undefined;
+            const my = members_top + 6 + @as(f32, @floatFromInt(mi)) * MEMBER_H + MEMBER_H / 2;
+            var buf: [320]u8 = undefined;
             const vis = visibilityChar(m.visibility);
-            const label = if (m.type_str.len > 0)
-                std.fmt.bufPrint(&buf, "{s}{s} : {s}", .{ vis, m.name, m.type_str }) catch m.name
+            const name_display = normalizeGenerics(m.name, &buf) catch m.name;
+            const type_display = normalizeGenerics(m.type_str, buf[128..]) catch m.type_str;
+            const label = if (type_display.len > 0)
+                std.fmt.bufPrint(buf[256..], "{s}{s} : {s}", .{ vis, name_display, type_display }) catch m.name
             else
-                std.fmt.bufPrint(&buf, "{s}{s}", .{ vis, m.name }) catch m.name;
+                std.fmt.bufPrint(buf[256..], "{s}{s}", .{ vis, name_display }) catch m.name;
             try svg.text(bx + 8, my, label, theme.text_color, theme.font_size_small, .start, "normal");
         }
     }
@@ -302,6 +326,32 @@ fn drawTerminator(svg: *SvgWriter, tip_x: f32, tip_y: f32, from_x: f32, from_y: 
 fn classIndex(classes: []const Class, name: []const u8) ?usize {
     for (classes, 0..) |c, i| if (std.mem.eql(u8, c.name, name)) return i;
     return null;
+}
+
+/// Convert mermaid generic notation `List~T~` to display form `List<T>`.
+/// Writes into `buf` and returns the resulting slice; returns `s` unchanged on overflow.
+fn normalizeGenerics(s: []const u8, buf: []u8) ![]const u8 {
+    if (std.mem.indexOfScalar(u8, s, '~') == null) return s;
+    var out: usize = 0;
+    var i: usize = 0;
+    while (i < s.len) {
+        if (s[i] == '~') {
+            const close = std.mem.indexOfScalar(u8, s[i + 1..], '~') orelse {
+                if (out >= buf.len) return error.NoSpaceLeft;
+                buf[out] = s[i]; out += 1; i += 1; continue;
+            };
+            if (out + 1 + close + 1 + 1 > buf.len) return error.NoSpaceLeft;
+            buf[out] = '<'; out += 1;
+            @memcpy(buf[out .. out + close], s[i + 1 .. i + 1 + close]);
+            out += close;
+            buf[out] = '>'; out += 1;
+            i += 1 + close + 1;
+        } else {
+            if (out >= buf.len) return error.NoSpaceLeft;
+            buf[out] = s[i]; out += 1; i += 1;
+        }
+    }
+    return buf[0..out];
 }
 
 fn parseMember(s: []const u8) Member {

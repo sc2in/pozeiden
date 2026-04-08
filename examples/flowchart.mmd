@@ -1,5 +1,8 @@
-graph TD
-    A[Start] --> B{Decision}
+flowchart TD
+    A([Start]) --> B{Decision}
     B -->|Yes| C[Process]
-    B -->|No| D[End]
-    C --> D
+    B -->|No| D[(Database)]
+    C -- update --> D
+    D --> E{{Config}}
+    E --> F[[Subroutine]]
+    F -.-> G((Done))

@@ -1,7 +1,7 @@
 //! pozeiden: mermaid diagram renderer.
 //!
 //! The single public entry point is `render`, which accepts any mermaid diagram
-//! text and returns a self-contained SVG string.  Fourteen diagram types are
+//! text and returns a self-contained SVG string.  Seventeen diagram types are
 //! supported; see `detect.DiagramType` for the full list.
 //!
 //! All internal work uses a short-lived `ArenaAllocator` that is freed before
@@ -32,6 +32,9 @@ const quadrant_renderer = @import("renderers/quadrant.zig");
 const mindmap_renderer = @import("renderers/mindmap.zig");
 const sankey_renderer = @import("renderers/sankey.zig");
 const c4_renderer = @import("renderers/c4.zig");
+const block_renderer = @import("renderers/block.zig");
+const requirement_renderer = @import("renderers/requirement.zig");
+const kanban_renderer = @import("renderers/kanban.zig");
 
 // Embedded grammar files (compiled into the binary)
 const common_langium = @embedFile("grammars/common.langium");
@@ -76,6 +79,9 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
         .mindmap => return renderMindmapDirect(allocator, mermaid_text),
         .sankey => return renderSankeyDirect(allocator, mermaid_text),
         .c4 => return renderC4Direct(allocator, mermaid_text),
+        .block => return renderBlockDirect(allocator, mermaid_text),
+        .requirement => return renderRequirementDirect(allocator, mermaid_text),
+        .kanban => return renderKanbanDirect(allocator, mermaid_text),
         .unknown => {
             // Emit a simple fallback SVG for unrecognised diagram types
             return renderUnknown(allocator, mermaid_text);
@@ -150,6 +156,276 @@ fn renderJison(
 
 /// Parse a flowchart/graph node spec like "A", "A[label]", "A{label}", "A((label))", "A([label])"
 /// Returns (id, label, shape_str)
+// ─── block-beta parser ────────────────────────────────────────────────────────
+
+fn renderBlockDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var blocks_list: std.ArrayList(Value) = .empty;
+    var edges_list: std.ArrayList(Value) = .empty;
+    var n_cols: f64 = 3.0;
+    var seen_ids = std.StringHashMap(void).init(a);
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) { first = false; continue; } // skip "block-beta"
+
+        // columns N
+        if (std.mem.startsWith(u8, line, "columns ")) {
+            n_cols = std.fmt.parseFloat(f64, std.mem.trim(u8, line[8..], " \t")) catch 3.0;
+            continue;
+        }
+
+        // Edge: "id --> id" or "id --> id : label"
+        if (std.mem.indexOf(u8, line, "-->")) |arrow_pos| {
+            const from_raw = std.mem.trim(u8, line[0..arrow_pos], " \t");
+            const after = std.mem.trim(u8, line[arrow_pos + 3..], " \t");
+            const colon = std.mem.indexOf(u8, after, ":") orelse after.len;
+            const to_raw = std.mem.trim(u8, after[0..colon], " \t");
+            const lbl = if (colon < after.len) std.mem.trim(u8, after[colon + 1..], " \t") else "";
+            // Auto-register bare ids as blocks
+            for (&[_][]const u8{ from_raw, to_raw }) |bid| {
+                if (bid.len > 0 and seen_ids.get(bid) == null) {
+                    try seen_ids.put(bid, {});
+                    var bn = Value.Node{ .type_name = "block", .fields = .{} };
+                    try bn.fields.put(a, "id", Value{ .string = bid });
+                    try bn.fields.put(a, "label", Value{ .string = bid });
+                    try blocks_list.append(a, Value{ .node = bn });
+                }
+            }
+            var en = Value.Node{ .type_name = "edge", .fields = .{} };
+            try en.fields.put(a, "from", Value{ .string = from_raw });
+            try en.fields.put(a, "to", Value{ .string = to_raw });
+            if (lbl.len > 0) try en.fields.put(a, "label", Value{ .string = lbl });
+            try edges_list.append(a, Value{ .node = en });
+            continue;
+        }
+
+        // Block definition: id or id["label"] or id["label"]:N (width)
+        // Multiple blocks per line; respect quoted labels with spaces.
+        var pos: usize = 0;
+        while (pos < line.len) {
+            // Skip leading whitespace
+            while (pos < line.len and (line[pos] == ' ' or line[pos] == '\t')) pos += 1;
+            if (pos >= line.len) break;
+            // Read id: up to '[' or space
+            const id_start = pos;
+            while (pos < line.len and line[pos] != '[' and line[pos] != ' ' and line[pos] != '\t') pos += 1;
+            const id = line[id_start..pos];
+            if (id.len == 0) { pos += 1; continue; }
+            // Check for ["label"] after id
+            var lbl = id;
+            var width_str: []const u8 = "";
+            if (pos < line.len and line[pos] == '[') {
+                // Find matching ]
+                const bracket_start = pos;
+                pos += 1; // skip [
+                // May have "label" inside
+                if (pos < line.len and line[pos] == '"') {
+                    pos += 1; // skip "
+                    const lbl_start = pos;
+                    while (pos < line.len and line[pos] != '"') pos += 1;
+                    lbl = line[lbl_start..pos];
+                    if (pos < line.len) pos += 1; // skip closing "
+                }
+                if (pos < line.len and line[pos] == ']') pos += 1; // skip ]
+                _ = bracket_start;
+                // Width: ]:N after the bracket
+                if (pos < line.len and line[pos] == ':') {
+                    pos += 1;
+                    const w_start = pos;
+                    while (pos < line.len and line[pos] != ' ' and line[pos] != '\t') pos += 1;
+                    width_str = line[w_start..pos];
+                }
+            }
+            if (seen_ids.get(id) != null) continue;
+            try seen_ids.put(id, {});
+            const width = std.fmt.parseFloat(f64, width_str) catch 1.0;
+            var bn = Value.Node{ .type_name = "block", .fields = .{} };
+            try bn.fields.put(a, "id", Value{ .string = id });
+            try bn.fields.put(a, "label", Value{ .string = lbl });
+            try bn.fields.put(a, "width", Value{ .number = width });
+            try blocks_list.append(a, Value{ .node = bn });
+        }
+    }
+
+    var root = Value.Node{ .type_name = "block-beta", .fields = .{} };
+    try root.fields.put(a, "cols", Value{ .number = n_cols });
+    try root.fields.put(a, "blocks", Value{ .list = try blocks_list.toOwnedSlice(a) });
+    try root.fields.put(a, "edges", Value{ .list = try edges_list.toOwnedSlice(a) });
+    return block_renderer.render(allocator, Value{ .node = root });
+}
+
+// ─── requirementDiagram parser ───────────────────────────────────────────────
+
+fn renderRequirementDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var requirements: std.ArrayList(Value) = .empty;
+    var elements: std.ArrayList(Value) = .empty;
+    var relationships: std.ArrayList(Value) = .empty;
+
+    var current_kind: []const u8 = ""; // "requirement" or "element"
+    var current_node: ?Value.Node = null;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) { first = false; continue; } // skip "requirementDiagram"
+
+        // End of block
+        if (std.mem.eql(u8, line, "}")) {
+            if (current_node) |n| {
+                if (std.mem.eql(u8, current_kind, "requirement")) {
+                    try requirements.append(a, Value{ .node = n });
+                } else {
+                    try elements.append(a, Value{ .node = n });
+                }
+                current_node = null;
+                current_kind = "";
+            }
+            continue;
+        }
+
+        // Block start: "requirement name {" or "element name {"
+        if (std.mem.startsWith(u8, line, "requirement ") or
+            std.mem.startsWith(u8, line, "functionalRequirement ") or
+            std.mem.startsWith(u8, line, "performanceRequirement ") or
+            std.mem.startsWith(u8, line, "interfaceRequirement ") or
+            std.mem.startsWith(u8, line, "physicalRequirement ") or
+            std.mem.startsWith(u8, line, "designConstraint "))
+        {
+            const sp = std.mem.indexOfScalar(u8, line, ' ') orelse line.len;
+            const rest = std.mem.trim(u8, line[sp..], " \t{");
+            current_kind = "requirement";
+            current_node = Value.Node{ .type_name = "requirement", .fields = .{} };
+            try current_node.?.fields.put(a, "name", Value{ .string = rest });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "element ")) {
+            const rest = std.mem.trim(u8, line[8..], " \t{");
+            current_kind = "element";
+            current_node = Value.Node{ .type_name = "element", .fields = .{} };
+            try current_node.?.fields.put(a, "name", Value{ .string = rest });
+            continue;
+        }
+
+        // Attribute inside block: "key: value"
+        if (current_node != null) {
+            if (std.mem.indexOf(u8, line, ":")) |ci| {
+                const key = std.mem.trim(u8, line[0..ci], " \t");
+                const val = std.mem.trim(u8, line[ci + 1..], " \t\"");
+                try current_node.?.fields.put(a, key, Value{ .string = val });
+            }
+            continue;
+        }
+
+        // Relationship: "A - kind -> B" or "A - kind - B"
+        if (std.mem.indexOf(u8, line, " - ")) |d1| {
+            const from = std.mem.trim(u8, line[0..d1], " \t");
+            const rest = line[d1 + 3..];
+            const d2 = std.mem.indexOf(u8, rest, " - ") orelse std.mem.indexOf(u8, rest, " -> ") orelse rest.len;
+            if (d2 < rest.len) {
+                const kind = std.mem.trim(u8, rest[0..d2], " \t");
+                const arrow_len: usize = if (std.mem.startsWith(u8, rest[d2..], " -> ")) 4 else 3;
+                const to = std.mem.trim(u8, rest[d2 + arrow_len..], " \t");
+                var rn = Value.Node{ .type_name = "relationship", .fields = .{} };
+                try rn.fields.put(a, "from", Value{ .string = from });
+                try rn.fields.put(a, "to", Value{ .string = to });
+                try rn.fields.put(a, "kind", Value{ .string = kind });
+                try relationships.append(a, Value{ .node = rn });
+            }
+        }
+    }
+
+    var root = Value.Node{ .type_name = "requirementDiagram", .fields = .{} };
+    try root.fields.put(a, "requirements", Value{ .list = try requirements.toOwnedSlice(a) });
+    try root.fields.put(a, "elements", Value{ .list = try elements.toOwnedSlice(a) });
+    try root.fields.put(a, "relationships", Value{ .list = try relationships.toOwnedSlice(a) });
+    return requirement_renderer.render(allocator, Value{ .node = root });
+}
+
+// ─── kanban parser ────────────────────────────────────────────────────────────
+
+fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var columns: std.ArrayList(Value) = .empty;
+    var current_col_label: ?[]const u8 = null;
+    var current_items: std.ArrayList(Value) = .empty;
+    var title: []const u8 = "";
+
+    const flushColumn = struct {
+        fn run(cols: *std.ArrayList(Value), label: []const u8, items: *std.ArrayList(Value), alloc: std.mem.Allocator) !void {
+            var cn = Value.Node{ .type_name = "column", .fields = .{} };
+            try cn.fields.put(alloc, "label", Value{ .string = label });
+            try cn.fields.put(alloc, "items", Value{ .list = try items.toOwnedSlice(alloc) });
+            try cols.append(alloc, Value{ .node = cn });
+        }
+    }.run;
+
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (first) {
+            first = false;
+            // "kanban" or "kanban title" on first line
+            if (std.mem.indexOf(u8, line, " ")) |sp| {
+                title = std.mem.trim(u8, line[sp..], " \t");
+            }
+            continue;
+        }
+
+        const is_indented = raw.len > 0 and (raw[0] == ' ' or raw[0] == '\t');
+
+        if (!is_indented and line.len > 0) {
+            // New column header
+            if (current_col_label) |lbl| {
+                try flushColumn(&columns, lbl, &current_items, a);
+                current_items = .empty;
+            }
+            current_col_label = line;
+        } else if (is_indented and current_col_label != null) {
+            // Item inside current column
+            // Syntax: "id" or "id[\"label\"]" or "@{...}"
+            var item_label = line;
+            var item_id = line;
+            if (std.mem.indexOf(u8, line, "[\"")) |lb| {
+                item_id = line[0..lb];
+                const rb = std.mem.indexOf(u8, line[lb..], "\"]") orelse (line.len - lb);
+                item_label = line[lb + 2 .. @min(lb + rb, line.len)];
+            }
+            var iv = Value.Node{ .type_name = "item", .fields = .{} };
+            try iv.fields.put(a, "id", Value{ .string = item_id });
+            try iv.fields.put(a, "label", Value{ .string = item_label });
+            try current_items.append(a, Value{ .node = iv });
+        }
+    }
+    if (current_col_label) |lbl| {
+        try flushColumn(&columns, lbl, &current_items, a);
+    }
+
+    if (columns.items.len == 0) return kanban_renderer.render(allocator, Value{ .null = {} });
+
+    var root = Value.Node{ .type_name = "kanban", .fields = .{} };
+    try root.fields.put(a, "title", Value{ .string = title });
+    try root.fields.put(a, "columns", Value{ .list = try columns.toOwnedSlice(a) });
+    return kanban_renderer.render(allocator, Value{ .node = root });
+}
+
 fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 } {
     const s = std.mem.trim(u8, spec, " \t\r\n");
     if (s.len == 0) return .{ "", "", "rect" };
@@ -158,15 +434,22 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
         switch (c) {
             '[' => {
                 const id = s[0..i];
-                // Check for stadium ([...]) or subroutine [[...]]
+                // Subroutine: [[label]]
                 if (i + 1 < s.len and s[i + 1] == '[') {
                     const end = std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1;
                     return .{ id, s[i + 2 .. @min(end, s.len)], "subroutine" };
                 }
+                // Cylinder: [(label)]  -- note: starts with `[` then `(`
                 if (i + 1 < s.len and s[i + 1] == '(') {
                     const end = std.mem.lastIndexOfScalar(u8, s, ')') orelse s.len - 1;
-                    return .{ id, s[i + 2 .. @min(end, s.len)], "stadium" };
+                    return .{ id, s[i + 2 .. @min(end, s.len)], "cylinder" };
                 }
+                // Parallelogram: [/label/]
+                if (i + 1 < s.len and s[i + 1] == '/') {
+                    const end = std.mem.indexOf(u8, s[i..], "/]") orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "parallelogram" };
+                }
+                // Rect: [label]
                 const end = std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1;
                 return .{ id, s[i + 1 .. @min(end, s.len)], "rect" };
             },
@@ -177,13 +460,35 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
                     const end = std.mem.lastIndexOfScalar(u8, s, ')') orelse s.len - 1;
                     return .{ id, s[i + 2 .. @min(end, s.len)], "circle" };
                 }
+                // Stadium: ([label])  -- note: starts with `(` then `[`
+                if (i + 1 < s.len and s[i + 1] == '[') {
+                    const end = std.mem.indexOf(u8, s[i..], "])") orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "stadium" };
+                }
+                // Round rectangle: (label)
                 const end = std.mem.lastIndexOfScalar(u8, s, ')') orelse s.len - 1;
                 return .{ id, s[i + 1 .. @min(end, s.len)], "round" };
             },
             '{' => {
                 const id = s[0..i];
+                // Hexagon: {{label}}
+                if (i + 1 < s.len and s[i + 1] == '{') {
+                    const end = std.mem.indexOf(u8, s[i..], "}}") orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "hexagon" };
+                }
+                // Diamond: {label}
                 const end = std.mem.lastIndexOfScalar(u8, s, '}') orelse s.len - 1;
                 return .{ id, s[i + 1 .. @min(end, s.len)], "diamond" };
+            },
+            '>' => {
+                // Asymmetric: id>label]  -- only if `]` exists and no space/dash right after `>`
+                if (i + 1 < s.len and s[i + 1] != ' ' and s[i + 1] != '\t' and s[i + 1] != '-') {
+                    if (std.mem.lastIndexOfScalar(u8, s[i..], ']') != null) {
+                        const id = s[0..i];
+                        const end = (std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1);
+                        return .{ id, s[i + 1 .. @min(end, s.len)], "asymmetric" };
+                    }
+                }
             },
             else => {},
         }
@@ -279,10 +584,10 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
 
         // Try to find an edge arrow
         if (findEdgeArrow(line)) |arrow| {
-            const from_part = std.mem.trim(u8, line[0..arrow[0]], " \t");
+            var from_raw = std.mem.trim(u8, line[0..arrow[0]], " \t");
             var to_part = std.mem.trim(u8, line[arrow[1]..], " \t");
 
-            // Edge label: |label| between arrow and destination
+            // Edge label: |label| between arrow and destination (A --> |label| B)
             var edge_label: ?[]const u8 = null;
             if (to_part.len > 0 and to_part[0] == '|') {
                 const label_end = std.mem.indexOfScalar(u8, to_part[1..], '|') orelse 0;
@@ -290,6 +595,20 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 to_part = std.mem.trim(u8, to_part[2 + label_end ..], " \t");
             }
 
+            // Edge label embedded before arrow: "A -- label -->" or "A -- label ---"
+            // Detect: from_raw contains " -- " and has content before it
+            if (edge_label == null) {
+                if (std.mem.lastIndexOf(u8, from_raw, " -- ")) |dash_pos| {
+                    const node_part = std.mem.trim(u8, from_raw[0..dash_pos], " \t");
+                    const lbl = std.mem.trim(u8, from_raw[dash_pos + 4 ..], " \t");
+                    if (node_part.len > 0 and lbl.len > 0) {
+                        from_raw = node_part;
+                        edge_label = lbl;
+                    }
+                }
+            }
+
+            const from_part = from_raw;
             const from_id, const from_label, const from_shape = parseNodeSpec(from_part);
             const to_id, const to_label, const to_shape = parseNodeSpec(to_part);
 
@@ -366,20 +685,8 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     var participants_list: std.ArrayList(Value) = .empty;
     var signals_list: std.ArrayList(Value) = .empty;
     var seen_actors = std.StringHashMap(void).init(a);
-
-    // Arrow type detection helpers
-    // signalType: "0"=solid-filled, "1"=dotted-filled, "2"=solid-open, "3"=dotted-open
-    const ArrowDef = struct { []const u8, []const u8, []const u8 }; // needle, signalType, arrowType
-    const arrow_types = [_]ArrowDef{
-        .{ "-->x", "3", "CROSS" },
-        .{ "->>", "0", "filled" },
-        .{ "-->>", "1", "filled" },
-        .{ "->x", "2", "CROSS" },
-        .{ "->>", "0", "filled" },
-        .{ "-->", "3", "OPEN" },  // dotted open
-        .{ "->", "2", "OPEN" },   // solid open
-    };
-    _ = arrow_types; // will use inline below
+    var autonumber = false;
+    var msg_count: usize = 0; // track message count for note row positions
 
     const BlockFrame = struct { kind: []const u8, label: []const u8, start: usize };
     var block_stack: std.ArrayList(BlockFrame) = .empty;
@@ -391,7 +698,10 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         if (line.len == 0) continue;
         if (std.mem.startsWith(u8, line, "%%")) continue;
 
-        if (first) { first = false; continue; } // skip "sequenceDiagram"
+        if (first) {
+            first = false;
+            continue; // skip "sequenceDiagram"
+        }
 
         // participant/actor declaration
         if (std.mem.startsWith(u8, line, "participant ") or std.mem.startsWith(u8, line, "actor ")) {
@@ -446,12 +756,63 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             try block_stack.append(a, .{ .kind = "par", .label = lbl, .start = signals_list.items.len - 1 });
             continue;
         }
+        if (std.mem.eql(u8, line, "autonumber")) {
+            autonumber = true;
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "activate ")) {
+            const actor_name = std.mem.trim(u8, line[9..], " \t");
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "activate" });
+            try sig.fields.put(a, "actor", Value{ .string = actor_name });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            try signals_list.append(a, Value{ .node = sig });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "deactivate ")) {
+            const actor_name = std.mem.trim(u8, line[11..], " \t");
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "deactivate" });
+            try sig.fields.put(a, "actor", Value{ .string = actor_name });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            try signals_list.append(a, Value{ .node = sig });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "note ") or std.mem.startsWith(u8, line, "Note ")) {
+            // Note over A,B: text  /  Note right of A: text  /  Note left of A: text
+            const rest = line[5..];
+            const colon = std.mem.indexOfScalar(u8, rest, ':') orelse rest.len;
+            const pos_part = std.mem.trim(u8, rest[0..colon], " \t");
+            const note_text = if (colon < rest.len) std.mem.trim(u8, rest[colon + 1..], " \t") else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "note" });
+            try sig.fields.put(a, "text", Value{ .string = note_text });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            if (std.mem.startsWith(u8, pos_part, "over ")) {
+                const actors_str = pos_part[5..];
+                if (std.mem.indexOfScalar(u8, actors_str, ',')) |ci| {
+                    try sig.fields.put(a, "actor1", Value{ .string = std.mem.trim(u8, actors_str[0..ci], " \t") });
+                    try sig.fields.put(a, "actor2", Value{ .string = std.mem.trim(u8, actors_str[ci + 1..], " \t") });
+                } else {
+                    try sig.fields.put(a, "actor1", Value{ .string = std.mem.trim(u8, actors_str, " \t") });
+                }
+                try sig.fields.put(a, "position", Value{ .string = "over" });
+            } else if (std.mem.startsWith(u8, pos_part, "right of ")) {
+                try sig.fields.put(a, "actor1", Value{ .string = std.mem.trim(u8, pos_part[9..], " \t") });
+                try sig.fields.put(a, "position", Value{ .string = "right" });
+            } else if (std.mem.startsWith(u8, pos_part, "left of ")) {
+                try sig.fields.put(a, "actor1", Value{ .string = std.mem.trim(u8, pos_part[8..], " \t") });
+                try sig.fields.put(a, "position", Value{ .string = "left" });
+            } else {
+                try sig.fields.put(a, "actor1", Value{ .string = pos_part });
+                try sig.fields.put(a, "position", Value{ .string = "over" });
+            }
+            try signals_list.append(a, Value{ .node = sig });
+            continue;
+        }
         if (std.mem.startsWith(u8, line, "else") or
             std.mem.startsWith(u8, line, "and ") or std.mem.eql(u8, line, "and")) {
             continue; // alt/par branch separator, skip
-        }
-        if (std.mem.startsWith(u8, line, "note ") or std.mem.startsWith(u8, line, "note\t")) {
-            continue; // note annotations not rendered
         }
         if (std.mem.eql(u8, line, "end")) {
             if (block_stack.items.len > 0) {
@@ -481,10 +842,20 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                 const after_arrow = line[arrow_pos + ap[0].len..];
                 // Split on ":"
                 const colon_pos = std.mem.indexOfScalar(u8, after_arrow, ':') orelse after_arrow.len;
-                const to_raw = std.mem.trim(u8, after_arrow[0..colon_pos], " \t");
+                var to_raw = std.mem.trim(u8, after_arrow[0..colon_pos], " \t");
                 const msg = if (colon_pos < after_arrow.len)
                     std.mem.trim(u8, after_arrow[colon_pos + 1..], " \t")
                 else "";
+
+                // +/- activation suffix on to-actor: "Bob+" activates, "Bob-" deactivates
+                var activate_suffix: i8 = 0; // +1=activate, -1=deactivate
+                if (to_raw.len > 0 and to_raw[to_raw.len - 1] == '+') {
+                    to_raw = to_raw[0 .. to_raw.len - 1];
+                    activate_suffix = 1;
+                } else if (to_raw.len > 0 and to_raw[to_raw.len - 1] == '-') {
+                    to_raw = to_raw[0 .. to_raw.len - 1];
+                    activate_suffix = -1;
+                }
 
                 // Register actors
                 for (&[_][]const u8{ from_raw, to_raw }) |actor| {
@@ -501,6 +872,22 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                 try sig.fields.put(a, "msg", Value{ .string = msg });
                 try sig.fields.put(a, "signalType", Value{ .string = ap[1] });
                 try signals_list.append(a, Value{ .node = sig });
+                msg_count += 1;
+
+                // Emit activate/deactivate after message if +/- suffix was present
+                if (activate_suffix == 1) {
+                    var asig = Value.Node{ .type_name = "signal", .fields = .{} };
+                    try asig.fields.put(a, "type", Value{ .string = "activate" });
+                    try asig.fields.put(a, "actor", Value{ .string = to_raw });
+                    try asig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+                    try signals_list.append(a, Value{ .node = asig });
+                } else if (activate_suffix == -1) {
+                    var asig = Value.Node{ .type_name = "signal", .fields = .{} };
+                    try asig.fields.put(a, "type", Value{ .string = "deactivate" });
+                    try asig.fields.put(a, "actor", Value{ .string = to_raw });
+                    try asig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+                    try signals_list.append(a, Value{ .node = asig });
+                }
                 found_arrow = true;
                 break;
             }
@@ -510,6 +897,7 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     var root = Value.Node{ .type_name = "sequenceDiagram", .fields = .{} };
     try root.fields.put(a, "participants", Value{ .list = try participants_list.toOwnedSlice(a) });
     try root.fields.put(a, "signals", Value{ .list = try signals_list.toOwnedSlice(a) });
+    try root.fields.put(a, "autonumber", Value{ .number = if (autonumber) 1.0 else 0.0 });
 
     return sequence_renderer.render(allocator, Value{ .node = root });
 }
@@ -549,13 +937,20 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         // End of class block
         if (std.mem.eql(u8, line, "}")) { current_class = null; continue; }
 
-        // Start of class block: "class Foo {" or "class Foo"
+        // Start of class block: "class Foo {" or "class Foo <<interface>>"
         if (std.mem.startsWith(u8, line, "class ")) {
             const rest = std.mem.trim(u8, line[6..], " \t");
-            const name = if (std.mem.indexOf(u8, rest, " ") orelse std.mem.indexOf(u8, rest, "{")) |sp|
-                std.mem.trim(u8, rest[0..sp], " \t") else rest;
-            if (!class_map.contains(name)) {
-                try class_map.put(name, .empty);
+            const name_end = std.mem.indexOfAny(u8, rest, " {") orelse rest.len;
+            const name = std.mem.trim(u8, rest[0..name_end], " \t");
+            const entry = try class_map.getOrPut(name);
+            if (!entry.found_existing) entry.value_ptr.* = .empty;
+            // Inline stereotype: "class Foo <<interface>>" or "class Foo <<interface>> {"
+            if (name_end < rest.len) {
+                const after = std.mem.trim(u8, rest[name_end..], " \t{");
+                if (std.mem.startsWith(u8, after, "<<") and std.mem.indexOf(u8, after, ">>") != null) {
+                    const ste_end = (std.mem.indexOf(u8, after, ">>") orelse after.len - 2) + 2;
+                    try entry.value_ptr.append(a, after[0..ste_end]);
+                }
             }
             if (std.mem.indexOf(u8, line, "{") != null) {
                 current_class = name;
@@ -669,9 +1064,26 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         if (first) { first = false; continue; } // skip header
 
         // `state "long name" as id` or `state id {` (compound)
+        // Also handles: `state id <<fork>>` / `<<join>>` / `<<choice>>`
         if (std.mem.startsWith(u8, line, "state ")) {
             const rest = line[6..];
-            if (std.mem.indexOf(u8, rest, " as ")) |ai| {
+            // Check for stereotype: state id <<fork>> etc.
+            if (std.mem.indexOf(u8, rest, "<<")) |ss| {
+                const id = std.mem.trim(u8, rest[0..ss], " \t");
+                const ste_start = ss + 2;
+                const ste_end = std.mem.indexOf(u8, rest[ste_start..], ">>") orelse (rest.len - ste_start);
+                const ste = rest[ste_start .. ste_start + ste_end];
+                if (id.len > 0) {
+                    if (seen.get(id) == null) {
+                        try seen.put(id, {});
+                        var sn = Value.Node{ .type_name = "state", .fields = .{} };
+                        try sn.fields.put(a, "id", Value{ .string = id });
+                        try sn.fields.put(a, "label", Value{ .string = id });
+                        try sn.fields.put(a, "shape", Value{ .string = ste });
+                        try states.append(a, Value{ .node = sn });
+                    }
+                }
+            } else if (std.mem.indexOf(u8, rest, " as ")) |ai| {
                 const lbl_raw = std.mem.trim(u8, rest[0..ai], " \t\"");
                 const id = std.mem.trim(u8, rest[ai + 4..], " \t{");
                 if (id.len > 0) try addState(&states, &seen, a, id, lbl_raw);
@@ -844,6 +1256,7 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var sections: std.ArrayList(Value) = .empty;
     var cur_section_label: []const u8 = "Tasks";
     var cur_tasks: std.ArrayList(Value) = .empty;
+    var show_today: bool = false;
 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
@@ -859,10 +1272,17 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         if (std.mem.startsWith(u8, line, "dateFormat") or
             std.mem.startsWith(u8, line, "axisFormat") or
             std.mem.startsWith(u8, line, "excludes") or
-            std.mem.startsWith(u8, line, "todayMarker") or
             std.mem.startsWith(u8, line, "tickInterval"))
         {
             continue; // skip format directives
+        }
+        if (std.mem.startsWith(u8, line, "todayMarker")) {
+            // "todayMarker off" disables it; anything else (including bare "todayMarker") enables
+            const rest2 = std.mem.trim(u8, line[11..], " \t");
+            if (!std.mem.eql(u8, rest2, "off")) {
+                show_today = true;
+            }
+            continue;
         }
         if (std.mem.startsWith(u8, line, "section ") or std.mem.startsWith(u8, line, "section\t")) {
             // Save previous section
@@ -920,6 +1340,7 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var root = Value.Node{ .type_name = "gantt", .fields = .{} };
     try root.fields.put(a, "title", Value{ .string = title });
     try root.fields.put(a, "sections", Value{ .list = try sections.toOwnedSlice(a) });
+    try root.fields.put(a, "show_today", Value{ .string = if (show_today) "1" else "0" });
     return gantt_renderer.render(allocator, Value{ .node = root });
 }
 
@@ -1312,7 +1733,7 @@ fn renderC4Direct(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     var boundaries: std.ArrayList(Value) = .empty;
 
     // Boundary tracking: stack of (alias, label, members)
-    const BStack = struct { alias: []const u8, label: []const u8, members: std.ArrayList([]const u8) };
+    const BStack = struct { alias: []const u8, label: []const u8, members: std.ArrayList([]const u8), is_enterprise: bool };
     var bstack: std.ArrayList(BStack) = .empty;
 
     var lines = std.mem.splitScalar(u8, text, '\n');
@@ -1341,6 +1762,7 @@ fn renderC4Direct(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 var bn = Value.Node{ .type_name = "boundary", .fields = .{} };
                 try bn.fields.put(a, "alias", Value{ .string = bs.alias });
                 try bn.fields.put(a, "label", Value{ .string = bs.label });
+                if (bs.is_enterprise) try bn.fields.put(a, "enterprise", Value{ .string = "1" });
                 var ml: std.ArrayList(Value) = .empty;
                 for (bs.members.items) |m| try ml.append(a, Value{ .string = m });
                 try bn.fields.put(a, "members", Value{ .list = try ml.toOwnedSlice(a) });
@@ -1356,25 +1778,30 @@ fn renderC4Direct(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
             const args = extractArgs(line) orelse continue;
             const alias = nextArg(args, 0);
             const lbl = stripQuotes(nextArg(args, 1));
-            const bs = BStack{ .alias = alias, .label = lbl, .members = .empty };
+            const is_ent = std.mem.startsWith(u8, line, "Enterprise_Boundary");
+            const bs = BStack{ .alias = alias, .label = lbl, .members = .empty, .is_enterprise = is_ent };
             try bstack.append(a, bs);
             continue;
         }
 
-        // Relationship: Rel / BiRel / Rel_D / Rel_U / Rel_L / Rel_R
+        // Relationship: Rel / BiRel / Rel_D / Rel_U / Rel_L / Rel_R / Rel_Back
         if (std.mem.startsWith(u8, line, "BiRel") or
             (std.mem.startsWith(u8, line, "Rel") and
              (line.len > 3 and (line[3] == '(' or line[3] == '_' or line[3] == ' '))))
         {
             const is_bi = std.mem.startsWith(u8, line, "BiRel");
+            const is_back = std.mem.startsWith(u8, line, "Rel_Back");
             const args = extractArgs(line) orelse continue;
-            const from = nextArg(args, 0);
-            const to = nextArg(args, 1);
+            // Rel_Back(from, to, ...) means arrow goes from `to` → `from`
+            const raw_from = nextArg(args, 0);
+            const raw_to = nextArg(args, 1);
+            const actual_from = if (is_back) raw_to else raw_from;
+            const actual_to = if (is_back) raw_from else raw_to;
             const lbl = stripQuotes(nextArg(args, 2));
             const tech = stripQuotes(nextArg(args, 3));
             var rn = Value.Node{ .type_name = "relation", .fields = .{} };
-            try rn.fields.put(a, "from", Value{ .string = from });
-            try rn.fields.put(a, "to", Value{ .string = to });
+            try rn.fields.put(a, "from", Value{ .string = actual_from });
+            try rn.fields.put(a, "to", Value{ .string = actual_to });
             try rn.fields.put(a, "label", Value{ .string = lbl });
             try rn.fields.put(a, "tech", Value{ .string = tech });
             if (is_bi) try rn.fields.put(a, "bidirectional", Value{ .string = "1" });
@@ -1738,6 +2165,50 @@ test "flowchart bezier path connector" {
     try std.testing.expect(std.mem.indexOf(u8, svg, " C ") != null);
 }
 
+test "flowchart cylinder hexagon subroutine shapes" {
+    const input =
+        \\graph TD
+        \\A[(Database)]
+        \\B{{Hexagon}}
+        \\C[[Subroutine]]
+        \\A --> B --> C
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    // Cylinder: ellipse element
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<ellipse") != null);
+    // Hexagon: polygon with 6 points
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<polygon") != null);
+    // Subroutine: rect + inner vertical lines
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Database") != null);
+}
+
+test "flowchart stadium and round shapes" {
+    const input =
+        \\graph LR
+        \\A([Stadium])
+        \\B(Round)
+        \\A --> B
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Stadium") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Round") != null);
+}
+
+test "flowchart -- label --> edge syntax" {
+    const input =
+        \\graph TD
+        \\A -- yes --> B
+        \\A -- no --> C
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "yes") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "no") != null);
+}
+
 // ─── Sequence feature tests ───────────────────────────────────────────────────
 
 test "sequence self-message" {
@@ -1831,17 +2302,59 @@ test "sequence par block rendered" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
 }
 
-test "sequence note lines skipped gracefully" {
+test "sequence note rendered" {
     const input =
         \\sequenceDiagram
         \\Alice->>Bob: hello
-        \\note right of Bob: thinking
+        \\Note right of Bob: thinking
         \\Bob-->>Alice: world
     ;
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "hello") != null);
     try std.testing.expect(std.mem.indexOf(u8, svg, "world") != null);
+    // Note box rendered
+    try std.testing.expect(std.mem.indexOf(u8, svg, "thinking") != null);
+}
+
+test "sequence note over two actors" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Bob: request
+        \\Note over Alice,Bob: processing
+        \\Bob-->>Alice: response
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "processing") != null);
+}
+
+test "sequence activation box" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Bob: request
+        \\activate Bob
+        \\Bob-->>Alice: response
+        \\deactivate Bob
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "request") != null);
+    // Activation bar is a narrow rect
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "sequence autonumber" {
+    const input =
+        \\sequenceDiagram
+        \\autonumber
+        \\Alice->>Bob: hello
+        \\Bob-->>Alice: world
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "1.") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "2.") != null);
 }
 
 // ─── ClassDiagram feature tests ───────────────────────────────────────────────
@@ -1909,6 +2422,47 @@ test "classDiagram relation label" {
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "drives") != null);
+}
+
+test "classDiagram stereotype inline" {
+    const input =
+        \\classDiagram
+        \\class Animal <<interface>> {
+        \\  +makeSound() String
+        \\}
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Animal") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "interface") != null);
+}
+
+test "classDiagram stereotype block" {
+    const input =
+        \\classDiagram
+        \\class Shape {
+        \\  <<abstract>>
+        \\  +draw() void
+        \\}
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "abstract") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "draw") != null);
+}
+
+test "classDiagram generic type notation" {
+    const input =
+        \\classDiagram
+        \\class Container~T~ {
+        \\  +items List~T~
+        \\  +add(item T) void
+        \\}
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    // Generic types rendered as <T>
+    try std.testing.expect(std.mem.indexOf(u8, svg, "List") != null);
 }
 
 // ─── StateDiagram feature tests ───────────────────────────────────────────────
@@ -2094,4 +2648,74 @@ test "flowchart subgraph background box" {
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "Auth") != null);
     try std.testing.expect(std.mem.indexOf(u8, svg, "Service Layer") != null);
+}
+
+// ─── block-beta tests ─────────────────────────────────────────────────────────
+
+test "block-beta basic grid" {
+    const input =
+        \\block-beta
+        \\columns 3
+        \\A["Block A"] B["Block B"] C["Block C"]
+        \\A --> B
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Block A") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Block B") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<line") != null);
+}
+
+test "block-beta bare ids" {
+    const input =
+        \\block-beta
+        \\columns 2
+        \\A B
+        \\A --> B
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+}
+
+// ─── requirementDiagram tests ─────────────────────────────────────────────────
+
+test "requirementDiagram basic" {
+    const input =
+        \\requirementDiagram
+        \\requirement req1 {
+        \\id: 1
+        \\text: "Shall do X"
+        \\risk: high
+        \\verifyMethod: test
+        \\}
+        \\element sys1 {
+        \\type: simulation
+        \\}
+        \\sys1 - satisfies -> req1
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "req1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "satisfies") != null);
+}
+
+// ─── kanban tests ─────────────────────────────────────────────────────────────
+
+test "kanban basic board" {
+    const input =
+        \\kanban
+        \\todo
+        \\  id1["Task A"]
+        \\  id2["Task B"]
+        \\in-progress
+        \\  id3["Task C"]
+        \\done
+        \\  id4["Task D"]
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "todo") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Task A") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "done") != null);
 }

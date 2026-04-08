@@ -1,12 +1,20 @@
 classDiagram
-    class Animal {
+    class Animal <<abstract>> {
         +String name
-        +makeSound() void
+        +makeSound() String
     }
     class Duck {
         +swim() void
+        +quack() String
     }
-    class Fish
+    class Fish {
+        +depth int
+    }
+    class Collection~T~ {
+        +items List~T~
+        +add(item T) void
+    }
     Animal <|-- Duck
     Animal <|-- Fish
     Duck --> Fish : chases
+    Collection~Duck~ o-- Duck
