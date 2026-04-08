@@ -75,6 +75,35 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     try svg.header(svg_w, svg_h);
     try svg.defs(arrow_marker_defs);
 
+    // Draw subgraph background boxes (behind edges and nodes)
+    const subgraphs_val = node.getList("subgraphs");
+    for (subgraphs_val) |sgv| {
+        const sgn = sgv.asNode() orelse continue;
+        const label = sgn.getString("label") orelse "";
+        const members = sgn.getList("members");
+        if (members.len == 0) continue;
+
+        // Compute bounding box of member nodes
+        var min_x: f32 = std.math.floatMax(f32);
+        var min_y: f32 = std.math.floatMax(f32);
+        var max_x: f32 = -std.math.floatMax(f32);
+        var max_y: f32 = -std.math.floatMax(f32);
+        for (members) |mv| {
+            const mid = mv.asString() orelse continue;
+            const mn = findNode(graph.nodes, mid) orelse continue;
+            if (mn.x < min_x) min_x = mn.x;
+            if (mn.y < min_y) min_y = mn.y;
+            if (mn.x + mn.w > max_x) max_x = mn.x + mn.w;
+            if (mn.y + mn.h > max_y) max_y = mn.y + mn.h;
+        }
+        if (min_x >= max_x) continue;
+        const pad: f32 = 16;
+        try svg.rect(min_x - pad, min_y - pad, max_x - min_x + pad * 2, max_y - min_y + pad * 2,
+            6.0, "#f0f4ff", "#b0c0e8", 1.2);
+        try svg.text(min_x - pad + 6, min_y - pad + 13, label,
+            "#4466aa", theme.font_size_small, .start, "normal");
+    }
+
     // Draw edges first (behind nodes)
     for (graph.edges) |e| {
         const from_node = findNode(graph.nodes, e.from) orelse continue;

@@ -122,15 +122,28 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             // Task label
             try svg.text(MARGIN_X + LABEL_W - 4, ty + ROW_H / 2 + 4, t.name, theme.text_color, theme.font_size_small, .end, "normal");
 
-            // Bar
+            // Bar or milestone diamond
             const bx = bar_x + (cursor / total_dur) * BAR_AREA_W;
             const bw = (t.duration / total_dur) * BAR_AREA_W;
             const is_crit = std.mem.indexOf(u8, t.flags, "crit") != null;
             const is_done = std.mem.indexOf(u8, t.flags, "done") != null;
+            const is_milestone = std.mem.indexOf(u8, t.flags, "milestone") != null;
             const bar_fill = if (is_crit) "#e55039"
                              else if (is_done) "#95a5a6"
                              else sect_color;
-            try svg.rect(bx, bar_y, bw, BAR_H, 3.0, bar_fill, "none", 0);
+            if (is_milestone) {
+                // Render as a diamond at the task's start position
+                const cx = bx;
+                const cy = bar_y + BAR_H / 2;
+                const r: f32 = BAR_H * 0.6;
+                var pts_buf: [192]u8 = undefined;
+                const pts = try std.fmt.bufPrint(&pts_buf,
+                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                    .{ cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy });
+                try svg.polygon(pts, bar_fill, bar_fill, 0);
+            } else {
+                try svg.rect(bx, bar_y, bw, BAR_H, 3.0, bar_fill, "none", 0);
+            }
 
             cursor += t.duration;
             row_idx += 1;

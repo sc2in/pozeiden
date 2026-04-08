@@ -205,6 +205,21 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     var seen_nodes = std.StringHashMap(void).init(a);
     var direction: []const u8 = "TB";
 
+    // Subgraph tracking
+    const Subgraph = struct {
+        label: []const u8,
+        members: std.ArrayList(Value),
+    };
+    var subgraphs: std.ArrayList(Subgraph) = .empty;
+    var cur_subgraph: ?usize = null; // index into subgraphs
+
+    const addNodeToSubgraph = struct {
+        fn run(sgs: *std.ArrayList(Subgraph), idx: ?usize, alloc: std.mem.Allocator, id: []const u8) !void {
+            const i = idx orelse return;
+            try sgs.items[i].members.append(alloc, Value{ .string = id });
+        }
+    }.run;
+
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
@@ -212,6 +227,11 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         if (line.len == 0) continue;
         // Skip comments
         if (std.mem.startsWith(u8, line, "%%")) continue;
+        // Skip style/classDef/linkStyle directives
+        if (std.mem.startsWith(u8, line, "style ") or
+            std.mem.startsWith(u8, line, "classDef ") or
+            std.mem.startsWith(u8, line, "class ") or
+            std.mem.startsWith(u8, line, "linkStyle ")) continue;
 
         if (first) {
             first = false;
@@ -219,6 +239,23 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             if (std.mem.indexOf(u8, line, " ")) |sp| {
                 direction = std.mem.trim(u8, line[sp..], " \t");
             }
+            continue;
+        }
+
+        // Subgraph start: "subgraph id" or "subgraph id [label]" or "subgraph [label]"
+        if (std.mem.startsWith(u8, line, "subgraph")) {
+            const rest = std.mem.trim(u8, line[8..], " \t");
+            // Extract display label: prefer bracket content, else use rest
+            const label = if (std.mem.indexOf(u8, rest, "[")) |lb|
+                if (std.mem.indexOf(u8, rest, "]")) |rb| rest[lb + 1 .. rb] else rest
+            else if (rest.len > 0) rest else "group";
+            const sg_idx = subgraphs.items.len;
+            try subgraphs.append(a, .{ .label = label, .members = .empty });
+            cur_subgraph = sg_idx;
+            continue;
+        }
+        if (std.mem.eql(u8, line, "end") and cur_subgraph != null) {
+            cur_subgraph = null;
             continue;
         }
 
@@ -248,6 +285,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = from_label });
                 try n.fields.put(a, "shape", Value{ .string = from_shape });
                 try nodes_list.append(a, Value{ .node = n });
+                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, from_id);
             }
             if (seen_nodes.get(to_id) == null) {
                 try seen_nodes.put(to_id, {});
@@ -256,6 +294,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = to_label });
                 try n.fields.put(a, "shape", Value{ .string = to_shape });
                 try nodes_list.append(a, Value{ .node = n });
+                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, to_id);
             }
 
             // Add edge
@@ -267,7 +306,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try e.fields.put(a, "label", Value{ .string = lbl });
             }
             try edges_list.append(a, Value{ .node = e });
-        } else if (line.len > 0 and !std.mem.startsWith(u8, line, "subgraph") and !std.mem.eql(u8, line, "end")) {
+        } else if (line.len > 0 and !std.mem.eql(u8, line, "end")) {
             // Standalone node definition
             const node_id, const node_label, const node_shape = parseNodeSpec(line);
             if (node_id.len > 0 and seen_nodes.get(node_id) == null) {
@@ -277,14 +316,26 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = node_label });
                 try n.fields.put(a, "shape", Value{ .string = node_shape });
                 try nodes_list.append(a, Value{ .node = n });
+                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, node_id);
             }
         }
+    }
+
+    // Build subgraphs list for the renderer
+    var subgraphs_val: std.ArrayList(Value) = .empty;
+    for (subgraphs.items) |*sg| {
+        if (sg.members.items.len == 0) continue;
+        var sgn = Value.Node{ .type_name = "subgraph", .fields = .{} };
+        try sgn.fields.put(a, "label", Value{ .string = sg.label });
+        try sgn.fields.put(a, "members", Value{ .list = try sg.members.toOwnedSlice(a) });
+        try subgraphs_val.append(a, Value{ .node = sgn });
     }
 
     var root = Value.Node{ .type_name = "flowchart", .fields = .{} };
     try root.fields.put(a, "direction", Value{ .string = direction });
     try root.fields.put(a, "nodes", Value{ .list = try nodes_list.toOwnedSlice(a) });
     try root.fields.put(a, "edges", Value{ .list = try edges_list.toOwnedSlice(a) });
+    try root.fields.put(a, "subgraphs", Value{ .list = try subgraphs_val.toOwnedSlice(a) });
 
     return flowchart_renderer.render(allocator, Value{ .node = root });
 }
@@ -354,15 +405,44 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             const lbl = if (line.len > 4) line[4..] else "";
             var sig = Value.Node{ .type_name = "signal", .fields = .{} };
             try sig.fields.put(a, "type", Value{ .string = "altStart" });
-            try sig.fields.put(a, "altText", Value{ .string = lbl });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
             try signals_list.append(a, Value{ .node = sig });
             try block_stack.append(a, .{ .kind = "alt", .label = lbl, .start = signals_list.items.len - 1 });
             continue;
         }
+        if (std.mem.startsWith(u8, line, "opt ") or std.mem.eql(u8, line, "opt")) {
+            const lbl = if (line.len > 4) line[4..] else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "optStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "opt", .label = lbl, .start = signals_list.items.len - 1 });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "par ") or std.mem.eql(u8, line, "par")) {
+            const lbl = if (line.len > 4) line[4..] else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "parStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "par", .label = lbl, .start = signals_list.items.len - 1 });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "else") or
+            std.mem.startsWith(u8, line, "and ") or std.mem.eql(u8, line, "and")) {
+            continue; // alt/par branch separator — skip
+        }
+        if (std.mem.startsWith(u8, line, "note ") or std.mem.startsWith(u8, line, "note\t")) {
+            continue; // note annotations not rendered
+        }
         if (std.mem.eql(u8, line, "end")) {
             if (block_stack.items.len > 0) {
                 const top = block_stack.pop().?;
-                const end_type = if (std.mem.eql(u8, top.kind, "loop")) "loopEnd" else "altEnd";
+                const end_type: []const u8 =
+                    if (std.mem.eql(u8, top.kind, "loop")) "loopEnd"
+                    else if (std.mem.eql(u8, top.kind, "opt")) "optEnd"
+                    else if (std.mem.eql(u8, top.kind, "par")) "parEnd"
+                    else "altEnd";
                 var sig = Value.Node{ .type_name = "signal", .fields = .{} };
                 try sig.fields.put(a, "type", Value{ .string = end_type });
                 try signals_list.append(a, Value{ .node = sig });
@@ -570,13 +650,17 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
         if (first) { first = false; continue; } // skip header
 
-        // `state "long name" as id`
+        // `state "long name" as id` or `state id {` (compound)
         if (std.mem.startsWith(u8, line, "state ")) {
             const rest = line[6..];
             if (std.mem.indexOf(u8, rest, " as ")) |ai| {
                 const lbl_raw = std.mem.trim(u8, rest[0..ai], " \t\"");
-                const id = std.mem.trim(u8, rest[ai + 4..], " \t");
-                try addState(&states, &seen, a, id, lbl_raw);
+                const id = std.mem.trim(u8, rest[ai + 4..], " \t{");
+                if (id.len > 0) try addState(&states, &seen, a, id, lbl_raw);
+            } else {
+                // "state id" or "state id {" — register with id as label
+                const id = std.mem.trim(u8, rest, " \t{\"");
+                if (id.len > 0) try addState(&states, &seen, a, id, id);
             }
             continue;
         }
@@ -1700,6 +1784,48 @@ test "sequence participants declared explicitly" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "Client") != null);
 }
 
+test "sequence opt block rendered" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Bob: request
+        \\opt retry
+        \\Bob->>Bob: retry
+        \\end
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "retry") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "sequence par block rendered" {
+    const input =
+        \\sequenceDiagram
+        \\par send emails
+        \\Alice->>Bob: email1
+        \\and send notifications
+        \\Alice->>Carol: email2
+        \\end
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "send emails") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "sequence note lines skipped gracefully" {
+    const input =
+        \\sequenceDiagram
+        \\Alice->>Bob: hello
+        \\note right of Bob: thinking
+        \\Bob-->>Alice: world
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "hello") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "world") != null);
+}
+
 // ─── ClassDiagram feature tests ───────────────────────────────────────────────
 
 test "classDiagram inheritance terminator" {
@@ -1808,6 +1934,21 @@ test "stateDiagram multiple states" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "Done") != null);
 }
 
+test "stateDiagram compound state label" {
+    const input =
+        \\stateDiagram-v2
+        \\state "Running State" as Running {
+        \\    [*] --> A
+        \\    A --> B
+        \\}
+        \\[*] --> Running
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Running State") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Running") != null);
+}
+
 // ─── ER Diagram feature tests ──────────────────────────────────────────────────
 
 test "erDiagram one-to-many relation" {
@@ -1907,4 +2048,32 @@ test "gantt title in SVG" {
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "My Timeline") != null);
+}
+
+test "gantt milestone diamond rendered" {
+    const input =
+        \\gantt
+        \\title Release
+        \\section Launch
+        \\Deploy : milestone, 0d
+        \\Verify : 1d
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<polygon") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Deploy") != null);
+}
+
+test "flowchart subgraph background box" {
+    const input =
+        \\graph TD
+        \\subgraph Service Layer
+        \\A[Auth] --> B[API]
+        \\end
+        \\B --> C[DB]
+    ;
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Auth") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Service Layer") != null);
 }

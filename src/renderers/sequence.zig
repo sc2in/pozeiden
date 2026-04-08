@@ -56,7 +56,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 .arrow_kind = arrowKind(signal_type),
             });
         } else if (std.mem.eql(u8, msg_type, "loopStart")) {
-            const lbl = sn.getString("loopText") orelse "";
+            const lbl = sn.getString("loopText") orelse sn.getString("blockText") orelse "";
             try blocks.append(allocator, Block{ .kind = .loop, .label = lbl, .start_row = messages.items.len });
         } else if (std.mem.eql(u8, msg_type, "loopEnd")) {
             for (blocks.items) |*b| {
@@ -66,11 +66,31 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 }
             }
         } else if (std.mem.eql(u8, msg_type, "altStart")) {
-            const lbl = sn.getString("altText") orelse "";
+            const lbl = sn.getString("altText") orelse sn.getString("blockText") orelse "";
             try blocks.append(allocator, Block{ .kind = .alt, .label = lbl, .start_row = messages.items.len });
         } else if (std.mem.eql(u8, msg_type, "altEnd")) {
             for (blocks.items) |*b| {
                 if (b.kind == .alt and b.end_row == null) {
+                    b.end_row = messages.items.len;
+                    break;
+                }
+            }
+        } else if (std.mem.eql(u8, msg_type, "optStart")) {
+            const lbl = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .opt, .label = lbl, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "optEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .opt and b.end_row == null) {
+                    b.end_row = messages.items.len;
+                    break;
+                }
+            }
+        } else if (std.mem.eql(u8, msg_type, "parStart")) {
+            const lbl = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .par, .label = lbl, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "parEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .par and b.end_row == null) {
                     b.end_row = messages.items.len;
                     break;
                 }
