@@ -1,4 +1,8 @@
 //! Gantt chart SVG renderer.
+//! Expects a Value.node with `title` (string) and `sections` (list of nodes with
+//! `label` and `tasks`). Each task node carries `name`, `duration` (e.g. "2d", "4h"),
+//! and `flags` (comma-separated: "crit", "done", "active", "milestone").
+//! Tasks are stacked sequentially left-to-right across the shared timeline.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -30,6 +34,10 @@ const Section = struct {
     task_end: usize,
 };
 
+/// Render a Gantt chart SVG from `value`.
+/// `value` must be a node with `title` (string) and `sections` (list of nodes with
+/// `label` and `tasks`). Each task carries `name`, `duration` ("2d"/"4h"/"1w"),
+/// and `flags` (e.g. "crit", "done", "milestone"). Tasks are laid out sequentially.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

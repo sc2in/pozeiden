@@ -1,4 +1,7 @@
 //! Class diagram SVG renderer.
+//! Expects a Value.node with `classes` (list of nodes with `name` and `members` string list)
+//! and `relations` (list of nodes with `from`, `to`, `kind`, and optional `label`).
+//! Classes are arranged in a fixed-width grid; relations are drawn behind the boxes.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -46,6 +49,10 @@ const Relation = struct {
     label: []const u8,
 };
 
+/// Render a class diagram SVG from `value`.
+/// `value` must be a node with `classes` (list of class nodes carrying `name` and
+/// a `members` string list) and `relations` (list of nodes with `from`, `to`, `kind`,
+/// and optional `label`). Returns a caller-owned SVG string.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

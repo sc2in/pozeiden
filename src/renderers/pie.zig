@@ -1,11 +1,17 @@
 //! Pie chart SVG renderer.
-//! Reads a Value.node with fields: title, showData, sections (list of {label, value}).
+//! Reads a Value.node with fields: `title` (string), `showData` (bool flag), and
+//! `sections` (list of nodes with `label` and numeric `value`).
+//! Slices are drawn clockwise from the top; a legend is rendered to the right.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 const theme = @import("../svg/theme.zig");
 const xmlEscape = @import("../svg/writer.zig").xmlEscape;
 
+/// Render a pie chart SVG from `value`.
+/// `value` must be a node with `title` (optional string), `showData` (bool),
+/// and `sections` (list of nodes with `label` string and numeric `value`).
+/// Percentage labels appear on slices larger than 5%; all sections are listed in a legend.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return error.InvalidInput;
 

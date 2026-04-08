@@ -1,5 +1,8 @@
 //! C4 architecture diagram SVG renderer.
 //! Supports C4Context, C4Container, C4Component, C4Dynamic, C4Deployment.
+//! Expects a Value.node with `title`, `elements` (alias, label, tech, desc, kind),
+//! `relations` (from, to, label, tech, bidirectional), and `boundaries` (alias, label,
+//! members list). Elements are arranged in a grid with C4-standard colour coding.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -63,6 +66,10 @@ const Boundary = struct {
     members: []const []const u8,
 };
 
+/// Render a C4 architecture diagram SVG from `value`.
+/// `value` must be a node with `title`, `elements` (nodes with `alias`, `label`,
+/// `tech`, `desc`, `kind`), `relations` (nodes with `from`, `to`, `label`, `tech`,
+/// `bidirectional`), and `boundaries` (nodes with `alias`, `label`, `members` list).
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

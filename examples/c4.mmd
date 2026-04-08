@@ -1,0 +1,17 @@
+C4Context
+  title System Context for Online Shop
+  Person(customer, "Customer", "A shopper browsing and buying products")
+  Person(admin, "Admin", "Manages inventory and orders")
+  Enterprise_Boundary(b0, "Online Shop") {
+    System(webapp, "Web Application", "Serves the storefront and checkout")
+    System(orderSvc, "Order Service", "Processes and tracks orders")
+    SystemDb(db, "Product DB", "Stores product and order data")
+  }
+  System_Ext(payment, "Payment Gateway", "Handles card payments")
+  System_Ext(email, "Email System", "Sends order confirmations")
+  Rel(customer, webapp, "Browses and orders")
+  Rel(admin, webapp, "Manages catalogue")
+  Rel(webapp, orderSvc, "Places orders", "REST")
+  Rel(orderSvc, db, "Reads/writes", "SQL")
+  Rel(orderSvc, payment, "Charges card", "HTTPS")
+  Rel(orderSvc, email, "Sends confirmation", "SMTP")

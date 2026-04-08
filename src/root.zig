@@ -1,4 +1,12 @@
-//! pozeiden public API: render mermaid diagram text to an SVG string.
+//! pozeiden: mermaid diagram renderer.
+//!
+//! The single public entry point is `render`, which accepts any mermaid diagram
+//! text and returns a self-contained SVG string.  Fourteen diagram types are
+//! supported; see `detect.DiagramType` for the full list.
+//!
+//! All internal work uses a short-lived `ArenaAllocator` that is freed before
+//! `render` returns.  The returned SVG slice is allocated with the caller's
+//! `allocator` and must be freed by the caller.
 const std = @import("std");
 const detect = @import("detect.zig");
 const Value = @import("diagram/value.zig").Value;
@@ -32,14 +40,24 @@ const git_langium = @embedFile("grammars/gitGraph.langium");
 const flow_jison = @embedFile("grammars/flow.jison");
 const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
+/// Errors that `render` can return in addition to `std.mem.Allocator.Error`.
 pub const RenderError = error{
+    /// The diagram type could not be identified from the first non-blank line.
     UnknownDiagramType,
+    /// A grammar file embedded in the binary failed to parse (should not occur
+    /// with an unmodified build).
     ParseError,
+    /// Memory allocation failed.
     OutOfMemory,
 };
 
-/// Render `mermaid_text` to an SVG string.
-/// Caller owns the returned slice (allocated with `allocator`).
+/// Render `mermaid_text` to a self-contained SVG string.
+///
+/// The diagram type is detected automatically from the first non-blank,
+/// non-comment line.  Fourteen diagram types are supported; unrecognised
+/// input produces a minimal fallback SVG rather than an error.
+///
+/// The caller owns the returned slice and must free it with `allocator`.
 pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u8 {
     const diagram_type = detect.detect(mermaid_text);
 
@@ -430,7 +448,7 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         }
         if (std.mem.startsWith(u8, line, "else") or
             std.mem.startsWith(u8, line, "and ") or std.mem.eql(u8, line, "and")) {
-            continue; // alt/par branch separator — skip
+            continue; // alt/par branch separator, skip
         }
         if (std.mem.startsWith(u8, line, "note ") or std.mem.startsWith(u8, line, "note\t")) {
             continue; // note annotations not rendered
@@ -658,7 +676,7 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 const id = std.mem.trim(u8, rest[ai + 4..], " \t{");
                 if (id.len > 0) try addState(&states, &seen, a, id, lbl_raw);
             } else {
-                // "state id" or "state id {" — register with id as label
+                // "state id" or "state id {": register with id as label
                 const id = std.mem.trim(u8, rest, " \t{\"");
                 if (id.len > 0) try addState(&states, &seen, a, id, id);
             }

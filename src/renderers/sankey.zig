@@ -1,4 +1,7 @@
 //! Sankey diagram SVG renderer (simplified column layout with Bezier bands).
+//! Expects a Value.node with `flows` (list of nodes each carrying `from`, `to`,
+//! and numeric `value`). Node depths are inferred by iterative relaxation; columns
+//! are stacked vertically and flows are drawn as semi-transparent cubic Bezier bands.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -18,6 +21,10 @@ const Flow = struct {
     value: f32,
 };
 
+/// Render a Sankey diagram SVG from `value`.
+/// `value` must be a node with `flows` (list of nodes each carrying string fields
+/// `from` and `to` and a numeric `value`). Node column depths are inferred automatically;
+/// flows are drawn as semi-transparent cubic Bezier bands proportional to their value.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

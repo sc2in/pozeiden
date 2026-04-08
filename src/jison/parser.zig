@@ -1,5 +1,5 @@
 //! Parse a .jison grammar file into a JisonGrammar AST.
-//! We parse structure only — JavaScript action bodies are extracted for token
+//! We parse structure only; JavaScript action bodies are extracted for token
 //! and state-transition information, but not executed.
 const std = @import("std");
 const ast = @import("ast.zig");
@@ -190,7 +190,7 @@ const JisonParser = struct {
                     continue;
                 }
 
-                // JS action block: { ... } — skip it
+                // JS action block: { ... } -- skip
                 if (body[i] == '{') {
                     i = skipBraceBlock(body, i);
                     continue;

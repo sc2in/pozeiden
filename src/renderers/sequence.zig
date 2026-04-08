@@ -1,4 +1,8 @@
 //! Sequence diagram SVG renderer.
+//! Expects a Value.node with `participants` (list of actor names or nodes with
+//! `actor`) and `signals` (list of typed message nodes with `from`, `to`, `msg`,
+//! `signalType`, and block markers such as loopStart/loopEnd, altStart/altEnd).
+//! Each actor gets a vertical lifeline; blocks are drawn as labelled background boxes.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -14,6 +18,10 @@ const MARGIN_Y: f32 = 20;
 const ACTOR_TOP_Y: f32 = 20;
 const FIRST_MSG_Y: f32 = 100;
 
+/// Render a sequence diagram SVG from `value`.
+/// `value` must be a node with `participants` (actor names or nodes with `actor`) and
+/// `signals` (typed nodes: `addMessage` with `from`, `to`, `msg`, `signalType`;
+/// block markers loopStart/loopEnd, altStart/altEnd, optStart/optEnd, parStart/parEnd).
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

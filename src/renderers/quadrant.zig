@@ -1,4 +1,7 @@
 //! Quadrant chart SVG renderer.
+//! Expects a Value.node with axis label strings (`x_left`, `x_right`, `y_bottom`,
+//! `y_top`), quadrant label strings (`q1` to `q4`), optional `title`, and `points`
+//! (list of nodes with `label`, `x`, and `y` in the [0, 1] normalised range).
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -10,6 +13,10 @@ const PLOT_SIZE: f32 = 440;
 const TOTAL_W: u32 = 580;
 const TOTAL_H: u32 = 580;
 
+/// Render a quadrant chart SVG from `value`.
+/// `value` must be a node with axis strings (`x_left`, `x_right`, `y_bottom`, `y_top`),
+/// quadrant label strings (`q1` to `q4`), optional `title`, and `points` (list of nodes
+/// with `label` and `x`/`y` coordinates normalised to [0, 1]).
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

@@ -1,4 +1,7 @@
 //! Timeline diagram SVG renderer.
+//! Expects a Value.node with `title` (string) and `sections` (list of nodes with
+//! `label` and `events` (list of plain strings)). Sections are evenly spaced
+//! along a horizontal spine; events hang below each section tick as labelled boxes.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -24,6 +27,10 @@ const TlSection = struct {
     events: []TlEvent,
 };
 
+/// Render a timeline diagram SVG from `value`.
+/// `value` must be a node with `title` (optional string) and `sections` (list of nodes
+/// with `label` and `events` (list of plain strings)). Sections are evenly spaced
+/// along a horizontal spine; events hang below as small labelled rectangles.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

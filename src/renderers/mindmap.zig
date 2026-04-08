@@ -1,4 +1,7 @@
 //! Mindmap SVG renderer (radial tree layout).
+//! Expects a Value.node with a `nodes` list; the first entry is the root node.
+//! Each node has `label`, `shape` (circle/rect/rounded/hexagon/ellipse), and a
+//! recursive `children` list. Positions are computed via proportional sector division.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -25,6 +28,10 @@ const MmNode = struct {
     leaf_count: usize = 1,
 };
 
+/// Render a mindmap SVG from `value`.
+/// `value` must be a node with a `nodes` list whose first entry is the root; each node
+/// carries `label`, `shape` (circle/rect/rounded/hexagon/ellipse), and a recursive
+/// `children` list. Positions are assigned via radial proportional sector subdivision.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

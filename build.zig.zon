@@ -22,5 +22,6 @@
         "build.zig.zon",
         "src",
         "grammars",
+        "examples",
     },
 }

@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>Bob: Hello Bob!
+    Bob-->>Alice: Hi Alice!
+    loop every minute
+        Bob->>Bob: health check
+    end

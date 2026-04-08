@@ -1,4 +1,8 @@
 //! State diagram SVG renderer.
+//! Expects a Value.node with `states` (list of nodes with `id` and optional `label`)
+//! and `transitions` (list of nodes with `from`, `to`, and optional `label`).
+//! States are placed in rows by BFS depth from `[*]` (or the first state); transitions
+//! are drawn as directed arrows between state box centres.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -24,6 +28,10 @@ const Transition = struct {
     label: []const u8,
 };
 
+/// Render a state diagram SVG from `value`.
+/// `value` must be a node with `states` (list of nodes with `id` and optional `label`)
+/// and `transitions` (list of nodes with `from`, `to`, and optional `label`).
+/// States are placed in BFS-depth rows from `[*]`; arrows connect state box centres.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

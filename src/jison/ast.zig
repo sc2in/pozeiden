@@ -1,4 +1,4 @@
-//! Jison grammar AST — structural representation of a .jison file.
+//! Jison grammar AST: structural representation of a .jison file.
 //! We parse enough to build a stateful lexer and LL parser.
 const std = @import("std");
 

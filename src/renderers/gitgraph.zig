@@ -1,5 +1,7 @@
 //! Git graph SVG renderer.
 //! Draws parallel horizontal lanes (one per branch), commit circles, and merge edges.
+//! Expects a Value.node with `statements` (list of typed nodes): Branch (`name`),
+//! Checkout (`branch`), Commit (`id`, `message`, `type`), and Merge (`branch`, `id`).
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -34,6 +36,10 @@ const Branch = struct {
     color: []const u8,
 };
 
+/// Render a git graph SVG from `value`.
+/// `value` must be a node with a `statements` list of typed nodes: Branch (`name`),
+/// Checkout (`branch`), Commit (`id`, `message`, `type`), and Merge (`branch`, `id`).
+/// Each branch is assigned a horizontal lane; commits are drawn left to right over time.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

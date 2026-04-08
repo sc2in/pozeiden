@@ -1,18 +1,30 @@
-//! DAG layout for flowchart diagrams (simplified Sugiyama).
-//! Also provides helpers for sequence diagram lifeline spacing.
+//! DAG layout engine used by the flowchart renderer.
+//!
+//! Implements a simplified three-phase Sugiyama algorithm:
+//! 1. Layer assignment: longest-path BFS from source nodes.
+//! 2. Node ordering: stable sort by id within each layer.
+//! 3. Coordinate assignment: evenly-spaced grid positions.
+//!
+//! The `H_GAP` and `V_GAP` constants are exported so that the flowchart
+//! renderer can derive Bezier control-point offsets that match the layout.
 const std = @import("std");
 
+/// A 2-D point in SVG coordinate space.
 pub const Point = struct { x: f32, y: f32 };
+/// An axis-aligned rectangle in SVG coordinate space.
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
 
 // ── Flowchart DAG layout ──────────────────────────────────────────────────────
 
+/// A node in the flowchart graph.  `x`, `y`, `w`, `h` are zero-initialised
+/// and filled in by `layout`.
 pub const GraphNode = struct {
     id: []const u8,
     label: []const u8,
     shape: NodeShape,
-    /// Assigned by layout
+    /// Top-left x coordinate (assigned by `layout`).
     x: f32 = 0,
+    /// Top-left y coordinate (assigned by `layout`).
     y: f32 = 0,
     w: f32 = 120,
     h: f32 = 40,
@@ -20,6 +32,7 @@ pub const GraphNode = struct {
     order: usize = 0,
 };
 
+/// Mermaid flowchart node shapes.
 pub const NodeShape = enum {
     rect,
     round,
@@ -32,6 +45,7 @@ pub const NodeShape = enum {
     ellipse,
 };
 
+/// A directed edge between two nodes.
 pub const GraphEdge = struct {
     from: []const u8,
     to: []const u8,
@@ -39,18 +53,23 @@ pub const GraphEdge = struct {
     style: EdgeStyle,
 };
 
+/// Edge line style.
 pub const EdgeStyle = enum { solid, dotted, thick };
 
+/// Flowchart layout direction, matching mermaid's `TD`/`TB`/`LR`/`RL`/`BT`
+/// keywords.
 pub const Direction = enum { tb, lr, rl, bt };
 
+/// A complete flowchart graph.  Pass to `layout` to assign coordinates.
 pub const Graph = struct {
     nodes: []GraphNode,
     edges: []GraphEdge,
     direction: Direction,
 };
 
-/// Assign (x, y) coordinates to nodes using a simplified Sugiyama algorithm.
-/// Modifies nodes in place.
+/// Assign `(x, y)` coordinates to every node in `graph` using a simplified
+/// three-phase Sugiyama algorithm (layer assignment → ordering → coordinates).
+/// Modifies `graph.nodes` in place; `graph.edges` is read-only.
 pub fn layout(allocator: std.mem.Allocator, graph: *Graph) !void {
     if (graph.nodes.len == 0) return;
 
@@ -183,6 +202,8 @@ fn assignCoordinates(graph: *Graph) void {
     }
 }
 
+/// Return the axis-aligned bounding box that encloses all `nodes`.
+/// Returns a 400×300 default rectangle when `nodes` is empty.
 pub fn boundingBox(nodes: []const GraphNode) Rect {
     if (nodes.len == 0) return .{ .x = 0, .y = 0, .w = 400, .h = 300 };
     var min_x: f32 = nodes[0].x;
@@ -203,11 +224,15 @@ pub fn boundingBox(nodes: []const GraphNode) Rect {
     };
 }
 
+/// Return a suitable SVG canvas width for the given laid-out nodes.
+/// The result is at least 400 pixels.
 pub fn svgWidth(nodes: []const GraphNode) u32 {
     const bb = boundingBox(nodes);
     return @intFromFloat(@max(400, bb.w + bb.x + MARGIN));
 }
 
+/// Return a suitable SVG canvas height for the given laid-out nodes.
+/// The result is at least 300 pixels.
 pub fn svgHeight(nodes: []const GraphNode) u32 {
     const bb = boundingBox(nodes);
     return @intFromFloat(@max(300, bb.h + bb.y + MARGIN));

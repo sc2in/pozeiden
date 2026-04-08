@@ -1,22 +1,47 @@
-//! Low-level SVG string builder.
+//! Low-level SVG string builder used by all renderers.
+//!
+//! `SvgWriter` accumulates SVG markup in an internal `ArrayList(u8)`.
+//! Callers write elements via typed methods (`rect`, `circle`, `text`, etc.),
+//! then call `toOwnedSlice` to obtain the final string.  Text content is
+//! automatically XML-escaped; attribute values must be safe before being
+//! passed in.
+//!
+//! Typical usage:
+//! ```zig
+//! var svg = SvgWriter.init(allocator);
+//! defer svg.deinit();
+//! try svg.header(800, 600);
+//! try svg.rect(10, 10, 200, 100, 4.0, "#ececff", "#9370db", 1.5);
+//! try svg.text(110, 65, "Hello", "#333", 14, .middle, "normal");
+//! try svg.footer();
+//! const output = try svg.toOwnedSlice(); // caller owns this
+//! ```
 const std = @import("std");
 
+/// Streaming SVG builder.  Call methods in document order; `header` first,
+/// `footer` last, `toOwnedSlice` after `footer`.
 pub const SvgWriter = struct {
     buf: std.ArrayList(u8),
     allocator: std.mem.Allocator,
 
+    /// Initialise an empty writer backed by `allocator`.
     pub fn init(allocator: std.mem.Allocator) SvgWriter {
         return .{ .buf = .empty, .allocator = allocator };
     }
 
+    /// Release the internal buffer.  Do not call after `toOwnedSlice`.
     pub fn deinit(self: *SvgWriter) void {
         self.buf.deinit(self.allocator);
     }
 
+    /// Transfer ownership of the accumulated SVG bytes to the caller.
+    /// The writer must not be used after this call.
     pub fn toOwnedSlice(self: *SvgWriter) ![]u8 {
         return self.buf.toOwnedSlice(self.allocator);
     }
 
+    /// Emit the SVG root element opening tag with explicit `width`/`height`
+    /// and a matching `viewBox`.
     pub fn header(self: *SvgWriter, width: u32, height: u32) !void {
         try self.buf.writer(self.allocator).print(
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{d}\" height=\"{d}\" viewBox=\"0 0 {d} {d}\">\n",
@@ -24,10 +49,13 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit the SVG root element closing tag.
     pub fn footer(self: *SvgWriter) !void {
         try self.buf.writer(self.allocator).writeAll("</svg>\n");
     }
 
+    /// Open a `<g>` group element.  Pass `attrs` for additional SVG attributes
+    /// (e.g. `"opacity=\"0.5\""`), or an empty string for a plain `<g>`.
     pub fn openGroup(self: *SvgWriter, attrs: []const u8) !void {
         if (attrs.len > 0) {
             try self.buf.writer(self.allocator).print("<g {s}>\n", .{attrs});
@@ -36,14 +64,18 @@ pub const SvgWriter = struct {
         }
     }
 
+    /// Close the current `<g>` group element.
     pub fn closeGroup(self: *SvgWriter) !void {
         try self.buf.writer(self.allocator).writeAll("</g>\n");
     }
 
+    /// Emit a `<defs>` block containing the raw `content` string.
+    /// Used for marker, gradient, and filter definitions.
     pub fn defs(self: *SvgWriter, content: []const u8) !void {
         try self.buf.writer(self.allocator).print("<defs>\n{s}</defs>\n", .{content});
     }
 
+    /// Emit a `<rect>` element.  `rx` is the corner radius (0 for sharp corners).
     pub fn rect(
         self: *SvgWriter,
         x: f32,
@@ -61,6 +93,7 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit a `<circle>` element centred at (`cx`, `cy`) with radius `r`.
     pub fn circle(
         self: *SvgWriter,
         cx: f32,
@@ -76,6 +109,7 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit a solid `<line>` element.
     pub fn line(
         self: *SvgWriter,
         x1: f32,
@@ -91,6 +125,10 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit a `<path>` element with SVG path data `d`.
+    /// Pass `extra_attrs` for additional attributes such as
+    /// `"stroke-dasharray=\"5,5\""` or `"fill-opacity=\"0.4\""`,
+    /// or an empty string for none.
     pub fn path(
         self: *SvgWriter,
         d: []const u8,
@@ -112,8 +150,10 @@ pub const SvgWriter = struct {
         }
     }
 
+    /// Horizontal text alignment for `text`.
     pub const TextAnchor = enum { start, middle, end };
 
+    /// Emit a `<text>` element.  `content` is XML-escaped automatically.
     pub fn text(
         self: *SvgWriter,
         x: f32,
@@ -137,6 +177,8 @@ pub const SvgWriter = struct {
         try self.buf.writer(self.allocator).writeAll("</text>\n");
     }
 
+    /// Emit a `<polygon>` element.  `points` is a space-separated list of
+    /// `x,y` coordinate pairs, e.g. `"0,0 10,5 0,10"`.
     pub fn polygon(
         self: *SvgWriter,
         points: []const u8,
@@ -150,6 +192,8 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit a `<line>` element with `stroke-dasharray` set to `dasharray`
+    /// (e.g. `"5,3"` or `"4,4"`).
     pub fn dashedLine(
         self: *SvgWriter,
         x1: f32,
@@ -166,12 +210,16 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Append a raw SVG fragment verbatim.  Use sparingly: no escaping or
+    /// validation is applied.  Useful for SVG features (e.g. rotated text)
+    /// that do not have a dedicated method.
     pub fn raw(self: *SvgWriter, fragment: []const u8) !void {
         try self.buf.writer(self.allocator).writeAll(fragment);
     }
 };
 
-/// Escape XML special characters.
+/// Write `s` to `writer` with XML special characters replaced by their
+/// entity equivalents (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`).
 pub fn xmlEscape(writer: anytype, s: []const u8) !void {
     for (s) |c| {
         switch (c) {

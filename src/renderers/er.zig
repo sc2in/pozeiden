@@ -1,4 +1,7 @@
 //! Entity-relationship diagram SVG renderer.
+//! Expects a Value.node with `entities` (list of nodes with `name` and `attrs` list)
+//! and `relations` (list of nodes with `from`, `to`, `rel` notation string, and optional `label`).
+//! Entities are laid out in a grid; crow's foot terminators reflect cardinality.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -37,6 +40,10 @@ const Relation = struct {
     dashed: bool,
 };
 
+/// Render an entity-relationship diagram SVG from `value`.
+/// `value` must be a node with `entities` (list of nodes with `name` and `attrs` list
+/// where each attr has `type`, `name`, and optional `key`) and `relations` (list of
+/// nodes with `from`, `to`, `rel` notation, and optional `label`).
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 

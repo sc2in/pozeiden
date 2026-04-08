@@ -1,25 +1,48 @@
-//! Identify the mermaid diagram type from the first meaningful line.
+//! Diagram type detection from the opening keyword of a mermaid source file.
+//!
+//! Mermaid files start with a keyword that identifies the diagram type
+//! (`pie`, `graph TD`, `sequenceDiagram`, etc.).  `detect` skips blank lines,
+//! YAML front-matter delimiters, and `%%`-prefixed directives before matching
+//! that keyword.
 const std = @import("std");
 
+/// Every diagram type that pozeiden can render, plus `.unknown` for
+/// unrecognised input.
 pub const DiagramType = enum {
+    /// `pie [title ...]`
     pie,
+    /// `graph <dir>` or `flowchart <dir>`
     flowchart,
+    /// `sequenceDiagram`
     sequence,
+    /// `gitGraph`
     gitgraph,
+    /// `classDiagram`
     class,
+    /// `stateDiagram-v2`
     state,
+    /// `erDiagram`
     er,
+    /// `gantt`
     gantt,
+    /// `timeline`
     timeline,
+    /// `xychart-beta`
     xychart,
+    /// `quadrantChart`
     quadrant,
+    /// `mindmap`
     mindmap,
+    /// `sankey-beta`
     sankey,
+    /// `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment`
     c4,
+    /// The opening keyword was not recognised.
     unknown,
 };
 
-/// Detect diagram type by inspecting the first non-blank, non-comment line.
+/// Return the diagram type by inspecting the first non-blank, non-comment line
+/// of `text`.  Returns `.unknown` if no recognised keyword is found.
 pub fn detect(text: []const u8) DiagramType {
     var lines = std.mem.splitScalar(u8, text, '\n');
     while (lines.next()) |raw_line| {

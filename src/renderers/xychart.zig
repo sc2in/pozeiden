@@ -1,4 +1,8 @@
 //! XY chart (bar/line) SVG renderer.
+//! Expects a Value.node with `title`, `y_min`, `y_max`, `x_labels` (list of strings),
+//! and `series` (list of nodes with `kind` ("bar" or "line") and `values`, a list of
+//! numbers). Multiple bar series are grouped side-by-side; line series are drawn as
+//! connected polylines with dot markers.
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
@@ -15,6 +19,10 @@ const COL_W: f32 = 60;
 const BAR_PAD: f32 = 8;
 const GRID_LINES: usize = 5;
 
+/// Render an XY chart (bar or line) SVG from `value`.
+/// `value` must be a node with `title`, `y_min`, `y_max`, `x_labels` (list of strings),
+/// and `series` (list of nodes with `kind` ("bar"/"line") and `values`, a number list).
+/// Bar series are grouped side-by-side per category; line series render as connected dots.
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const node = value.asNode() orelse return renderFallback(allocator);
 
