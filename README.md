@@ -22,6 +22,9 @@ and no heap allocations beyond the arena used during rendering.
 | Mindmap | `mindmap` |
 | Sankey diagram | `sankey-beta` |
 | C4 architecture | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` |
+| Block diagram | `block-beta` |
+| Requirement diagram | `requirementDiagram` |
+| Kanban board | `kanban` |
 
 ## Requirements
 
@@ -30,16 +33,39 @@ and no heap allocations beyond the arena used during rendering.
 ## Build
 
 ```sh
-zig build          # builds the pozeiden CLI binary to zig-out/bin/
-zig build test     # runs the test suite
-zig build examples # renders examples/*.mmd to zig-out/examples/*.svg
+zig build            # builds the pozeiden CLI binary to zig-out/bin/
+zig build test       # runs the test suite
+zig build examples   # renders examples/*.mmd to zig-out/examples/*.svg
+zig build playground # compiles pozeiden to WASM and bundles the live playground
+                     # to zig-out/playground/
 ```
+
+## Playground
+
+A live browser playground is included. It compiles pozeiden to a ~295 KB
+WebAssembly module and serves a split-pane editor where edits render instantly.
+
+```sh
+nix run .#playground          # build WASM + serve on http://localhost:8080
+nix run .#playground -- 3000  # custom port
+```
+
+Without Nix:
+
+```sh
+zig build playground
+cd zig-out/playground && python3 -m http.server
+```
+
+All 17 diagram types are available as presets in the example dropdown.
 
 ## CLI usage
 
 ```sh
-# stdin to stdout
-echo 'pie\n"A": 1\n"B": 2' | pozeiden > out.svg
+# stdin → stdout
+echo 'pie title Pets
+"Dogs" : 60
+"Cats" : 40' | pozeiden > out.svg
 
 # explicit files
 pozeiden -i diagram.mmd -o diagram.svg
@@ -98,10 +124,11 @@ Run `zig build examples` to render them all to `zig-out/examples/*.svg`.
 
 ```text
 examples/
-  c4.mmd          flowchart.mmd   gantt.mmd    gitgraph.mmd
-  class.mmd       er.mmd          mindmap.mmd  pie.mmd
-  quadrant.mmd    sankey.mmd      sequence.mmd state.mmd
-  timeline.mmd    xychart.mmd
+  block.mmd       c4.mmd          class.mmd       er.mmd
+  flowchart.mmd   gantt.mmd       gitgraph.mmd    kanban.mmd
+  mindmap.mmd     pie.mmd         quadrant.mmd    requirement.mmd
+  sankey.mmd      sequence.mmd    state.mmd       timeline.mmd
+  xychart.mmd
 ```
 
 ## Architecture
@@ -111,6 +138,7 @@ src/
   root.zig              Public API: detect type, parse, dispatch to renderer
   detect.zig            First-line diagram type detection
   main.zig              CLI entry point
+  wasm.zig              WebAssembly entry point (get_input_ptr / render / get_output_ptr)
   diagram/
     value.zig           Generic AST value (string | number | bool | node | list)
   svg/
@@ -119,23 +147,27 @@ src/
     layout.zig          DAG layout (simplified Sugiyama) for flowcharts
   renderers/
     pie.zig             Pie chart
-    flowchart.zig       Flowchart / graph
-    sequence.zig        Sequence diagram
+    flowchart.zig       Flowchart / graph (shapes, edge labels, dashed/thick edges)
+    sequence.zig        Sequence diagram (activation bars, notes, autonumber)
     gitgraph.zig        Git graph
-    class.zig           Class diagram
-    state.zig           State diagram
+    class.zig           Class diagram (stereotypes, generics, visibility)
+    state.zig           State diagram (fork/join bars, choice diamonds)
     er.zig              Entity-relationship diagram
-    gantt.zig           Gantt chart
+    gantt.zig           Gantt chart (today marker, section backgrounds)
     timeline.zig        Timeline
     xychart.zig         XY chart (bar + line)
     quadrant.zig        Quadrant chart
     mindmap.zig         Mindmap (radial tree)
     sankey.zig          Sankey diagram
-    c4.zig              C4 architecture diagrams
+    c4.zig              C4 architecture diagrams (ext dashed borders, enterprise boundaries)
+    block.zig           Block diagram (grid layout)
+    requirement.zig     Requirement diagram (two-section boxes)
+    kanban.zig          Kanban board (column + card layout)
   langium/              Parser for .langium grammar files (pie, gitGraph)
   jison/                Parser for .jison grammar files (flowchart)
 grammars/               Embedded .langium and .jison grammar definitions
 examples/               Source .mmd files for each diagram type
+playground/             HTML + JS source for the live browser playground
 ```
 
 Two grammar backends are used:
