@@ -15,6 +15,7 @@ pub const DiagramType = enum {
     quadrant,
     mindmap,
     sankey,
+    c4,
     unknown,
 };
 
@@ -58,6 +59,13 @@ pub fn detect(text: []const u8) DiagramType {
         if (std.mem.startsWith(u8, line, "mindmap")) return .mindmap;
 
         if (std.mem.startsWith(u8, line, "sankey-beta")) return .sankey;
+
+        if (std.mem.startsWith(u8, line, "C4Context") or
+            std.mem.startsWith(u8, line, "C4Container") or
+            std.mem.startsWith(u8, line, "C4Component") or
+            std.mem.startsWith(u8, line, "C4Dynamic") or
+            std.mem.startsWith(u8, line, "C4Deployment"))
+            return .c4;
 
         return .unknown;
     }
