@@ -190,7 +190,7 @@ const JisonParser = struct {
                     continue;
                 }
 
-                // JS action block: { ... } -- skip
+                // JS action block: { ... }, skip
                 if (body[i] == '{') {
                     i = skipBraceBlock(body, i);
                     continue;
@@ -267,7 +267,7 @@ fn extractPattern(line: []const u8) struct { []const u8, []const u8 } {
     while (i < line.len) {
         const c = line[i];
         if (c == '\\' and i + 1 < line.len) { i += 2; continue; }
-        // Jison quoted literal: "..." — skip without depth tracking
+        // Jison quoted literal: "...", skip without depth tracking
         if (c == '"' and depth_bracket == 0) {
             i += 1;
             while (i < line.len and line[i] != '"') {

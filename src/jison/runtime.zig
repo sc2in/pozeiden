@@ -94,9 +94,9 @@ pub const Runtime = struct {
         try state_stack.append(self.arena, "INITIAL");
 
         while (pos <= input.len) {
-            // Skip whitespace (spaces/tabs — but NOT newlines, which may be tokens)
+            // Skip whitespace (spaces/tabs, but NOT newlines, which may be tokens)
             while (pos < input.len and (input[pos] == ' ' or input[pos] == '\t')) {
-                // Check if any lex rule explicitly handles whitespace — if not, skip
+                // Check if any lex rule explicitly handles whitespace, if not, skip
                 const ws_handled = blk: {
                     for (self.compiled) |*cr| {
                         if (!ruleMatchesState(cr.source, currentState(state_stack.items))) continue;
@@ -167,7 +167,7 @@ pub const Runtime = struct {
             }
 
             if (!matched) {
-                // Unrecognised character — skip it
+                // Unrecognised character, skip
                 pos += 1;
             }
         }
@@ -339,7 +339,7 @@ const ParseCtx = struct {
             }
             return false;
         }
-        // Unknown symbol — try as token name
+        // Unknown symbol: try as token name
         if (self.matchToken(sym) != null) return true;
         return false;
     }
@@ -402,7 +402,7 @@ test "jison flow lex: labeled edge" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    // "graph LR\nA-->|label|B\n" — after the LINK token the lexer enters edgeText
+    // "graph LR\nA-->|label|B\n": after the LINK token the lexer enters edgeText
     // state; "|" delimiters produce PIPE tokens and the label text an EDGE_TEXT token.
     const tokens = try testLexDiagram(arena.allocator(), flow_src,
         \\graph LR
@@ -417,7 +417,7 @@ test "jison flow lex: node with brackets" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    // A[Start] — SQS is "[" token, SQE is "]" token (in vertex state)
+    // A[Start]: SQS is "[" token, SQE is "]" token (in vertex state)
     const tokens = try testLexDiagram(arena.allocator(), flow_src,
         \\graph TD
         \\A[Start]-->B

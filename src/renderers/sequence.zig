@@ -129,7 +129,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // Background
     try svg.rect(0, 0, @floatFromInt(total_w), @floatFromInt(total_h), 0, theme.background, theme.background, 0);
 
-    // 1. Loop/alt blocks first — behind everything
+    // 1. Loop/alt blocks first, behind everything
     for (blocks.items) |b| {
         const end = b.end_row orelse n_msgs;
         const by = FIRST_MSG_Y + @as(f32, @floatFromInt(b.start_row)) * ROW_H - 10;
@@ -143,7 +143,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.text(bx + 4, by + 14, kind_label, theme.text_color, theme.font_size_small, .start, "normal");
     }
 
-    // 2. Lifelines — on top of blocks, behind actor boxes and messages
+    // 2. Lifelines, on top of blocks, behind actor boxes and messages
     for (actors.items, 0..) |_, i| {
         const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
         const line_x = lx + ACTOR_W / 2;
@@ -152,7 +152,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.dashedLine(line_x, line_top, line_x, line_bot, theme.signal_color, 1.0, "4,4");
     }
 
-    // 3. Actor boxes — on top of lifelines and blocks
+    // 3. Actor boxes, on top of lifelines and blocks
     for (actors.items, 0..) |actor, i| {
         const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
         const line_bot = @as(f32, @floatFromInt(total_h)) - ACTOR_H - MARGIN_Y;
@@ -160,7 +160,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try drawActorBox(&svg, lx, line_bot, actor);
     }
 
-    // 4. Messages — topmost layer
+    // 4. Messages, topmost layer
     for (messages.items, 0..) |msg, mi| {
         const my = FIRST_MSG_Y + @as(f32, @floatFromInt(mi)) * ROW_H + ROW_H / 2;
 
@@ -171,7 +171,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const tx = MARGIN_X + @as(f32, @floatFromInt(to_idx)) * LANE_GAP + ACTOR_W / 2;
 
         if (from_idx == to_idx) {
-            // Self-message: right-bracket shape — out, down, back with arrowhead
+            // Self-message: right-bracket shape: out, down, back with arrowhead
             const loop_w: f32 = 40;
             const loop_h: f32 = ROW_H * 0.6;
             const arr: f32 = 8.0;

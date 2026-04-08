@@ -164,7 +164,7 @@ const Parser = struct {
             return Token{ .kind = kind, .text = text, .pos = start };
         }
 
-        // Unknown character — skip it
+        // Unknown character, skip
         self.pos += 1;
         return self.nextToken();
     }
@@ -416,7 +416,7 @@ const Parser = struct {
                     .cardinality = cardinality,
                 } };
             } else {
-                // Not an assignment — restore state
+                // Not an assignment: restore state
                 self.pos = saved_pos;
                 self.peek_buf = saved_peek;
             }

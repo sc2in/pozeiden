@@ -318,7 +318,7 @@ fn parseMember(s: []const u8) Member {
         }
     }
     const is_method = std.mem.indexOf(u8, rest, "(") != null;
-    // Mermaid syntax: `Type name` — first token is type, second is name.
+    // Mermaid syntax: `Type name` : first token is type, second is name.
     // Display convention (UML): `+name : Type`.
     var name = rest;
     var type_str: []const u8 = "";

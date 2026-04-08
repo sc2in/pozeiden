@@ -30,7 +30,7 @@ pub fn jsToMvzr(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
                     i += 3;
                 },
                 '=', '!' => {
-                    // Lookahead — skip the entire (?...) group
+                    // Lookahead: skip the entire (?...) group
                     i = skipParenGroup(pattern, i);
                     // Also skip any quantifier following the removed lookahead
                     if (i < pattern.len) switch (pattern[i]) {
@@ -45,7 +45,7 @@ pub fn jsToMvzr(allocator: std.mem.Allocator, pattern: []const u8) ![]const u8 {
                 },
             }
         } else if (i + 1 < pattern.len and pattern[i] == '\\' and pattern[i + 1] == 'u') {
-            // Unicode escape \uXXXX — skip for now (rare in mermaid grammars)
+            // Unicode escape \uXXXX, skip for now (rare in mermaid grammars)
             i += 6;
         } else if (pattern[i] == '[' and i + 1 < pattern.len and pattern[i + 1] == 'S' and
             i + 2 < pattern.len and pattern[i + 2] == 's' and
@@ -505,7 +505,7 @@ const ParseCtx = struct {
                 if (self.runtime.merged.findRule(name)) |rule| {
                     return try self.parseRule(rule);
                 }
-                // Try terminal — produce a typed Value based on returns_type annotation
+                // Try terminal: produce a typed Value based on returns_type annotation
                 if (self.matchTerminal(name)) |text| {
                     return terminalTextToValue(self.runtime.compiled, name, text);
                 }
@@ -812,7 +812,7 @@ test "langium gitgraph: multiple commit types" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    // commit type: X — the "type:" keyword includes a colon.  Our tokeniser emits
+    // commit type: X; the "type:" keyword includes a colon.  Our tokeniser emits
     // "type" as an ID and ":" as an unrecognised character (skipped), so the
     // type= assignment never fires.  The commits ARE parsed; their type field is
     // simply absent.  This test asserts the structural parse succeeds and produces
