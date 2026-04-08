@@ -6,25 +6,25 @@ and no heap allocations beyond the arena used during rendering.
 
 ## Supported diagram types
 
-| Type | Keyword |
-| ---- | ------- |
-| Pie chart | `pie` |
-| Flowchart | `graph` / `flowchart` |
-| Sequence diagram | `sequenceDiagram` |
-| Git graph | `gitGraph` |
-| Class diagram | `classDiagram` |
-| State diagram | `stateDiagram-v2` |
-| ER diagram | `erDiagram` |
-| Gantt chart | `gantt` |
-| Timeline | `timeline` |
-| XY chart | `xychart-beta` |
-| Quadrant chart | `quadrantChart` |
-| Mindmap | `mindmap` |
-| Sankey diagram | `sankey-beta` |
-| C4 architecture | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` |
-| Block diagram | `block-beta` |
-| Requirement diagram | `requirementDiagram` |
-| Kanban board | `kanban` |
+| Type                | Keyword                                                                    |
+| ------------------- | -------------------------------------------------------------------------- |
+| Pie chart           | `pie`                                                                      |
+| Flowchart           | `graph` / `flowchart`                                                      |
+| Sequence diagram    | `sequenceDiagram`                                                          |
+| Git graph           | `gitGraph`                                                                 |
+| Class diagram       | `classDiagram`                                                             |
+| State diagram       | `stateDiagram-v2`                                                          |
+| ER diagram          | `erDiagram`                                                                |
+| Gantt chart         | `gantt`                                                                    |
+| Timeline            | `timeline`                                                                 |
+| XY chart            | `xychart-beta`                                                             |
+| Quadrant chart      | `quadrantChart`                                                            |
+| Mindmap             | `mindmap`                                                                  |
+| Sankey diagram      | `sankey-beta`                                                              |
+| C4 architecture     | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` |
+| Block diagram       | `block-beta`                                                               |
+| Requirement diagram | `requirementDiagram`                                                       |
+| Kanban board        | `kanban`                                                                   |
 
 ## Requirements
 
@@ -180,4 +180,4 @@ Two grammar backends are used:
 
 ## License
 
-MIT
+PolyForm NonCommercial v1.0.0
