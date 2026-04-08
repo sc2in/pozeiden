@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pozeiden Playground</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #1e1e2e;
+      --surface:     #24273a;
+      --surface2:    #2d3045;
+      --border:      #363a52;
+      --text:        #cad3f5;
+      --text-dim:    #6e738d;
+      --accent:      #8aadf4;
+      --green:       #a6da95;
+      --red:         #ed8796;
+      --yellow:      #eed49f;
+      --preview-bg:  #f8f9fa;
+      --radius:      7px;
+      --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      height: 46px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .logo span { color: var(--text-dim); font-weight: 400; font-size: 0.8rem; margin-left: 6px; }
+
+    #example-select {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 10px;
+      font-size: 0.83rem;
+      cursor: pointer;
+      height: 30px;
+    }
+    #example-select:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    #copy-btn {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      height: 30px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #copy-btn:hover { background: var(--border); }
+
+    #status {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      min-width: 80px;
+      text-align: right;
+    }
+    #status.ok    { color: var(--green); }
+    #status.error { color: var(--red); }
+    #status.loading { color: var(--yellow); }
+
+    /* ── Panel labels ─────────────────────────────────────────── */
+    .panel-label {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ── Two-panel layout ─────────────────────────────────────── */
+    .panels {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    #editor {
+      flex: 1;
+      resize: none;
+      background: var(--bg);
+      color: var(--text);
+      border: none;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.65;
+      outline: none;
+      tab-size: 4;
+      overflow: auto;
+    }
+
+    .preview-pane {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #preview {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      padding: 20px;
+      background: var(--preview-bg);
+      position: relative;
+    }
+
+    #preview svg {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .placeholder {
+      color: #adb5bd;
+      font-size: 0.875rem;
+    }
+
+    #wasm-error {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(30,30,46,0.92);
+      color: var(--red);
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+
+    /* ── Mobile ───────────────────────────────────────────────── */
+    @media (max-width: 680px) {
+      .panels {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+      .editor-pane { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Pozeiden <span>mermaid → svg</span></div>
+  <select id="example-select" title="Load an example diagram">
+    <option value="">— examples —</option>
+  </select>
+  <div class="header-right">
+    <button id="copy-btn" title="Copy SVG to clipboard">Copy SVG</button>
+    <div id="status" class="loading">Loading…</div>
+  </div>
+</header>
+
+<div class="panels">
+  <div class="editor-pane">
+    <div class="panel-label">Mermaid</div>
+    <textarea id="editor" spellcheck="false" autocorrect="off" autocomplete="off" autocapitalize="off"></textarea>
+  </div>
+  <div class="preview-pane">
+    <div class="panel-label">SVG Preview</div>
+    <div id="preview">
+      <span class="placeholder">Waiting…</span>
+      <div id="wasm-error"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Embedded example diagrams ────────────────────────────────────────────────
+const examples = {
+  flowchart: `flowchart TD
+    A([Start]) --> B{Decision}
+    B -->|Yes| C[Process]
+    B -->|No| D[(Database)]
+    C -- update --> D
+    D --> E{{Config}}
+    E --> F[[Subroutine]]
+    F -.-> G((Done))`,
+
+  sequence: `sequenceDiagram
+    autonumber
+    participant Alice
+    participant Bob
+    participant Server
+    Alice->>Bob: request
+    activate Bob
+    Note right of Bob: processing
+    Bob->>Server: forward
+    activate Server
+    Server-->>Bob: data
+    deactivate Server
+    Bob-->>Alice: response
+    deactivate Bob
+    Note over Alice,Bob: done`,
+
+  class: `classDiagram
+    class Animal <<abstract>> {
+        +String name
+        +makeSound() String
+    }
+    class Duck {
+        +swim() void
+        +quack() String
+    }
+    class Fish {
+        +depth int
+    }
+    class Collection~T~ {
+        +items List~T~
+        +add(item T) void
+    }
+    Animal <|-- Duck
+    Animal <|-- Fish
+    Duck --> Fish : chases
+    Collection~Duck~ o-- Duck`,
+
+  state: `stateDiagram-v2
+    [*] --> Idle
+    Idle --> Running : start
+    Running --> Idle : stop
+    Running --> Error : fail
+    Error --> Idle : reset
+    state fork1 <<fork>>
+    state join1 <<join>>
+    state choice1 <<choice>>
+    Running --> fork1
+    fork1 --> Logging
+    fork1 --> Metrics
+    Logging --> join1
+    Metrics --> join1
+    join1 --> Done
+    Done --> choice1
+    choice1 --> Idle : retry
+    choice1 --> [*] : exit`,
+
+  er: `erDiagram
+    CUSTOMER ||--o{ ORDER : "places"
+    ORDER ||--|{ LINE-ITEM : "contains"
+    CUSTOMER {
+        string name PK
+        string email
+    }
+    ORDER {
+        int orderNumber PK
+        string status
+    }`,
+
+  gantt: `gantt
+    title Project Timeline
+    dateFormat YYYY-MM-DD
+    todayMarker
+    section Design
+        Research        : done, 3d
+        Wireframes      : done, 2d
+    section Development
+        Backend         : crit, 5d
+        Frontend        : 4d
+    section Testing
+        QA              : 3d
+        Bug fixes       : 2d`,
+
+  gitgraph: `gitGraph
+    commit
+    branch develop
+    checkout develop
+    commit
+    commit
+    checkout main
+    merge develop
+    commit`,
+
+  pie: `pie title Pets adopted by volunteers
+"Dogs" : 386
+"Cats" : 200
+"Rats" : 15`,
+
+  mindmap: `mindmap
+  root((Software\\nArchitecture))
+    Frontend
+      React
+      CSS
+    Backend
+      API
+      Database
+    DevOps
+      CI/CD
+      Monitoring`,
+
+  timeline: `timeline
+    title History of Social Media
+    2002 : LinkedIn
+    2004 : Facebook
+    2005 : YouTube
+    2006 : Twitter
+    2010 : Instagram
+    2016 : TikTok`,
+
+  xychart: `xychart-beta
+    title "Monthly Revenue"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    y-axis "Revenue ($k)" 0 --> 120
+    bar [42, 55, 78, 90, 105, 115]
+    line [50, 60, 70, 85, 100, 110]`,
+
+  quadrant: `quadrantChart
+    title Feature Prioritization
+    x-axis Low Effort --> High Effort
+    y-axis Low Value --> High Value
+    quadrant-1 Schedule
+    quadrant-2 Do Now
+    quadrant-3 Deprioritize
+    quadrant-4 Delegate
+    Search: [0.3, 0.8]
+    Analytics: [0.7, 0.9]
+    Dark Mode: [0.2, 0.4]
+    Export CSV: [0.8, 0.3]
+    Onboarding: [0.5, 0.7]`,
+
+  sankey: `sankey-beta
+Electricity,Lighting,25
+Electricity,Heating,40
+Electricity,Cooling,20
+Gas,Heating,60
+Gas,Cooking,15
+Heating,House,100
+Lighting,House,25
+Cooling,House,20
+Cooking,House,15`,
+
+  c4: `C4Context
+  title System Context for Online Shop
+  Person(customer, "Customer", "A shopper browsing and buying products")
+  Person(admin, "Admin", "Manages inventory and orders")
+  Enterprise_Boundary(b0, "Online Shop") {
+    System(webapp, "Web Application", "Serves the storefront and checkout")
+    System(orderSvc, "Order Service", "Processes and tracks orders")
+    SystemDb(db, "Product DB", "Stores product and order data")
+  }
+  System_Ext(payment, "Payment Gateway", "Handles card payments")
+  System_Ext(email, "Email System", "Sends order confirmations")
+  Rel(customer, webapp, "Browses and orders")
+  Rel(admin, webapp, "Manages catalogue")
+  Rel(webapp, orderSvc, "Places orders", "REST")
+  Rel(orderSvc, db, "Reads/writes", "SQL")
+  Rel(orderSvc, payment, "Charges card", "HTTPS")
+  Rel(orderSvc, email, "Sends confirmation", "SMTP")`,
+
+  block: `block-beta
+    columns 3
+    A["Frontend"] B["API Gateway"] C["Auth Service"]
+    D["User DB"] E["Cache"] F["Email Service"]
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> D
+    B --> F`,
+
+  requirement: `requirementDiagram
+    requirement auth_req {
+        id: 1
+        text: "Users must authenticate"
+        risk: high
+        verifyMethod: test
+    }
+    requirement perf_req {
+        id: 2
+        text: "Response under 200ms"
+        risk: medium
+        verifyMethod: analysis
+    }
+    element auth_service {
+        type: software
+        docRef: /docs/auth
+    }
+    element load_balancer {
+        type: hardware
+    }
+    auth_service - satisfies -> auth_req
+    load_balancer - satisfies -> perf_req
+    auth_service - refines -> perf_req`,
+
+  kanban: `kanban
+todo
+    id1["Design API"]
+    id2["Write tests"]
+    id3["Update docs"]
+in-progress
+    id4["Implement auth"]
+    id5["Fix login bug"]
+review
+    id6["Code review PR #42"]
+done
+    id7["Deploy v1.0"]
+    id8["Setup CI pipeline"]`,
+};
+
+// ── WASM bridge ───────────────────────────────────────────────────────────────
+let wasm = null;
+let lastSvgText = '';
+
+// Always fetch a fresh reference — memory.buffer can be detached after grow.
+function wasmMemBuf() { return wasm ? wasm.memory.buffer : new ArrayBuffer(0); }
+
+// Minimal WASI shim — only the 5 fd_* calls the module imports.
+// These are used by Zig's panic/stdio path and won't be called during
+// normal rendering; stubs returning EBADF (8) are sufficient.
+function makeWasiShim(getMemory) {
+  const EBADF = 8, SUCCESS = 0;
+  return {
+    wasi_snapshot_preview1: {
+      fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
+        // Allow stderr (2) writes so panic messages appear in the console.
+        const mem = new DataView(getMemory());
+        let written = 0;
+        for (let i = 0; i < iovs_len; i++) {
+          const base = mem.getUint32(iovs_ptr + i * 8, true);
+          const len  = mem.getUint32(iovs_ptr + i * 8 + 4, true);
+          if (fd === 2 /* stderr */) {
+            const bytes = new Uint8Array(getMemory(), base, len);
+            console.warn('[wasm stderr]', new TextDecoder().decode(bytes));
+          }
+          written += len;
+        }
+        mem.setUint32(nwritten_ptr, written, true);
+        return SUCCESS;
+      },
+      fd_read()        { return EBADF; },
+      fd_filestat_get(){ return EBADF; },
+      fd_seek()        { return EBADF; },
+      fd_pwrite()      { return EBADF; },
+    },
+  };
+}
+
+async function loadWasm() {
+  try {
+    const shim = makeWasiShim(() => wasmMemBuf());
+    const result = await WebAssembly.instantiateStreaming(fetch('pozeiden.wasm'), shim);
+    wasm = result.instance.exports;
+    setStatus('Ready', 'ok');
+    // Render the default example
+    const editor = document.getElementById('editor');
+    editor.value = examples.flowchart;
+    document.getElementById('example-select').value = 'flowchart';
+    doRender(editor.value);
+  } catch (err) {
+    const errEl = document.getElementById('wasm-error');
+    errEl.style.display = 'flex';
+    errEl.textContent = 'Failed to load pozeiden.wasm\n\n' + String(err) +
+      '\n\nServe this directory over HTTP (e.g. python3 -m http.server)';
+    setStatus('Load failed', 'error');
+  }
+}
+
+function doRender(text) {
+  if (!wasm) return;
+  const t0 = performance.now();
+  try {
+    const bytes = new TextEncoder().encode(text);
+    const inputPtr = wasm.get_input_ptr();
+    new Uint8Array(wasmMemBuf()).set(bytes, inputPtr);
+    const svgLen = wasm.render(bytes.length);
+    if (svgLen === 0) {
+      setStatus('Error', 'error');
+      document.getElementById('preview').innerHTML =
+        '<span class="placeholder" style="color:#ed8796">Render returned empty output.</span>';
+      lastSvgText = '';
+      return;
+    }
+    const outPtr = wasm.get_output_ptr();
+    // Fresh buffer reference after potential memory growth during render()
+    lastSvgText = new TextDecoder().decode(new Uint8Array(wasmMemBuf(), outPtr, svgLen));
+    const ms = (performance.now() - t0).toFixed(1);
+    document.getElementById('preview').innerHTML = lastSvgText;
+    setStatus(`${ms} ms`, 'ok');
+  } catch (err) {
+    setStatus('JS error', 'error');
+    console.error(err);
+  }
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+// ── UI wiring ─────────────────────────────────────────────────────────────────
+let debounceTimer = null;
+
+const editor = document.getElementById('editor');
+
+editor.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => doRender(editor.value), 180);
+});
+
+// Tab key → insert 4 spaces
+editor.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const s = editor.selectionStart;
+  const end = editor.selectionEnd;
+  editor.value = editor.value.slice(0, s) + '    ' + editor.value.slice(end);
+  editor.selectionStart = editor.selectionEnd = s + 4;
+});
+
+// Example dropdown
+const select = document.getElementById('example-select');
+for (const name of Object.keys(examples)) {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  select.appendChild(opt);
+}
+select.addEventListener('change', () => {
+  const name = select.value;
+  if (!name || !examples[name]) return;
+  editor.value = examples[name];
+  doRender(examples[name]);
+});
+
+// Copy SVG button
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  if (!lastSvgText) return;
+  try {
+    await navigator.clipboard.writeText(lastSvgText);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy SVG'; }, 1500);
+  } catch {
+    // Fallback for non-secure contexts
+    const ta = document.createElement('textarea');
+    ta.value = lastSvgText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+});
+
+// Boot
+loadWasm();
+</script>
+</body>
+</html>

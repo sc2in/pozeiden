@@ -52,6 +52,64 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_mod_tests.step);
 
+    // ── playground step ───────────────────────────────────────────────────────
+    // Compiles pozeiden to WebAssembly and bundles it with the HTML playground.
+    //
+    //   zig build playground
+    //   cd zig-out/playground && python3 -m http.server
+    //   open http://localhost:8000
+
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .wasi,
+    });
+
+    const mvzr_wasm = b.dependency("mvzr", .{
+        .target = wasm_target,
+        .optimize = .ReleaseSmall,
+    });
+    const mecha_wasm = b.dependency("mecha", .{});
+    const zigmark_wasm = b.dependency("zigmark", .{
+        .target = wasm_target,
+        .optimize = .ReleaseSmall,
+    });
+
+    const mod_wasm = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = wasm_target,
+        .optimize = .ReleaseSmall,
+        .single_threaded = true,
+    });
+    mod_wasm.addImport("mvzr", mvzr_wasm.module("mvzr"));
+    mod_wasm.addImport("mecha", mecha_wasm.module("mecha"));
+    mod_wasm.addImport("zigmark", zigmark_wasm.module("zigmark"));
+
+    const wasm_exe = b.addExecutable(.{
+        .name = "pozeiden",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm.zig"),
+            .target = wasm_target,
+            .optimize = .ReleaseSmall,
+            .single_threaded = true,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod_wasm },
+            },
+        }),
+    });
+    wasm_exe.entry = .disabled;
+    wasm_exe.rdynamic = true;
+
+    const playground_step = b.step("playground", "Build WASM + HTML playground to zig-out/playground/");
+    const install_wasm = b.addInstallArtifact(wasm_exe, .{
+        .dest_dir = .{ .override = .{ .custom = "playground" } },
+    });
+    const install_html = b.addInstallFile(
+        b.path("playground/index.html"),
+        "playground/index.html",
+    );
+    playground_step.dependOn(&install_wasm.step);
+    playground_step.dependOn(&install_html.step);
+
     // ── examples step ─────────────────────────────────────────────────────────
     // Renders the .mmd files in examples/ to SVGs in zig-out/examples/.
     //

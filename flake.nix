@@ -35,7 +35,7 @@
             ./build.zig.zon
             ./build.zig.zon2json-lock
             ./src
-            ./include
+            ./playground
           ];
         };
         # Helper: build zigmark at a given optimization level (null = default).
@@ -144,6 +144,27 @@
           type = "app";
           program = "${self.packages.${system}.zigmark-safe}/bin/zigmark";
           meta.description = "Run zigmark (ReleaseSafe)";
+        };
+
+        # Open the live playground:  nix run .#playground [port]
+        playground = let
+          playground-app = pkgs.writeShellApplication {
+            name = "pozeiden-playground";
+            meta.description = "Build the WASM module and serve the live playground locally (optional port argument, default 8080)";
+            runtimeInputs = [pkgs.git pkgs.python3];
+            text = ''
+              cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+              echo "▸ Building playground…"
+              zig build playground
+              PORT="''${1:-8080}"
+              echo "✓ Open http://localhost:$PORT in your browser"
+              python3 -m http.server "$PORT" -d zig-out/playground
+            '';
+          };
+        in {
+          type = "app";
+          program = "${playground-app}/bin/pozeiden-playground";
+          meta.description = "Build the WASM module and serve the live playground locally (optional port argument, default 8080)";
         };
 
         # Serve the WASM live-preview demo:  nix run .#wasm-demo
