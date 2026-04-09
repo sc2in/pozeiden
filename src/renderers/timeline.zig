@@ -8,9 +8,9 @@ const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 const theme = @import("../svg/theme.zig");
 
 const SPINE_Y: f32 = 120; // Y position of the horizontal spine
-const SECTION_W: f32 = 180; // width per section/era
+const SECTION_W: f32 = 150; // width per section/era
 const EVENT_H: f32 = 22;
-const EVENT_W: f32 = 160;
+const EVENT_W: f32 = 132;
 const MARGIN_X: f32 = 40;
 const MARGIN_Y: f32 = 20;
 const TITLE_H: f32 = 36;
@@ -104,7 +104,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const ey = spine_y_actual + 20 + @as(f32, @floatFromInt(ei)) * (EVENT_H + 8);
             try svg.rect(sx + 10, ey, EVENT_W, EVENT_H, 3.0, "#f8f9fa", color, 1.0);
             // Truncate long event text
-            const max_len: usize = 22;
+            const max_len: usize = 19;
             const display = if (ev.text.len > max_len) ev.text[0..max_len] else ev.text;
             try svg.text(sx + 10 + EVENT_W / 2, ey + EVENT_H / 2 + 4, display, theme.text_color, theme.font_size_small, .middle, "normal");
         }

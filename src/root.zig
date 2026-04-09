@@ -187,6 +187,7 @@ fn renderBlockDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var edges_list: std.ArrayList(Value) = .empty;
     var n_cols: f64 = 3.0;
     var seen_ids = std.StringHashMap(void).init(a);
+    var space_counter: usize = 0;
 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
@@ -236,11 +237,17 @@ fn renderBlockDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             // Read id: up to '[' or space
             const id_start = pos;
             while (pos < line.len and line[pos] != '[' and line[pos] != ' ' and line[pos] != '\t') pos += 1;
-            const id = line[id_start..pos];
-            if (id.len == 0) { pos += 1; continue; }
+            const raw_id = line[id_start..pos];
+            if (raw_id.len == 0) { pos += 1; continue; }
+            // Handle bare id:N width suffix (e.g. "space:2")
+            var id = raw_id;
+            var width_str: []const u8 = "";
+            if (std.mem.indexOfScalar(u8, raw_id, ':')) |colon| {
+                id = raw_id[0..colon];
+                width_str = raw_id[colon + 1..];
+            }
             // Check for ["label"] after id
             var lbl = id;
-            var width_str: []const u8 = "";
             if (pos < line.len and line[pos] == '[') {
                 // Find matching ]
                 const bracket_start = pos;
@@ -263,13 +270,21 @@ fn renderBlockDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                     width_str = line[w_start..pos];
                 }
             }
-            if (seen_ids.get(id) != null) continue;
-            try seen_ids.put(id, {});
+            const is_space = std.mem.eql(u8, id, "space");
+            // Give each space block a unique synthetic id so multiple spaces
+            // on the same line don't get deduped by seen_ids.
+            const effective_id = if (is_space) blk: {
+                space_counter += 1;
+                break :blk try std.fmt.allocPrint(a, "__space{d}", .{space_counter});
+            } else id;
+            if (!is_space and seen_ids.get(id) != null) continue;
+            if (!is_space) try seen_ids.put(id, {});
             const width = std.fmt.parseFloat(f64, width_str) catch 1.0;
             var bn = Value.Node{ .type_name = "block", .fields = .{} };
-            try bn.fields.put(a, "id", Value{ .string = id });
-            try bn.fields.put(a, "label", Value{ .string = lbl });
+            try bn.fields.put(a, "id", Value{ .string = effective_id });
+            try bn.fields.put(a, "label", Value{ .string = if (is_space) "" else lbl });
             try bn.fields.put(a, "width", Value{ .number = width });
+            try bn.fields.put(a, "space", Value{ .number = if (is_space) 1.0 else 0.0 });
             try blocks_list.append(a, Value{ .node = bn });
         }
     }
@@ -689,6 +704,9 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             continue;
         }
 
+        // Skip subgraph-local direction directives (direction LR / direction TB etc.)
+        if (std.mem.startsWith(u8, line, "direction ")) continue;
+
         // Try to find an edge arrow
         if (findEdgeArrow(line)) |arrow| {
             var from_raw = std.mem.trim(u8, line[0..arrow[0]], " \t");
@@ -900,6 +918,12 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             try block_stack.append(a, .{ .kind = "par", .label = lbl, .start = signals_list.items.len - 1 });
             continue;
         }
+        // box <color> <label> ... end: treat as a visual grouping; skip header/end,
+        // participants inside are still parsed normally.
+        if (std.mem.startsWith(u8, line, "box ") or std.mem.eql(u8, line, "box")) {
+            try block_stack.append(a, .{ .kind = "box", .label = "", .start = signals_list.items.len });
+            continue;
+        }
         if (std.mem.eql(u8, line, "autonumber")) {
             autonumber = true;
             continue;
@@ -961,14 +985,19 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         if (std.mem.eql(u8, line, "end")) {
             if (block_stack.items.len > 0) {
                 const top = block_stack.pop().?;
-                const end_type: []const u8 =
-                    if (std.mem.eql(u8, top.kind, "loop")) "loopEnd"
-                    else if (std.mem.eql(u8, top.kind, "opt")) "optEnd"
-                    else if (std.mem.eql(u8, top.kind, "par")) "parEnd"
-                    else "altEnd";
-                var sig = Value.Node{ .type_name = "signal", .fields = .{} };
-                try sig.fields.put(a, "type", Value{ .string = end_type });
-                try signals_list.append(a, Value{ .node = sig });
+                // "box" groups are visual-only; no signal emitted for them
+                if (std.mem.eql(u8, top.kind, "box")) {
+                    // nothing to emit
+                } else {
+                    const end_type: []const u8 =
+                        if (std.mem.eql(u8, top.kind, "loop")) "loopEnd"
+                        else if (std.mem.eql(u8, top.kind, "opt")) "optEnd"
+                        else if (std.mem.eql(u8, top.kind, "par")) "parEnd"
+                        else "altEnd";
+                    var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+                    try sig.fields.put(a, "type", Value{ .string = end_type });
+                    try signals_list.append(a, Value{ .node = sig });
+                }
             }
             continue;
         }
@@ -977,7 +1006,7 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         // Try to find an arrow pattern
         const arrow_patterns = [_]struct { []const u8, []const u8 }{
             .{ "-->x", "3" }, .{ "-->>", "1" }, .{ "->>", "0" },
-            .{ "-->", "3" }, .{ "->x", "2" }, .{ "->", "2" },
+            .{ "-->", "3" }, .{ "->x", "2" }, .{ "->)", "0" }, .{ "-)", "0" }, .{ "->", "2" },
         };
         var found_arrow = false;
         for (arrow_patterns) |ap| {
@@ -991,9 +1020,15 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                     std.mem.trim(u8, after_arrow[colon_pos + 1..], " \t")
                 else "";
 
-                // +/- activation suffix on to-actor: "Bob+" activates, "Bob-" deactivates
+                // +/- activation marker on to-actor: prefix "+" or "-" or suffix "+" or "-"
                 var activate_suffix: i8 = 0; // +1=activate, -1=deactivate
-                if (to_raw.len > 0 and to_raw[to_raw.len - 1] == '+') {
+                if (to_raw.len > 0 and to_raw[0] == '+') {
+                    to_raw = to_raw[1..];
+                    activate_suffix = 1;
+                } else if (to_raw.len > 0 and to_raw[0] == '-') {
+                    to_raw = to_raw[1..];
+                    activate_suffix = -1;
+                } else if (to_raw.len > 0 and to_raw[to_raw.len - 1] == '+') {
                     to_raw = to_raw[0 .. to_raw.len - 1];
                     activate_suffix = 1;
                 } else if (to_raw.len > 0 and to_raw[to_raw.len - 1] == '-') {
@@ -1516,8 +1551,8 @@ fn renderTimelineDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             continue;
         }
         if (std.mem.startsWith(u8, line, "section ") or std.mem.startsWith(u8, line, "section\t")) {
-            // flush
-            if (cur_label.len > 0 or cur_events.items.len > 0) {
+            // flush only if current section has events
+            if (cur_events.items.len > 0) {
                 var sn = Value.Node{ .type_name = "section", .fields = .{} };
                 try sn.fields.put(a, "label", Value{ .string = cur_label });
                 try sn.fields.put(a, "events", Value{ .list = try cur_events.toOwnedSlice(a) });
@@ -1533,7 +1568,7 @@ fn renderTimelineDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             const era = std.mem.trim(u8, line[0..colon], " \t");
             // Flush previous section if era changed
             if (era.len > 0 and !std.mem.eql(u8, era, cur_label)) {
-                if (cur_label.len > 0 or cur_events.items.len > 0) {
+                if (cur_events.items.len > 0) {
                     var sn = Value.Node{ .type_name = "section", .fields = .{} };
                     try sn.fields.put(a, "label", Value{ .string = cur_label });
                     try sn.fields.put(a, "events", Value{ .list = try cur_events.toOwnedSlice(a) });
@@ -1555,8 +1590,8 @@ fn renderTimelineDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             try cur_events.append(a, Value{ .string = line });
         }
     }
-    // Flush last section
-    if (cur_label.len > 0 or cur_events.items.len > 0) {
+    // Flush last section (only if it has events)
+    if (cur_events.items.len > 0) {
         var sn = Value.Node{ .type_name = "section", .fields = .{} };
         try sn.fields.put(a, "label", Value{ .string = cur_label });
         try sn.fields.put(a, "events", Value{ .list = try cur_events.toOwnedSlice(a) });
@@ -1601,7 +1636,10 @@ fn renderXyChartDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
                 const rb = std.mem.lastIndexOf(u8, rest, "]") orelse rest.len;
                 var iter = std.mem.splitScalar(u8, rest[lb + 1..rb], ',');
                 while (iter.next()) |tok| {
-                    const t = std.mem.trim(u8, tok, " \t");
+                    var t = std.mem.trim(u8, tok, " \t");
+                    // Strip surrounding quotes if present
+                    if (t.len >= 2 and (t[0] == '"' or t[0] == '\'') and t[t.len - 1] == t[0])
+                        t = t[1 .. t.len - 1];
                     if (t.len > 0) try x_labels.append(a, Value{ .string = t });
                 }
             }
@@ -1772,6 +1810,8 @@ fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
         }
         const content = std.mem.trim(u8, trimmed_right, " \t");
         if (content.len == 0) continue;
+        // Skip ::icon() and ::class() directives — decorators, not nodes
+        if (std.mem.startsWith(u8, content, "::")) continue;
 
         var label: []const u8 = content;
         var shape: []const u8 = "ellipse";

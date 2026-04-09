@@ -36,6 +36,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         x: f32,
         y: f32,
         w: f32,
+        is_space: bool,
     };
 
     var blocks: std.ArrayList(BlockEntry) = .empty;
@@ -47,6 +48,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (node.getList("blocks")) |bv| {
         const bn = bv.asNode() orelse continue;
         const id = bn.getString("id") orelse continue;
+        const is_space = (bn.getNumber("space") orelse 0.0) != 0.0;
         const label = bn.getString("label") orelse id;
         const width: usize = @intFromFloat(bn.getNumber("width") orelse 1.0);
         const w = @as(f32, @floatFromInt(width)) * CELL_W + @as(f32, @floatFromInt(width - 1)) * GAP;
@@ -65,6 +67,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .id = id, .label = label, .width = width,
             .grid_col = cur_col, .grid_row = cur_row,
             .x = x, .y = y, .w = w,
+            .is_space = is_space,
         });
 
         cur_col += width;
@@ -241,9 +244,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
-    // Draw blocks
-    for (blocks.items, 0..) |b, bi| {
-        const color = theme.pie_colors[bi % theme.pie_colors.len];
+    // Draw blocks (skip space placeholders)
+    var color_idx: usize = 0;
+    for (blocks.items) |b| {
+        if (b.is_space) continue;
+        const color = theme.pie_colors[color_idx % theme.pie_colors.len];
+        color_idx += 1;
         try svg.rect(b.x, b.y, b.w, CELL_H, 6.0, theme.node_fill, color, 2.0);
         try svg.textWrapped(b.x + b.w / 2, b.y + CELL_H / 2 + 4,
             b.label, b.w - 8, theme.text_color, theme.font_size, .middle, "normal");

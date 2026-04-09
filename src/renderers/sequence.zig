@@ -166,8 +166,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     const n_actors = actors.items.len;
     const n_msgs = messages.items.len;
+    // Width: span to the right edge of the last actor box, plus room for a
+    // "Note right of <last actor>" (NOTE_PAD + ~100 px) and a right margin.
     const total_w: u32 = @intFromFloat(
-        MARGIN_X * 2 + @as(f32, @floatFromInt(n_actors)) * LANE_GAP
+        MARGIN_X * 2 + @as(f32, @floatFromInt(n_actors -| 1)) * LANE_GAP + ACTOR_W + NOTE_PAD + 100
     );
     const total_h: u32 = @intFromFloat(
         FIRST_MSG_Y + @as(f32, @floatFromInt(n_msgs + 1)) * ROW_H + ACTOR_H + MARGIN_Y * 2

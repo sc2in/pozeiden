@@ -26,6 +26,7 @@ const Commit = struct {
     label: []const u8,
     commit_type: []const u8, // "NORMAL", "REVERSE", "HIGHLIGHT"
     merge_from: ?[]const u8, // branch name being merged if this is a merge commit
+    tag: ?[]const u8 = null,
     x: f32 = 0,
     y: f32 = 0,
 };
@@ -96,16 +97,23 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const lane = branchLane(branches.items, current_branch) orelse 0;
             const y = MARGIN_Y + @as(f32, @floatFromInt(lane)) * LANE_H + LANE_H / 2;
 
+            const tag_opt: ?[]const u8 = blk: {
+                const tags = sn.getList("tags");
+                if (tags.len > 0) break :blk tags[0].asString();
+                break :blk null;
+            };
             const id_owned = try a.dupe(u8, id);
             const msg_owned = try a.dupe(u8, msg);
             const branch_owned = try a.dupe(u8, current_branch);
             const ctype_owned = try a.dupe(u8, ctype);
+            const tag_owned = if (tag_opt) |t| try a.dupe(u8, t) else null;
             try commits.append(a, Commit{
                 .id = id_owned,
                 .branch = branch_owned,
                 .label = msg_owned,
                 .commit_type = ctype_owned,
                 .merge_from = null,
+                .tag = tag_owned,
                 .x = new_x,
                 .y = y,
             });
@@ -124,14 +132,21 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const lane = branchLane(branches.items, current_branch) orelse 0;
             const y = MARGIN_Y + @as(f32, @floatFromInt(lane)) * LANE_H + LANE_H / 2;
 
+            const merge_tag_opt: ?[]const u8 = blk: {
+                const tags = sn.getList("tags");
+                if (tags.len > 0) break :blk tags[0].asString();
+                break :blk null;
+            };
             const target_owned = try a.dupe(u8, target_branch);
             const cur_owned = try a.dupe(u8, current_branch);
+            const mtag_owned = if (merge_tag_opt) |t| try a.dupe(u8, t) else null;
             try commits.append(a, Commit{
                 .id = merge_id,
                 .branch = cur_owned,
                 .label = "",
                 .commit_type = "NORMAL",
                 .merge_from = target_owned,
+                .tag = mtag_owned,
                 .x = new_x,
                 .y = y,
             });
@@ -194,9 +209,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const fill = if (std.mem.eql(u8, c.commit_type, "HIGHLIGHT")) color else theme.background;
         const stroke = color;
         try svg.circle(c.x, c.y, COMMIT_R, fill, stroke, 2.5);
-        // Commit label below circle
-        if (c.label.len > 0 and !std.mem.eql(u8, c.label, c.id)) {
-            try svg.text(c.x, c.y + COMMIT_R + 14, c.label, theme.text_color, theme.font_size_small, .middle, "normal");
+        // Tag: small rounded rect above the commit circle
+        if (c.tag) |tag| {
+            const tag_w: f32 = @as(f32, @floatFromInt(tag.len)) * 6.5 + 10;
+            const tag_h: f32 = 16;
+            const tag_x = c.x - tag_w / 2;
+            const tag_y = c.y - COMMIT_R - tag_h - 4;
+            try svg.rect(tag_x, tag_y, tag_w, tag_h, 3.0, "#fef3c7", "#d97706", 1.0);
+            try svg.text(c.x, tag_y + tag_h / 2 + 4, tag, "#92400e", 10, .middle, "bold");
         }
     }
 

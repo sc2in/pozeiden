@@ -1,35 +1,25 @@
 block-beta
     columns 4
 
-    Internet(["🌐 Internet"]):1 space LB["Load Balancer"]:1 space
+    inet["Internet"]:1 space:1 lb["Load Balancer"]:1 space:1
 
-    subgraph API["API Tier"]
-        API1["API Server 1"]:1 API2["API Server 2"]:1
-    end
+    api1["API Server 1"]:1 api2["API Server 2"]:1 r1["Redis Primary"]:1 r2["Redis Replica"]:1
 
-    subgraph Cache["Cache Tier"]
-        R1["Redis Primary"]:1 R2["Redis Replica"]:1
-    end
+    pg["Postgres Primary"]:2 pgr["Postgres Replica"]:2
 
-    subgraph DB["Database Tier"]
-        PG["Postgres Primary"]:2 PGR["Postgres Replica"]:2
-    end
+    q["Job Queue"]:2 w1["Worker 1"]:1 w2["Worker 2"]:1
 
-    subgraph Jobs["Background Jobs"]
-        W1["Worker 1"]:1 W2["Worker 2"]:1 Q["Job Queue"]:2
-    end
-
-    Internet --> LB
-    LB --> API1
-    LB --> API2
-    API1 --> R1
-    API2 --> R1
-    R1 --> R2
-    API1 --> PG
-    API2 --> PG
-    PG --> PGR
-    API1 --> Q
-    Q --> W1
-    Q --> W2
-    W1 --> PG
-    W2 --> PG
+    inet --> lb
+    lb --> api1
+    lb --> api2
+    api1 --> r1
+    api2 --> r1
+    r1 --> r2
+    api1 --> pg
+    api2 --> pg
+    pg --> pgr
+    api1 --> q
+    q --> w1
+    q --> w2
+    w1 --> pg
+    w2 --> pg

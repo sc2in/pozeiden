@@ -15,7 +15,7 @@ const TITLE_H: f32 = 36;
 const CHART_H: f32 = 300;
 const AXIS_H: f32 = 30;
 const MARGIN_B: f32 = 20;
-const COL_W: f32 = 60;
+const COL_W: f32 = 90;
 const BAR_PAD: f32 = 8;
 const GRID_LINES: usize = 5;
 
