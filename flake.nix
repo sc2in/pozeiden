@@ -51,10 +51,10 @@
             meta = (old.meta or {}) // {description = desc;};
           });
       in {
-        default        = withDesc (mkPozeiden null)           "pozeiden — mermaid → SVG renderer";
-        pozeiden-safe  = withDesc (mkPozeiden "ReleaseSafe")  "pozeiden (ReleaseSafe)";
+        default = withDesc (mkPozeiden null) "pozeiden — mermaid → SVG renderer";
+        pozeiden-safe = withDesc (mkPozeiden "ReleaseSafe") "pozeiden (ReleaseSafe)";
         pozeiden-small = withDesc (mkPozeiden "ReleaseSmall") "pozeiden (ReleaseSmall)";
-        pozeiden-fast  = withDesc (mkPozeiden "ReleaseFast")  "pozeiden (ReleaseFast)";
+        pozeiden-fast = withDesc (mkPozeiden "ReleaseFast") "pozeiden (ReleaseFast)";
       }
     );
 

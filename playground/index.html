@@ -222,234 +222,23 @@
 </div>
 
 <script>
-// ── Embedded example diagrams ────────────────────────────────────────────────
-const examples = {
-  flowchart: `flowchart TD
-    A([Start]) --> B{Decision}
-    B -->|Yes| C[Process]
-    B -->|No| D[(Database)]
-    C -- update --> D
-    D --> E{{Config}}
-    E --> F[[Subroutine]]
-    F -.-> G((Done))`,
+// ── Example list — content fetched from examples/{name}.mmd at runtime ───────
+const exampleNames = [
+  'flowchart', 'sequence', 'class', 'state', 'er', 'gantt',
+  'gitgraph', 'pie', 'mindmap', 'timeline', 'xychart', 'quadrant',
+  'sankey', 'c4', 'block', 'requirement', 'kanban',
+];
 
-  sequence: `sequenceDiagram
-    autonumber
-    participant Alice
-    participant Bob
-    participant Server
-    Alice->>Bob: request
-    activate Bob
-    Note right of Bob: processing
-    Bob->>Server: forward
-    activate Server
-    Server-->>Bob: data
-    deactivate Server
-    Bob-->>Alice: response
-    deactivate Bob
-    Note over Alice,Bob: done`,
+const exampleCache = {}; // name → fetched text
 
-  class: `classDiagram
-    class Animal <<abstract>> {
-        +String name
-        +makeSound() String
-    }
-    class Duck {
-        +swim() void
-        +quack() String
-    }
-    class Fish {
-        +depth int
-    }
-    class Collection~T~ {
-        +items List~T~
-        +add(item T) void
-    }
-    Animal <|-- Duck
-    Animal <|-- Fish
-    Duck --> Fish : chases
-    Collection~Duck~ o-- Duck`,
-
-  state: `stateDiagram-v2
-    [*] --> Idle
-    Idle --> Running : start
-    Running --> Idle : stop
-    Running --> Error : fail
-    Error --> Idle : reset
-    state fork1 <<fork>>
-    state join1 <<join>>
-    state choice1 <<choice>>
-    Running --> fork1
-    fork1 --> Logging
-    fork1 --> Metrics
-    Logging --> join1
-    Metrics --> join1
-    join1 --> Done
-    Done --> choice1
-    choice1 --> Idle : retry
-    choice1 --> [*] : exit`,
-
-  er: `erDiagram
-    CUSTOMER ||--o{ ORDER : "places"
-    ORDER ||--|{ LINE-ITEM : "contains"
-    CUSTOMER {
-        string name PK
-        string email
-    }
-    ORDER {
-        int orderNumber PK
-        string status
-    }`,
-
-  gantt: `gantt
-    title Project Timeline
-    dateFormat YYYY-MM-DD
-    todayMarker
-    section Design
-        Research        : done, 3d
-        Wireframes      : done, 2d
-    section Development
-        Backend         : crit, 5d
-        Frontend        : 4d
-    section Testing
-        QA              : 3d
-        Bug fixes       : 2d`,
-
-  gitgraph: `gitGraph
-    commit
-    branch develop
-    checkout develop
-    commit
-    commit
-    checkout main
-    merge develop
-    commit`,
-
-  pie: `pie title Pets adopted by volunteers
-"Dogs" : 386
-"Cats" : 200
-"Rats" : 15`,
-
-  mindmap: `mindmap
-  root((Software\\nArchitecture))
-    Frontend
-      React
-      CSS
-    Backend
-      API
-      Database
-    DevOps
-      CI/CD
-      Monitoring`,
-
-  timeline: `timeline
-    title History of Social Media
-    2002 : LinkedIn
-    2004 : Facebook
-    2005 : YouTube
-    2006 : Twitter
-    2010 : Instagram
-    2016 : TikTok`,
-
-  xychart: `xychart-beta
-    title "Monthly Revenue"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    y-axis "Revenue ($k)" 0 --> 120
-    bar [42, 55, 78, 90, 105, 115]
-    line [50, 60, 70, 85, 100, 110]`,
-
-  quadrant: `quadrantChart
-    title Feature Prioritization
-    x-axis Low Effort --> High Effort
-    y-axis Low Value --> High Value
-    quadrant-1 Schedule
-    quadrant-2 Do Now
-    quadrant-3 Deprioritize
-    quadrant-4 Delegate
-    Search: [0.3, 0.8]
-    Analytics: [0.7, 0.9]
-    Dark Mode: [0.2, 0.4]
-    Export CSV: [0.8, 0.3]
-    Onboarding: [0.5, 0.7]`,
-
-  sankey: `sankey-beta
-Electricity,Lighting,25
-Electricity,Heating,40
-Electricity,Cooling,20
-Gas,Heating,60
-Gas,Cooking,15
-Heating,House,100
-Lighting,House,25
-Cooling,House,20
-Cooking,House,15`,
-
-  c4: `C4Context
-  title System Context for Online Shop
-  Person(customer, "Customer", "A shopper browsing and buying products")
-  Person(admin, "Admin", "Manages inventory and orders")
-  Enterprise_Boundary(b0, "Online Shop") {
-    System(webapp, "Web Application", "Serves the storefront and checkout")
-    System(orderSvc, "Order Service", "Processes and tracks orders")
-    SystemDb(db, "Product DB", "Stores product and order data")
-  }
-  System_Ext(payment, "Payment Gateway", "Handles card payments")
-  System_Ext(email, "Email System", "Sends order confirmations")
-  Rel(customer, webapp, "Browses and orders")
-  Rel(admin, webapp, "Manages catalogue")
-  Rel(webapp, orderSvc, "Places orders", "REST")
-  Rel(orderSvc, db, "Reads/writes", "SQL")
-  Rel(orderSvc, payment, "Charges card", "HTTPS")
-  Rel(orderSvc, email, "Sends confirmation", "SMTP")`,
-
-  block: `block-beta
-    columns 3
-    A["Frontend"] B["API Gateway"] C["Auth Service"]
-    D["User DB"] E["Cache"] F["Email Service"]
-    A --> B
-    B --> C
-    B --> D
-    B --> E
-    C --> D
-    B --> F`,
-
-  requirement: `requirementDiagram
-    requirement auth_req {
-        id: 1
-        text: "Users must authenticate"
-        risk: high
-        verifyMethod: test
-    }
-    requirement perf_req {
-        id: 2
-        text: "Response under 200ms"
-        risk: medium
-        verifyMethod: analysis
-    }
-    element auth_service {
-        type: software
-        docRef: /docs/auth
-    }
-    element load_balancer {
-        type: hardware
-    }
-    auth_service - satisfies -> auth_req
-    load_balancer - satisfies -> perf_req
-    auth_service - refines -> perf_req`,
-
-  kanban: `kanban
-todo
-    id1["Design API"]
-    id2["Write tests"]
-    id3["Update docs"]
-in-progress
-    id4["Implement auth"]
-    id5["Fix login bug"]
-review
-    id6["Code review PR #42"]
-done
-    id7["Deploy v1.0"]
-    id8["Setup CI pipeline"]`,
-};
+async function loadExample(name) {
+  if (exampleCache[name]) return exampleCache[name];
+  const res = await fetch(`examples/${name}.mmd`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const text = await res.text();
+  exampleCache[name] = text;
+  return text;
+}
 
 // ── WASM bridge ───────────────────────────────────────────────────────────────
 let wasm = null;
@@ -495,11 +284,17 @@ async function loadWasm() {
     const result = await WebAssembly.instantiateStreaming(fetch('pozeiden.wasm'), shim);
     wasm = result.instance.exports;
     setStatus('Ready', 'ok');
-    // Render the default example
+    // Load and render the default example
     const editor = document.getElementById('editor');
-    editor.value = examples.flowchart;
-    document.getElementById('example-select').value = 'flowchart';
-    doRender(editor.value);
+    const sel = document.getElementById('example-select');
+    sel.value = 'flowchart';
+    try {
+      const text = await loadExample('flowchart');
+      editor.value = text;
+      doRender(text);
+    } catch {
+      doRender(editor.value);
+    }
   } catch (err) {
     const errEl = document.getElementById('wasm-error');
     errEl.style.display = 'flex';
@@ -564,17 +359,24 @@ editor.addEventListener('keydown', (e) => {
 
 // Example dropdown
 const select = document.getElementById('example-select');
-for (const name of Object.keys(examples)) {
+for (const name of exampleNames) {
   const opt = document.createElement('option');
   opt.value = name;
   opt.textContent = name;
   select.appendChild(opt);
 }
-select.addEventListener('change', () => {
+select.addEventListener('change', async () => {
   const name = select.value;
-  if (!name || !examples[name]) return;
-  editor.value = examples[name];
-  doRender(examples[name]);
+  if (!name) return;
+  setStatus('Loading…', 'loading');
+  try {
+    const text = await loadExample(name);
+    editor.value = text;
+    doRender(text);
+  } catch (err) {
+    setStatus('Fetch error', 'error');
+    console.error('Failed to load example:', name, err);
+  }
 });
 
 // Copy SVG button

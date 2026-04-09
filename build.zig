@@ -110,6 +110,22 @@ pub fn build(b: *std.Build) void {
     playground_step.dependOn(&install_wasm.step);
     playground_step.dependOn(&install_html.step);
 
+    // Copy .mmd example files into zig-out/playground/examples/ so the
+    // playground can fetch them at runtime without hardcoding their content.
+    const example_names_pg = [_][]const u8{
+        "pie", "flowchart", "sequence", "gitgraph", "class",
+        "state", "er", "gantt", "timeline", "xychart",
+        "quadrant", "mindmap", "sankey", "c4",
+        "block", "requirement", "kanban",
+    };
+    for (example_names_pg) |name| {
+        const install_mmd = b.addInstallFile(
+            b.path(b.fmt("examples/{s}.mmd", .{name})),
+            b.fmt("playground/examples/{s}.mmd", .{name}),
+        );
+        playground_step.dependOn(&install_mmd.step);
+    }
+
     // ── examples step ─────────────────────────────────────────────────────────
     // Renders the .mmd files in examples/ to SVGs in zig-out/examples/.
     //
