@@ -114,7 +114,178 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (graph.edges) |e| {
         const from_node = findNode(graph.nodes, e.from) orelse continue;
         const to_node = findNode(graph.nodes, e.to) orelse continue;
+        const stroke = theme.edge_color;
+        const sw = theme.edge_stroke_width;
 
+        // ── Self-loop: node connects to itself ────────────────────────────
+        if (std.mem.eql(u8, e.from, e.to)) {
+            const n = from_node;
+            const cx = n.x + n.w / 2.0;
+            const cy = n.y + n.h / 2.0;
+            const lp: f32 = 42.0; // loop extension distance
+            var loop_buf: [256]u8 = undefined;
+            var loop_ux: f32 = 0;
+            var loop_uy: f32 = 0;
+            var loop_tx: f32 = 0;
+            var loop_ty: f32 = 0;
+            var lbl_x: f32 = 0;
+            var lbl_y: f32 = 0;
+            // For each direction: loop exits and re-enters the node on the
+            // upstream face (opposite to the normal flow direction), arcing
+            // away from the graph body.
+            const loop_d: []const u8 = switch (direction) {
+                .tb => blk: {
+                    // Loop above the node: exit top-left, arc up, enter top-right
+                    loop_ux = 0; loop_uy = 1; // arrowhead points down
+                    loop_tx = cx + 14; loop_ty = n.y;
+                    lbl_x = cx; lbl_y = n.y - lp - 8;
+                    break :blk try std.fmt.bufPrint(&loop_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ cx - 14, n.y, cx - 14, n.y - lp, cx + 14, n.y - lp, cx + 14, n.y });
+                },
+                .bt => blk: {
+                    // Loop below the node
+                    loop_ux = 0; loop_uy = -1;
+                    loop_tx = cx + 14; loop_ty = n.y + n.h;
+                    lbl_x = cx; lbl_y = n.y + n.h + lp + 8;
+                    break :blk try std.fmt.bufPrint(&loop_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ cx - 14, n.y + n.h, cx - 14, n.y + n.h + lp, cx + 14, n.y + n.h + lp, cx + 14, n.y + n.h });
+                },
+                .lr => blk: {
+                    // Loop to the right of the node
+                    loop_ux = -1; loop_uy = 0;
+                    loop_tx = n.x + n.w; loop_ty = cy + 14;
+                    lbl_x = n.x + n.w + lp + 10; lbl_y = cy + 5;
+                    break :blk try std.fmt.bufPrint(&loop_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ n.x + n.w, cy - 14, n.x + n.w + lp, cy - 14, n.x + n.w + lp, cy + 14, n.x + n.w, cy + 14 });
+                },
+                .rl => blk: {
+                    // Loop to the left of the node
+                    loop_ux = 1; loop_uy = 0;
+                    loop_tx = n.x; loop_ty = cy + 14;
+                    lbl_x = n.x - lp - 10; lbl_y = cy + 5;
+                    break :blk try std.fmt.bufPrint(&loop_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ n.x, cy - 14, n.x - lp, cy - 14, n.x - lp, cy + 14, n.x, cy + 14 });
+                },
+            };
+            if (e.style == .dotted) {
+                try svg.path(loop_d, "none", stroke, sw, "stroke-dasharray=\"5,5\"");
+            } else if (e.style == .thick) {
+                try svg.path(loop_d, "none", stroke, sw + 1.5, "");
+            } else {
+                try svg.path(loop_d, "none", stroke, sw, "");
+            }
+            const arr: f32 = 8.0;
+            const half: f32 = 4.5;
+            var lp_pts_buf: [128]u8 = undefined;
+            const lp_pts = try std.fmt.bufPrint(&lp_pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{
+                    loop_tx - loop_ux * arr - loop_uy * half,
+                    loop_ty - loop_uy * arr + loop_ux * half,
+                    loop_tx, loop_ty,
+                    loop_tx - loop_ux * arr + loop_uy * half,
+                    loop_ty - loop_uy * arr - loop_ux * half,
+                });
+            try svg.polygon(lp_pts, stroke, stroke, 0);
+            if (e.label) |lbl| {
+                try svg.text(lbl_x, lbl_y, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+            }
+            continue;
+        }
+
+        // ── Back edge: target is upstream of source in layout coordinates ──
+        // Detected by coordinate position rather than layer number, so cycles
+        // in the graph (where all nodes collapse to layer 0) are also handled.
+        // The standard Bezier control points would fold backwards, so instead
+        // route the edge around the outside of the graph body.
+        const is_back: bool = switch (direction) {
+            .tb => to_node.y <= from_node.y,
+            .bt => to_node.y >= from_node.y,
+            .lr => to_node.x <= from_node.x,
+            .rl => to_node.x >= from_node.x,
+        };
+        if (is_back) {
+            const layer_diff: f32 = if (from_node.layer > to_node.layer)
+                @floatFromInt(from_node.layer - to_node.layer)
+            else
+                @floatFromInt(to_node.layer - from_node.layer);
+            const lateral: f32 = @max(layout.H_GAP * 2.5,
+                layer_diff * from_node.w * 0.4 + layout.H_GAP);
+            var path_buf: [256]u8 = undefined;
+            var bfx: f32 = 0;
+            var bfy: f32 = 0;
+            var btx: f32 = 0;
+            var bty: f32 = 0;
+            var bcx1: f32 = 0;
+            var bcy1: f32 = 0;
+            var bcx2: f32 = 0;
+            var bcy2: f32 = 0;
+            const path_d: []const u8 = switch (direction) {
+                // TB/BT: route around the right side; exit/enter right-center
+                .tb, .bt => blk: {
+                    bfx = from_node.x + from_node.w;
+                    bfy = from_node.y + from_node.h / 2.0;
+                    btx = to_node.x + to_node.w;
+                    bty = to_node.y + to_node.h / 2.0;
+                    bcx1 = bfx + lateral; bcy1 = bfy;
+                    bcx2 = btx + lateral; bcy2 = bty;
+                    break :blk try std.fmt.bufPrint(&path_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ bfx, bfy, bcx1, bcy1, bcx2, bcy2, btx, bty });
+                },
+                // LR/RL: route around the bottom; exit/enter bottom-center
+                .lr, .rl => blk: {
+                    bfx = from_node.x + from_node.w / 2.0;
+                    bfy = from_node.y + from_node.h;
+                    btx = to_node.x + to_node.w / 2.0;
+                    bty = to_node.y + to_node.h;
+                    bcx1 = bfx; bcy1 = bfy + lateral;
+                    bcx2 = btx; bcy2 = bty + lateral;
+                    break :blk try std.fmt.bufPrint(&path_buf,
+                        "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                        .{ bfx, bfy, bcx1, bcy1, bcx2, bcy2, btx, bty });
+                },
+            };
+            if (e.style == .dotted) {
+                try svg.path(path_d, "none", stroke, sw, "stroke-dasharray=\"5,5\"");
+            } else if (e.style == .thick) {
+                try svg.path(path_d, "none", stroke, sw + 1.5, "");
+            } else {
+                try svg.path(path_d, "none", stroke, sw, "");
+            }
+            const tang_x = btx - bcx2;
+            const tang_y = bty - bcy2;
+            const tang_len = @sqrt(tang_x * tang_x + tang_y * tang_y);
+            if (tang_len > 0.5) {
+                const ux = tang_x / tang_len;
+                const uy = tang_y / tang_len;
+                const arr: f32 = 8.0;
+                const half: f32 = 4.5;
+                var pts_buf: [128]u8 = undefined;
+                const pts = try std.fmt.bufPrint(&pts_buf,
+                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                    .{
+                        btx - ux * arr - uy * half,
+                        bty - uy * arr + ux * half,
+                        btx, bty,
+                        btx - ux * arr + uy * half,
+                        bty - uy * arr - ux * half,
+                    });
+                try svg.polygon(pts, stroke, stroke, 0);
+            }
+            if (e.label) |lbl| {
+                const mid_x = 0.125 * bfx + 0.375 * bcx1 + 0.375 * bcx2 + 0.125 * btx;
+                const mid_y = 0.125 * bfy + 0.375 * bcy1 + 0.375 * bcy2 + 0.125 * bty;
+                try svg.text(mid_x + 4, mid_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+            }
+            continue;
+        }
+
+        // ── Normal forward edge ───────────────────────────────────────────
         // Connection points: exit bottom-center / enter top-center for TB,
         // exit right-center / enter left-center for LR, etc.
         const fx: f32, const fy: f32, const tx: f32, const ty: f32 = switch (direction) {
@@ -157,9 +328,6 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .lr  => .{ fx + ctrl, fy,        tx - ctrl, ty },
             .rl  => .{ fx - ctrl, fy,        tx + ctrl, ty },
         };
-
-        const stroke = theme.edge_color;
-        const sw = theme.edge_stroke_width;
 
         var path_buf: [256]u8 = undefined;
         const path_d = try std.fmt.bufPrint(&path_buf,

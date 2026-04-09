@@ -87,7 +87,27 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     try svg.header(total_w, total_h);
     try svg.rect(0, 0, @floatFromInt(total_w), @floatFromInt(total_h), 0, theme.background, theme.background, 0);
 
-    // Draw edges first (behind blocks)
+    // ── Edge routing ──────────────────────────────────────────────────────
+    // Elbow routes (crossing rows and columns) are collected first so we can
+    // run greedy interval-graph coloring per row-gap before rendering.  This
+    // gives each horizontal segment its own y track within the gap, preventing
+    // paths from running on top of one another when they share the same gap.
+    const ElbowRoute = struct {
+        src_x: f32, src_y: f32,
+        tgt_x: f32, tgt_y: f32,
+        gap_row: usize,
+        base_gap_y: f32,
+        gap_y: f32,        // filled after track assignment
+        horiz_min: f32,    // x interval of the horizontal segment
+        horiz_max: f32,
+        end_uy: f32,       // direction of last (vertical) segment for arrowhead
+        label: ?[]const u8,
+        track: usize,
+    };
+
+    var elbow_routes: std.ArrayList(ElbowRoute) = .empty;
+
+    // Pass 1: direct edges rendered immediately; elbow edges collected.
     for (node.getList("edges")) |ev| {
         const en = ev.asNode() orelse continue;
         const from_id = en.getString("from") orelse continue;
@@ -99,35 +119,124 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const fb = blocks.items[fi];
         const tb = blocks.items[ti];
 
-        const fx = fb.x + fb.w / 2;
-        const fy = fb.y + CELL_H / 2;
-        const tx = tb.x + tb.w / 2;
-        const ty = tb.y + CELL_H / 2;
-
-        try svg.line(fx, fy, tx, ty, theme.edge_color, 1.5);
-
-        // Arrowhead at destination
-        const dx = tx - fx;
-        const dy = ty - fy;
+        const fcx = fb.x + fb.w / 2.0;
+        const fcy = fb.y + CELL_H / 2.0;
+        const tcx = tb.x + tb.w / 2.0;
+        const tcy = tb.y + CELL_H / 2.0;
+        const dx = tcx - fcx;
+        const dy = tcy - fcy;
         const len = @sqrt(dx * dx + dy * dy);
-        if (len > 1.0) {
-            const ux = dx / len;
-            const uy = dy / len;
-            const arr: f32 = 8.0;
-            const half: f32 = 4.5;
+        if (len < 1.0) continue;
+        const ux = dx / len;
+        const uy = dy / len;
+
+        const src = rectEdgePoint(fcx, fcy, fb.w, CELL_H, ux, uy);
+        const tgt = rectEdgePoint(tcx, tcy, tb.w, CELL_H, -ux, -uy);
+
+        const same_row = fb.grid_row == tb.grid_row;
+        const same_col = fb.grid_col == tb.grid_col;
+        const arr: f32 = 8.0;
+        const half: f32 = 4.5;
+
+        if (!same_row and !same_col) {
+            const row_min = @min(fb.grid_row, tb.grid_row);
+            const base_gap_y = MARGIN +
+                @as(f32, @floatFromInt(row_min + 1)) * (CELL_H + GAP) - GAP / 2.0;
+            try elbow_routes.append(a, .{
+                .src_x = src.x, .src_y = src.y,
+                .tgt_x = tgt.x, .tgt_y = tgt.y,
+                .gap_row = row_min,
+                .base_gap_y = base_gap_y,
+                .gap_y = base_gap_y,
+                .horiz_min = @min(src.x, tgt.x),
+                .horiz_max = @max(src.x, tgt.x),
+                .end_uy = if (tb.grid_row > fb.grid_row) 1.0 else -1.0,
+                .label = label,
+                .track = 0,
+            });
+        } else {
+            // Same row or column: straight boundary-to-boundary line.
+            try svg.line(src.x, src.y, tgt.x, tgt.y, theme.edge_color, 1.5);
             var pts_buf: [128]u8 = undefined;
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{
-                    tx - ux * arr - uy * half, ty - uy * arr + ux * half,
-                    tx, ty,
-                    tx - ux * arr + uy * half, ty - uy * arr - ux * half,
+                    tgt.x - ux * arr - uy * half, tgt.y - uy * arr + ux * half,
+                    tgt.x, tgt.y,
+                    tgt.x - ux * arr + uy * half, tgt.y - uy * arr - ux * half,
                 });
             try svg.polygon(pts, theme.edge_color, theme.edge_color, 0);
+            if (label) |lbl| {
+                try svg.text((src.x + tgt.x) / 2.0, (src.y + tgt.y) / 2.0 - 6, lbl,
+                    theme.text_color, theme.font_size_small, .middle, "normal");
+            }
         }
+    }
 
-        if (label) |lbl| {
-            try svg.text((fx + tx) / 2, (fy + ty) / 2 - 6, lbl,
+    // Pass 2: assign y tracks for elbow routes within each row gap.
+    // Sort by (gap_row, horiz_min) so the greedy interval-coloring processes
+    // segments left-to-right within each gap, producing the minimum track count.
+    std.mem.sort(ElbowRoute, elbow_routes.items, {}, struct {
+        fn lt(_: void, a_: ElbowRoute, b_: ElbowRoute) bool {
+            if (a_.gap_row != b_.gap_row) return a_.gap_row < b_.gap_row;
+            return a_.horiz_min < b_.horiz_min;
+        }
+    }.lt);
+
+    // track_end_x[gap_row][track] = horiz_max of last segment assigned to that track.
+    const MAX_TRACKS = 7;
+    var track_end_x = std.mem.zeroes([64][MAX_TRACKS]f32);
+    var track_count = std.mem.zeroes([64]usize);
+
+    for (elbow_routes.items) |*r| {
+        const gr = r.gap_row % 64;
+        var assigned = false;
+        for (0..track_count[gr]) |t| {
+            if (track_end_x[gr][t] <= r.horiz_min) {
+                track_end_x[gr][t] = r.horiz_max;
+                r.track = t;
+                assigned = true;
+                break;
+            }
+        }
+        if (!assigned and track_count[gr] < MAX_TRACKS) {
+            const t = track_count[gr];
+            track_end_x[gr][t] = r.horiz_max;
+            track_count[gr] = t + 1;
+            r.track = t;
+        }
+    }
+
+    // Space tracks evenly within the gap, centred on base_gap_y.
+    for (elbow_routes.items) |*r| {
+        const gr = r.gap_row % 64;
+        const n: f32 = @floatFromInt(track_count[gr]);
+        const t: f32 = @floatFromInt(r.track);
+        const pitch = if (n > 1) GAP / (n + 1.0) else 0.0;
+        r.gap_y = r.base_gap_y + (t - (n - 1.0) / 2.0) * pitch;
+    }
+
+    // Pass 3: render elbow routes with assigned gap_y values.
+    for (elbow_routes.items) |r| {
+        var path_buf: [256]u8 = undefined;
+        const path_d = try std.fmt.bufPrint(&path_buf,
+            "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}",
+            .{ r.src_x, r.src_y, r.src_x, r.gap_y, r.tgt_x, r.gap_y, r.tgt_x, r.tgt_y });
+        try svg.path(path_d, "none", theme.edge_color, 1.5, "");
+
+        const arr: f32 = 8.0;
+        const half: f32 = 4.5;
+        var pts_buf: [128]u8 = undefined;
+        const pts = try std.fmt.bufPrint(&pts_buf,
+            "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+            .{
+                r.tgt_x - r.end_uy * half, r.tgt_y - r.end_uy * arr,
+                r.tgt_x, r.tgt_y,
+                r.tgt_x + r.end_uy * half, r.tgt_y - r.end_uy * arr,
+            });
+        try svg.polygon(pts, theme.edge_color, theme.edge_color, 0);
+        if (r.label) |lbl| {
+            try svg.text((r.src_x + r.tgt_x) / 2.0, r.gap_y - 6, lbl,
                 theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
@@ -142,6 +251,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     try svg.footer();
     return svg.toOwnedSlice();
+}
+
+/// Returns the point where a ray from (cx, cy) in direction (dx, dy)
+/// exits the rectangle of size (w, h) centred at (cx, cy).
+fn rectEdgePoint(cx: f32, cy: f32, w: f32, h: f32, dx: f32, dy: f32) struct { x: f32, y: f32 } {
+    const hw = w / 2.0;
+    const hh = h / 2.0;
+    var t: f32 = std.math.inf(f32);
+    if (@abs(dx) > 0.001) t = @min(t, hw / @abs(dx));
+    if (@abs(dy) > 0.001) t = @min(t, hh / @abs(dy));
+    return .{ .x = cx + t * dx, .y = cy + t * dy };
 }
 
 fn renderFallback(allocator: std.mem.Allocator) ![]const u8 {

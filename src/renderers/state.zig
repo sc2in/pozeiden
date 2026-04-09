@@ -157,32 +157,105 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const fy = stateY(fs.depth);
         const tx = stateX(ts.col);
         const ty = stateY(ts.depth);
+        const stroke = theme.edge_color;
+        const sw: f32 = 1.5;
 
-        // From center-bottom to center-top (or bend for same-depth)
-        const from_y = fy + (if (std.mem.eql(u8, t.from, "[*]")) START_R else STATE_H / 2);
-        const to_y = ty - (if (std.mem.eql(u8, t.to, "[*]")) START_R else STATE_H / 2);
-
-        try svg.line(fx, from_y, tx, to_y, theme.edge_color, 1.5);
-
-        // Arrowhead at destination
-        const dx = tx - fx;
-        const dy = to_y - from_y;
-        const dlen = @sqrt(dx * dx + dy * dy);
-        if (dlen > 1.0) {
-            const ux = dx / dlen;
-            const uy = dy / dlen;
+        // ── Self-loop ─────────────────────────────────────────────────────
+        if (std.mem.eql(u8, t.from, t.to)) {
+            const lp: f32 = 38.0;
+            const ex = fx - STATE_W / 2.0; // left edge of the state box
+            const y1 = fy - 14.0;
+            const y2 = fy + 14.0;
+            var loop_buf: [256]u8 = undefined;
+            const loop_d = try std.fmt.bufPrint(&loop_buf,
+                "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+                .{ ex, y1, ex - lp, y1, ex - lp, y2, ex, y2 });
+            try svg.path(loop_d, "none", stroke, sw, "");
+            // Tangent at t=1: (ex,y2)-(ex-lp,y2) = (lp,0) → arrowhead points right
             const arr: f32 = 8.0;
+            const half: f32 = 4.5;
+            var pts_buf: [128]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ ex - arr, y2 - half, ex, y2, ex - arr, y2 + half });
+            try svg.polygon(pts, stroke, stroke, 1.0);
+            if (t.label.len > 0) {
+                try svg.text(ex - lp / 2.0, fy - 8.0, t.label, theme.text_color, theme.font_size_small, .middle, "normal");
+            }
+            continue;
+        }
+
+        // ── Cubic Bezier path ─────────────────────────────────────────────
+        // Connection points and control points vary by edge type.
+        var pfx: f32 = fx;
+        var pfy: f32 = fy;
+        var ptx: f32 = tx;
+        var pty: f32 = ty;
+        var cx1: f32 = 0;
+        var cy1: f32 = 0;
+        var cx2: f32 = 0;
+        var cy2: f32 = 0;
+
+        if (fs.depth == ts.depth) {
+            // Same depth row: connect side-to-side with a horizontal arc
+            const ctrl: f32 = COL_GAP * 0.8;
+            if (tx >= fx) {
+                pfx = fx + STATE_W / 2.0; ptx = tx - STATE_W / 2.0;
+                cx1 = pfx + ctrl; cy1 = pfy;
+                cx2 = ptx - ctrl; cy2 = pty;
+            } else {
+                pfx = fx - STATE_W / 2.0; ptx = tx + STATE_W / 2.0;
+                cx1 = pfx - ctrl; cy1 = pfy;
+                cx2 = ptx + ctrl; cy2 = pty;
+            }
+        } else if (fs.depth < ts.depth) {
+            // Forward edge: exit bottom-center, enter top-center
+            pfy = fy + (if (std.mem.eql(u8, t.from, "[*]")) START_R else STATE_H / 2.0);
+            pty = ty - (if (std.mem.eql(u8, t.to, "[*]")) START_R else STATE_H / 2.0);
+            const ctrl: f32 = ROW_GAP * 0.6;
+            cx1 = pfx; cy1 = pfy + ctrl;
+            cx2 = ptx; cy2 = pty - ctrl;
+        } else {
+            // Back edge: route around the right side
+            const layer_diff: f32 = @floatFromInt(fs.depth - ts.depth);
+            const lateral: f32 = @max(COL_GAP * 2.0, layer_diff * STATE_W * 0.4 + COL_GAP);
+            pfx = fx + STATE_W / 2.0; ptx = tx + STATE_W / 2.0;
+            cx1 = pfx + lateral; cy1 = pfy;
+            cx2 = ptx + lateral; cy2 = pty;
+        }
+
+        var path_buf: [256]u8 = undefined;
+        const path_d = try std.fmt.bufPrint(&path_buf,
+            "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+            .{ pfx, pfy, cx1, cy1, cx2, cy2, ptx, pty });
+        try svg.path(path_d, "none", stroke, sw, "");
+
+        // Arrowhead: tangent at Bezier t=1 is (P3 - C2)
+        const tang_x = ptx - cx2;
+        const tang_y = pty - cy2;
+        const tang_len = @sqrt(tang_x * tang_x + tang_y * tang_y);
+        if (tang_len > 0.5) {
+            const ux = tang_x / tang_len;
+            const uy = tang_y / tang_len;
+            const arr: f32 = 8.0;
+            const half: f32 = 4.5;
             var pts_buf: [192]u8 = undefined;
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ tx - ux * arr - uy * arr / 2, to_y - uy * arr + ux * arr / 2,
-                   tx, to_y,
-                   tx - ux * arr + uy * arr / 2, to_y - uy * arr - ux * arr / 2 });
-            try svg.polygon(pts, theme.edge_color, theme.edge_color, 1.0);
+                .{
+                    ptx - ux * arr - uy * half,
+                    pty - uy * arr + ux * half,
+                    ptx, pty,
+                    ptx - ux * arr + uy * half,
+                    pty - uy * arr - ux * half,
+                });
+            try svg.polygon(pts, stroke, stroke, 1.0);
         }
 
         if (t.label.len > 0) {
-            try svg.text((fx + tx) / 2 + 4, (from_y + to_y) / 2 - 6, t.label, theme.text_color, theme.font_size_small, .start, "normal");
+            const mid_x = 0.125 * pfx + 0.375 * cx1 + 0.375 * cx2 + 0.125 * ptx;
+            const mid_y = 0.125 * pfy + 0.375 * cy1 + 0.375 * cy2 + 0.125 * pty;
+            try svg.text(mid_x + 4, mid_y - 6, t.label, theme.text_color, theme.font_size_small, .start, "normal");
         }
     }
 
