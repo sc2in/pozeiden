@@ -165,6 +165,27 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             for (blocks.items) |*b| {
                 if (b.kind == .rect and b.end_row == null) { b.end_row = messages.items.len; break; }
             }
+        } else if (std.mem.eql(u8, msg_type, "criticalStart")) {
+            const lbl = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .critical, .label = lbl, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "criticalEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .critical and b.end_row == null) { b.end_row = messages.items.len; break; }
+            }
+        } else if (std.mem.eql(u8, msg_type, "breakStart")) {
+            const lbl = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .brk, .label = lbl, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "breakEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .brk and b.end_row == null) { b.end_row = messages.items.len; break; }
+            }
+        } else if (std.mem.eql(u8, msg_type, "negStart")) {
+            const lbl = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .neg, .label = lbl, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "negEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .neg and b.end_row == null) { b.end_row = messages.items.len; break; }
+            }
         } else if (std.mem.eql(u8, msg_type, "blockSep")) {
             const lbl = sn.getString("label") orelse "";
             const row: usize = @intFromFloat(sn.getNumber("row") orelse @as(f64, @floatFromInt(messages.items.len)));
@@ -234,22 +255,32 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             continue;
         }
         const blk_fill = switch (b.kind) {
-            .loop => "#f0f4ff",
-            .alt  => "#fff8f0",
-            .opt  => "#f0fff4",
-            .par  => "#fdf0ff",
-            .rect => unreachable,
+            .loop     => "#f0f4ff",
+            .alt      => "#fff8f0",
+            .opt      => "#f0fff4",
+            .par      => "#fdf0ff",
+            .critical => "#fff0f0",
+            .brk      => "#fff4e6",
+            .neg      => "#f8f0ff",
+            .rect     => unreachable,
         };
         const blk_stroke = switch (b.kind) {
-            .loop => "#b0c0e8",
-            .alt  => "#e8c8a0",
-            .opt  => "#a0d8b0",
-            .par  => "#c8a0d8",
-            .rect => unreachable,
+            .loop     => "#b0c0e8",
+            .alt      => "#e8c8a0",
+            .opt      => "#a0d8b0",
+            .par      => "#c8a0d8",
+            .critical => "#e88080",
+            .brk      => "#e8b070",
+            .neg      => "#b080d8",
+            .rect     => unreachable,
         };
         try svg.rect(bx, by, bw, bh, 4.0, blk_fill, blk_stroke, 1.0);
         var kind_label_buf: [64]u8 = undefined;
-        const kind_str: []const u8 = switch (b.kind) { .loop => "loop", .alt => "alt", .opt => "opt", .par => "par", .rect => unreachable };
+        const kind_str: []const u8 = switch (b.kind) {
+            .loop => "loop", .alt => "alt", .opt => "opt", .par => "par",
+            .critical => "critical", .brk => "break", .neg => "neg",
+            .rect => unreachable,
+        };
         const kind_label = try std.fmt.bufPrint(&kind_label_buf, "{s} {s}", .{ kind_str, b.label });
         try svg.text(bx + 4, by + 14, kind_label, theme.text_color, theme.font_size_small, .start, "normal");
     }
@@ -421,7 +452,7 @@ fn positionKind(s: []const u8) PosKind {
 }
 
 const Block = struct {
-    kind: enum { loop, alt, opt, par, rect },
+    kind: enum { loop, alt, opt, par, rect, critical, brk, neg },
     label: []const u8,   // for rect: the color string
     start_row: usize,
     end_row: ?usize = null,

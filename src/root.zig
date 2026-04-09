@@ -63,6 +63,10 @@ pub const RenderError = error{
 ///
 /// The caller owns the returned slice and must free it with `allocator`.
 pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u8 {
+    // Apply %%{init: {...}}%% directive overrides for this render call.
+    const applied_init = applyInitDirective(mermaid_text);
+    defer if (applied_init) theme.resetToDefaults();
+
     const diagram_type = detect.detect(mermaid_text);
 
     switch (diagram_type) {
@@ -503,6 +507,91 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
     return kanban_renderer.render(allocator, Value{ .node = root });
 }
 
+/// Scan `text` for a `%%{init: {...}}%%` directive and apply any theme overrides
+/// found within it.  Supports both single-quoted and double-quoted JSON.
+/// Handles `theme` (named preset) and `themeVariables` (individual color keys).
+/// Returns `true` if an init directive was found and applied.
+fn applyInitDirective(text: []const u8) bool {
+    const marker = "%%{init";
+    const start = std.mem.indexOf(u8, text, marker) orelse return false;
+    const colon = std.mem.indexOfScalarPos(u8, text, start + marker.len, ':') orelse return false;
+    const end_marker = "}%%";
+    const end = std.mem.indexOfPos(u8, text, colon, end_marker) orelse return false;
+    // json_src is everything between the ':' and the closing '}%%'
+    const json_src = std.mem.trim(u8, text[colon + 1 .. end + 1], " \t\n\r");
+
+    var ov = theme.ThemeOverride{};
+
+    // Extract named theme preset
+    if (jsonStringValue(json_src, "theme")) |t| {
+        if (std.mem.eql(u8, t, "dark")) {
+            ov.background  = "#1a1a2e";
+            ov.text_color  = "#e0e0e0";
+            ov.node_fill   = "#16213e";
+            ov.node_stroke = "#0f3460";
+            ov.edge_color  = "#aaaaaa";
+        } else if (std.mem.eql(u8, t, "forest")) {
+            ov.background  = "#f8fff8";
+            ov.node_fill   = "#d5e8d4";
+            ov.node_stroke = "#82b366";
+        } else if (std.mem.eql(u8, t, "neutral")) {
+            ov.background  = "#f5f5f5";
+            ov.node_fill   = "#e8e8e8";
+            ov.node_stroke = "#888888";
+            ov.text_color  = "#333333";
+        } // "default"/"base" → no override needed
+    }
+
+    // Extract themeVariables block — find its '{' and '}' and scan within.
+    if (std.mem.indexOf(u8, json_src, "themeVariables")) |tv_pos| {
+        const brace = std.mem.indexOfScalarPos(u8, json_src, tv_pos, '{') orelse 0;
+        const close = std.mem.indexOfScalarPos(u8, json_src, brace, '}') orelse json_src.len;
+        const vars = json_src[brace .. close + 1];
+        if (jsonStringValue(vars, "primaryColor"))      |v| { ov.node_fill   = v; }
+        if (jsonStringValue(vars, "primaryTextColor"))  |v| { ov.text_color  = v; }
+        if (jsonStringValue(vars, "primaryBorderColor")) |v| { ov.node_stroke = v; }
+        if (jsonStringValue(vars, "lineColor"))         |v| { ov.edge_color  = v; }
+        if (jsonStringValue(vars, "background"))        |v| { ov.background  = v; }
+        if (jsonStringValue(vars, "mainBkg"))           |v| { ov.background  = v; }
+    }
+
+    theme.applyOverride(ov);
+    return true;
+}
+
+/// Extract a JSON string value for `key` from a JSON-like object string.
+/// Handles both single-quoted and double-quoted strings.
+fn jsonStringValue(json: []const u8, key: []const u8) ?[]const u8 {
+    // Search for key as a quoted string
+    var i: usize = 0;
+    while (i < json.len) {
+        // Find a quote character
+        const q_pos = std.mem.indexOfAnyPos(u8, json, i, "\"'") orelse break;
+        const quote = json[q_pos];
+        // Check if this is our key
+        const key_end = q_pos + 1 + key.len;
+        if (key_end < json.len and
+            std.mem.eql(u8, json[q_pos + 1 .. key_end], key) and
+            json[key_end] == quote)
+        {
+            // Skip past key, optional whitespace, colon, optional whitespace
+            var j = key_end + 1;
+            while (j < json.len and (json[j] == ' ' or json[j] == '\t')) j += 1;
+            if (j < json.len and json[j] == ':') j += 1;
+            while (j < json.len and (json[j] == ' ' or json[j] == '\t')) j += 1;
+            if (j < json.len and (json[j] == '"' or json[j] == '\'')) {
+                const vq = json[j];
+                j += 1;
+                const v_start = j;
+                while (j < json.len and json[j] != vq) j += 1;
+                return json[v_start..j];
+            }
+        }
+        i = q_pos + 1;
+    }
+    return null;
+}
+
 /// Extract a CSS-style property value from a comma-separated style string.
 /// e.g. flowchartParseProp("fill:#f9f,stroke:#333", "fill") → "#f9f"
 fn flowchartParseProp(style: []const u8, prop: []const u8) ?[]const u8 {
@@ -841,16 +930,18 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         const nid = nn.getString("id") orelse continue;
         if (node_class_map.get(nid)) |cname| {
             if (class_defs.get(cname)) |style| {
-                if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
-                if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
-                if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
+                if (flowchartParseProp(style, "fill"))        |v| try nn.fields.put(a, "fill",        Value{ .string = v });
+                if (flowchartParseProp(style, "stroke"))       |v| try nn.fields.put(a, "stroke",      Value{ .string = v });
+                if (flowchartParseProp(style, "color"))        |v| try nn.fields.put(a, "text_color",  Value{ .string = v });
+                if (flowchartParseProp(style, "font-weight"))  |v| try nn.fields.put(a, "font_weight", Value{ .string = v });
             }
         }
         // Direct `style` overrides take priority over classDef.
         if (node_styles.get(nid)) |style| {
-            if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
-            if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
-            if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
+            if (flowchartParseProp(style, "fill"))        |v| try nn.fields.put(a, "fill",        Value{ .string = v });
+            if (flowchartParseProp(style, "stroke"))       |v| try nn.fields.put(a, "stroke",      Value{ .string = v });
+            if (flowchartParseProp(style, "color"))        |v| try nn.fields.put(a, "text_color",  Value{ .string = v });
+            if (flowchartParseProp(style, "font-weight"))  |v| try nn.fields.put(a, "font_weight", Value{ .string = v });
         }
     }
 
@@ -964,6 +1055,33 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             try sig.fields.put(a, "blockText", Value{ .string = lbl });
             try signals_list.append(a, Value{ .node = sig });
             try block_stack.append(a, .{ .kind = "par", .label = lbl, .start = signals_list.items.len - 1 });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "critical") or std.mem.eql(u8, line, "critical")) {
+            const lbl = if (line.len > 9 and line[8] == ' ') std.mem.trim(u8, line[9..], " \t") else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "criticalStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "critical", .label = lbl, .start = signals_list.items.len - 1 });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "break ") or std.mem.eql(u8, line, "break")) {
+            const lbl = if (line.len > 6) std.mem.trim(u8, line[6..], " \t") else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "breakStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "break", .label = lbl, .start = signals_list.items.len - 1 });
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "neg ") or std.mem.eql(u8, line, "neg")) {
+            const lbl = if (line.len > 4) std.mem.trim(u8, line[4..], " \t") else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "negStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = lbl });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "neg", .label = lbl, .start = signals_list.items.len - 1 });
             continue;
         }
         // box [color] [label] ... end: colored background band behind actor columns.
@@ -1080,6 +1198,9 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                         else if (std.mem.eql(u8, top.kind, "opt")) "optEnd"
                         else if (std.mem.eql(u8, top.kind, "par")) "parEnd"
                         else if (std.mem.eql(u8, top.kind, "rect")) "rectEnd"
+                        else if (std.mem.eql(u8, top.kind, "critical")) "criticalEnd"
+                        else if (std.mem.eql(u8, top.kind, "break")) "breakEnd"
+                        else if (std.mem.eql(u8, top.kind, "neg")) "negEnd"
                         else "altEnd";
                     var sig = Value.Node{ .type_name = "signal", .fields = .{} };
                     try sig.fields.put(a, "type", Value{ .string = end_type });

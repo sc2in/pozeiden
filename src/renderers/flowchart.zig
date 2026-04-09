@@ -40,6 +40,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .fill = nn.getString("fill"),
             .stroke = nn.getString("stroke"),
             .label_color = nn.getString("text_color"),
+            .font_weight = nn.getString("font_weight"),
         });
     }
 
@@ -432,9 +433,10 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
     const cx = x + w / 2;
     const cy = y + h / 2;
     // Per-node style from classDef; fall back to theme defaults.
-    const nfill   = n.fill   orelse theme.node_fill;
-    const nstroke = n.stroke orelse theme.node_stroke;
-    const ntextc  = n.label_color orelse theme.text_color;
+    const nfill    = n.fill        orelse theme.node_fill;
+    const nstroke  = n.stroke      orelse theme.node_stroke;
+    const ntextc   = n.label_color orelse theme.text_color;
+    const nweight  = n.font_weight orelse "normal";
 
     switch (n.shape) {
         .diamond => {
@@ -513,7 +515,7 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
     }
 
     // Node label (wrapped if too wide)
-    try svg.textWrapped(cx, cy + 4, n.label, w - 8, ntextc, theme.font_size, .middle, "normal");
+    try svg.textWrapped(cx, cy + 4, n.label, w - 8, ntextc, theme.font_size, .middle, nweight);
 }
 
 fn renderFallback(allocator: std.mem.Allocator, msg: []const u8) ![]const u8 {

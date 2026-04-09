@@ -34,6 +34,7 @@ pub const GraphNode = struct {
     fill: ?[]const u8 = null,
     stroke: ?[]const u8 = null,
     label_color: ?[]const u8 = null,
+    font_weight: ?[]const u8 = null,
 };
 
 /// Mermaid flowchart node shapes.
