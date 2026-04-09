@@ -10,15 +10,19 @@ sequenceDiagram
         participant DB
     end
     participant EmailSvc as Email Service
+    create participant Audit
 
     User->>Browser: Submit login form
     activate Browser
     Browser->>+API: POST /auth/login
     API->>+Auth: validate(credentials)
+    Auth->>+Auth: generateChallenge()
+    Auth-->>-Auth: challenge
     Auth->>+DB: SELECT user WHERE email=?
     DB-->>-Auth: user record
     alt Invalid credentials
         Auth-->>API: 401 Unauthorized
+        Auth-xAudit: log failed attempt
         API-->>Browser: 401 error
         Browser-->>User: Show error message
     else Valid credentials
@@ -34,3 +38,4 @@ sequenceDiagram
         end
     end
     Note over User,DB: Full auth flow complete
+    destroy Audit

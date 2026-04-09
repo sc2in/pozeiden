@@ -26,6 +26,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     var graph_edges: std.ArrayList(layout.GraphEdge) = .empty;
     defer graph_edges.deinit(allocator);
 
+    // Build node_id → subgraph_idx map
+    var node_subgraph = std.StringHashMap(usize).init(allocator);
+    defer node_subgraph.deinit();
+    for (node.getList("subgraphs"), 0..) |sgv, sg_idx| {
+        const sgn = sgv.asNode() orelse continue;
+        for (sgn.getList("members")) |mv| {
+            const mid = mv.asString() orelse continue;
+            try node_subgraph.put(mid, sg_idx);
+        }
+    }
+
     const nodes_val = node.getList("nodes");
     for (nodes_val) |nv| {
         const nn = nv.asNode() orelse continue;
@@ -42,6 +53,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .label_color = nn.getString("text_color"),
             .font_weight = nn.getString("font_weight"),
             .href = nn.getString("href"),
+            .subgraph = node_subgraph.get(id) orelse std.math.maxInt(usize),
         });
     }
 

@@ -16,13 +16,15 @@ flowchart TD
         C[(Load from DB)] --> D[[Enrich Data]]
         D --> E{{Cache hit?}}
         E -->|Yes| FAST[/Return cached/]
-        E -->|No| SLOW[Heavy Process]
-        SLOW --> F[(Write to DB)]
+        E -->|No| SLOW[/Heavy Process\]
+        SLOW --> SEC[\Auth Check\]
+        SEC --> F[(Write to DB)]
     end
 
     subgraph Output["Output Layer"]
         G[Format Response] --> H>Publish to Queue]
-        H --> I((Done))
+        G --> AUDIT[\/Audit Log\/]
+        H --> I(((Done)))
     end
 
     B -->|Yes| C
@@ -33,3 +35,5 @@ flowchart TD
     class ERR critical
     class E,B warning
     class C,F,D info
+
+    click I href "https://example.com/success"

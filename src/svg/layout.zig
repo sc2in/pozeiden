@@ -36,6 +36,8 @@ pub const GraphNode = struct {
     label_color: ?[]const u8 = null,
     font_weight: ?[]const u8 = null,
     href: ?[]const u8 = null,
+    /// Index of the subgraph this node belongs to. `std.math.maxInt(usize)` = none.
+    subgraph: usize = std.math.maxInt(usize),
 };
 
 /// Mermaid flowchart node shapes.
@@ -319,6 +321,65 @@ fn orderNodes(allocator: std.mem.Allocator, graph: *Graph) !void {
                     idxs[t] = idxs[t - 1];
                 }
                 idxs[t] = key_i;
+            }
+            for (idxs[0..ic], 0..) |ni, ord| {
+                nodes[ni].order = ord;
+            }
+        }
+    }
+
+    // Final pass: cluster subgraph members within each layer.
+    // For each layer, compute group centroid (mean order of members with same subgraph id),
+    // then sort by (group_centroid, member_order) so same-subgraph nodes are adjacent
+    // while the group sits at its barycenter-computed position.
+    {
+        var layer: usize = 0;
+        while (layer <= max_layer) : (layer += 1) {
+            // Collect node indices in this layer
+            var idxs: [128]usize = undefined;
+            var ic: usize = 0;
+            for (nodes, 0..) |nd, ni| {
+                if (nd.layer == layer and ic < idxs.len) { idxs[ic] = ni; ic += 1; }
+            }
+            if (ic <= 1) continue;
+
+            // Compute group centroid per subgraph_id (within this layer)
+            // Use a simple map: scan all pairs (O(n²) is fine for small layers)
+            // centroid[i] = mean order of all nodes in same subgraph as idxs[i]
+            var centroids: [128]f32 = undefined;
+            for (idxs[0..ic], 0..) |ni, ii| {
+                const sg = nodes[ni].subgraph;
+                if (sg == std.math.maxInt(usize)) {
+                    centroids[ii] = @floatFromInt(nodes[ni].order);
+                    continue;
+                }
+                var sum: f32 = 0;
+                var cnt: usize = 0;
+                for (idxs[0..ic]) |nj| {
+                    if (nodes[nj].subgraph == sg) {
+                        sum += @floatFromInt(nodes[nj].order);
+                        cnt += 1;
+                    }
+                }
+                centroids[ii] = sum / @as(f32, @floatFromInt(cnt));
+            }
+
+            // Insertion sort idxs by (centroid, order)
+            var s: usize = 1;
+            while (s < ic) : (s += 1) {
+                const key_i = idxs[s];
+                const key_c = centroids[s];
+                const key_o = nodes[key_i].order;
+                var t: usize = s;
+                while (t > 0) : (t -= 1) {
+                    const pc = centroids[t - 1];
+                    const po = nodes[idxs[t - 1]].order;
+                    if (pc < key_c or (pc == key_c and po <= key_o)) break;
+                    idxs[t] = idxs[t - 1];
+                    centroids[t] = centroids[t - 1];
+                }
+                idxs[t] = key_i;
+                centroids[t] = key_c;
             }
             for (idxs[0..ic], 0..) |ni, ord| {
                 nodes[ni].order = ord;

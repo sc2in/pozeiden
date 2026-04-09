@@ -745,6 +745,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
 
     // Subgraph tracking
     const Subgraph = struct {
+        id: []const u8,
         label: []const u8,
         members: std.ArrayList(Value),
     };
@@ -841,12 +842,18 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         // Subgraph start: "subgraph id" or "subgraph id [label]" or "subgraph [label]"
         if (std.mem.startsWith(u8, line, "subgraph")) {
             const rest = std.mem.trim(u8, line[8..], " \t");
-            // Extract display label: prefer bracket content, else use rest
-            const label = if (std.mem.indexOf(u8, rest, "[")) |lb|
-                if (std.mem.indexOf(u8, rest, "]")) |rb| rest[lb + 1 .. rb] else rest
-            else if (rest.len > 0) rest else "group";
+            // When brackets present: "SG1 [My Label]" → id="SG1", label="My Label"
+            // Without brackets: "Service Layer" → id=label=entire rest
+            const sg_id: []const u8, const label: []const u8 = if (std.mem.indexOf(u8, rest, "[")) |lb| blk: {
+                const id = std.mem.trim(u8, rest[0..lb], " \t");
+                const rb = std.mem.indexOf(u8, rest, "]") orelse (rest.len - 1);
+                break :blk .{ id, rest[lb + 1 .. rb] };
+            } else blk: {
+                const lbl = if (rest.len > 0) rest else "group";
+                break :blk .{ lbl, lbl };
+            };
             const sg_idx = subgraphs.items.len;
-            try subgraphs.append(a, .{ .label = label, .members = .empty });
+            try subgraphs.append(a, .{ .id = sg_id, .label = label, .members = .empty });
             cur_subgraph = sg_idx;
             continue;
         }
@@ -957,6 +964,46 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         }
     }
 
+    // Build subgraph ID → index map for post-processing
+    var subgraph_id_map = std.StringHashMap(usize).init(a);
+    for (subgraphs.items, 0..) |sg, si| {
+        if (sg.id.len > 0) try subgraph_id_map.put(sg.id, si);
+    }
+
+    // Rewire edges that target a subgraph ID: point to the subgraph's first member instead.
+    for (edges_list.items) |*ev| {
+        const en = switch (ev.*) { .node => |*n| n, else => continue };
+        if (en.getString("from")) |fid| {
+            if (subgraph_id_map.get(fid)) |si| {
+                const sg = &subgraphs.items[si];
+                if (sg.members.items.len > 0) {
+                    if (sg.members.items[0].asString()) |mid|
+                        try en.fields.put(a, "from", Value{ .string = mid });
+                }
+            }
+        }
+        if (en.getString("to")) |tid| {
+            if (subgraph_id_map.get(tid)) |si| {
+                const sg = &subgraphs.items[si];
+                if (sg.members.items.len > 0) {
+                    if (sg.members.items[0].asString()) |mid|
+                        try en.fields.put(a, "to", Value{ .string = mid });
+                }
+            }
+        }
+    }
+
+    // Remove phantom nodes whose IDs are subgraph IDs (they were created by edge parsing).
+    {
+        var filtered: std.ArrayList(Value) = .empty;
+        for (nodes_list.items) |nv| {
+            const nid = switch (nv) { .node => |n| n.getString("id") orelse "", else => "" };
+            if (nid.len > 0 and subgraph_id_map.contains(nid)) continue;
+            try filtered.append(a, nv);
+        }
+        nodes_list = filtered;
+    }
+
     // Apply classDef styles to nodes that carry a class assignment.
     for (nodes_list.items) |*nv| {
         const is_node = switch (nv.*) { .node => true, else => false };
@@ -996,6 +1043,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     for (subgraphs.items) |*sg| {
         if (sg.members.items.len == 0) continue;
         var sgn = Value.Node{ .type_name = "subgraph", .fields = .{} };
+        try sgn.fields.put(a, "id", Value{ .string = sg.id });
         try sgn.fields.put(a, "label", Value{ .string = sg.label });
         try sgn.fields.put(a, "members", Value{ .list = try sg.members.toOwnedSlice(a) });
         try subgraphs_val.append(a, Value{ .node = sgn });

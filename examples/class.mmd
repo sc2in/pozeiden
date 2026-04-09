@@ -62,3 +62,6 @@ classDiagram
     LineItem "many" --> "1" Product : references
     User "1" --> "0..*" Order : places
     User --> Role : has
+
+    note for User "Core aggregate root — owns the auth lifecycle"
+    note for Order "Raises OrderPlaced domain event on place()"
