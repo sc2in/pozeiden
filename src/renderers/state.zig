@@ -121,9 +121,26 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (col_count[0..max_depth + 2]) |c| { if (c > max_col) max_col = c; }
     const n_rows = max_depth + 2;
 
-    const total_w: u32 = @intFromFloat(
-        MARGIN * 2 + @as(f32, @floatFromInt(if (max_col > 0) max_col else 1)) * (STATE_W + COL_GAP) - COL_GAP
-    );
+    const base_w: f32 = MARGIN * 2 +
+        @as(f32, @floatFromInt(if (max_col > 0) max_col else 1)) * (STATE_W + COL_GAP) - COL_GAP;
+
+    // Back edges route laterally to the right; ensure canvas is wide enough.
+    var back_edge_max_x: f32 = 0;
+    for (transitions.items) |t| {
+        const fi2 = stateIndex(states.items, t.from) orelse continue;
+        const ti2 = stateIndex(states.items, t.to) orelse continue;
+        const fs2 = states.items[fi2];
+        const ts2 = states.items[ti2];
+        if (fs2.depth > ts2.depth) {
+            const layer_diff: f32 = @floatFromInt(fs2.depth - ts2.depth);
+            const lateral: f32 = @max(COL_GAP * 2.0, layer_diff * STATE_W * 0.4 + COL_GAP);
+            const right_x = MARGIN + @as(f32, @floatFromInt(fs2.col)) * (STATE_W + COL_GAP) +
+                STATE_W + lateral + MARGIN;
+            if (right_x > back_edge_max_x) back_edge_max_x = right_x;
+        }
+    }
+
+    const total_w: u32 = @intFromFloat(@max(base_w, back_edge_max_x));
     const total_h: u32 = @intFromFloat(
         MARGIN * 2 + @as(f32, @floatFromInt(n_rows)) * (STATE_H + ROW_GAP)
     );
@@ -265,8 +282,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const cy = stateY(s.depth);
 
         if (std.mem.eql(u8, s.id, "[*]")) {
-            // Start/end: filled circle
+            // Initial pseudo-state: filled circle
             try svg.circle(cx, cy, START_R, theme.edge_color, theme.edge_color, 0);
+        } else if (std.mem.eql(u8, s.id, "[*]-end")) {
+            // Final pseudo-state: filled circle inside a ring (double circle)
+            try svg.circle(cx, cy, START_R + 5, "none", theme.edge_color, 2.0);
+            try svg.circle(cx, cy, START_R - 1, theme.edge_color, theme.edge_color, 0);
         } else if (std.mem.eql(u8, s.shape, "fork") or std.mem.eql(u8, s.shape, "join")) {
             // Fork/join: filled horizontal bar (wide, short)
             const bar_w: f32 = STATE_W * 0.8;

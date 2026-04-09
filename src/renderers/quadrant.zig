@@ -84,7 +84,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .{ yl_x, yl_bot_y, theme.text_color, qfs, yl_x, yl_bot_y, y_bottom });
         try svg.raw(frag_bot);
         const frag_top = try std.fmt.bufPrint(&buf,
-            "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"start\" " ++
+            "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"end\" " ++
             "font-family=\"trebuchet ms,verdana,arial,sans-serif\" " ++
             "transform=\"rotate(-90 {d:.1} {d:.1})\">{s}</text>\n",
             .{ yl_x, yl_top_y, theme.text_color, qfs, yl_x, yl_top_y, y_top });

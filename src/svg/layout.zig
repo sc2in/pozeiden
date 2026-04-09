@@ -181,26 +181,44 @@ fn assignCoordinates(graph: *Graph) void {
         layer_counts[n.layer % 64] += 1;
     }
 
+    // Assign coordinates centered around origin; translateNodes shifts to MARGIN.
     for (graph.nodes) |*n| {
         const per_layer = layer_counts[n.layer % 64];
         const total_w = @as(f32, @floatFromInt(per_layer)) * (NODE_W + H_GAP) - H_GAP;
 
         switch (graph.direction) {
             .tb, .bt => {
-                const x_start = MARGIN + (@as(f32, @floatFromInt(n.order)) * (NODE_W + H_GAP)) -
-                    total_w / 2.0 + 400.0;
-                const y = MARGIN + @as(f32, @floatFromInt(n.layer)) * (NODE_H + V_GAP);
+                const x_start = @as(f32, @floatFromInt(n.order)) * (NODE_W + H_GAP) - total_w / 2.0;
+                const y = @as(f32, @floatFromInt(n.layer)) * (NODE_H + V_GAP);
                 n.x = x_start;
                 n.y = if (graph.direction == .bt) -y else y;
             },
             .lr, .rl => {
-                const y_start = MARGIN + (@as(f32, @floatFromInt(n.order)) * (NODE_H + H_GAP)) -
-                    total_w / 2.0 + 300.0;
-                const x = MARGIN + @as(f32, @floatFromInt(n.layer)) * (NODE_W + V_GAP);
+                const y_start = @as(f32, @floatFromInt(n.order)) * (NODE_H + H_GAP) - total_w / 2.0;
+                const x = @as(f32, @floatFromInt(n.layer)) * (NODE_W + V_GAP);
                 n.y = y_start;
                 n.x = if (graph.direction == .rl) -x else x;
             },
         }
+    }
+
+    // Shift all nodes so the minimum coordinate is at MARGIN.
+    translateNodes(graph);
+}
+
+fn translateNodes(graph: *Graph) void {
+    if (graph.nodes.len == 0) return;
+    var min_x: f32 = graph.nodes[0].x;
+    var min_y: f32 = graph.nodes[0].y;
+    for (graph.nodes[1..]) |n| {
+        if (n.x < min_x) min_x = n.x;
+        if (n.y < min_y) min_y = n.y;
+    }
+    const dx = MARGIN - min_x;
+    const dy = MARGIN - min_y;
+    for (graph.nodes) |*n| {
+        n.x += dx;
+        n.y += dy;
     }
 }
 
@@ -227,15 +245,21 @@ pub fn boundingBox(nodes: []const GraphNode) Rect {
 }
 
 /// Return a suitable SVG canvas width for the given laid-out nodes.
-/// The result is at least 400 pixels.
 pub fn svgWidth(nodes: []const GraphNode) u32 {
-    const bb = boundingBox(nodes);
-    return @intFromFloat(@max(400, bb.w + bb.x + MARGIN));
+    if (nodes.len == 0) return 300;
+    var max_x: f32 = 0;
+    for (nodes) |n| {
+        if (n.x + n.w > max_x) max_x = n.x + n.w;
+    }
+    return @intFromFloat(max_x + MARGIN);
 }
 
 /// Return a suitable SVG canvas height for the given laid-out nodes.
-/// The result is at least 300 pixels.
 pub fn svgHeight(nodes: []const GraphNode) u32 {
-    const bb = boundingBox(nodes);
-    return @intFromFloat(@max(300, bb.h + bb.y + MARGIN));
+    if (nodes.len == 0) return 200;
+    var max_y: f32 = 0;
+    for (nodes) |n| {
+        if (n.y + n.h > max_y) max_y = n.y + n.h;
+    }
+    return @intFromFloat(max_y + MARGIN);
 }

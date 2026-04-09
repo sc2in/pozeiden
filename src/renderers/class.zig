@@ -221,9 +221,11 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 ste_raw, "#666666", theme.font_size_small, .middle, "normal");
         }
 
-        // Class name
+        // Class name (convert ~T~ generics to <T> for display)
         const name_y = by + ste_h + CLASS_HEADER_H / 2 + 5;
-        try svg.text(bx + CLASS_W / 2, name_y, cl.name, theme.text_color, theme.font_size, .middle, "bold");
+        var name_buf: [128]u8 = undefined;
+        const display_name = normalizeGenerics(cl.name, &name_buf) catch cl.name;
+        try svg.text(bx + CLASS_W / 2, name_y, display_name, theme.text_color, theme.font_size, .middle, "bold");
 
         // Header separator
         try svg.line(bx, by + ste_h + CLASS_HEADER_H, bx + CLASS_W, by + ste_h + CLASS_HEADER_H, theme.node_stroke, 1.0);

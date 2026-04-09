@@ -185,9 +185,56 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
 
     switch (shape) {
         .circle => {
-            const r = if (depth == 0) ROOT_R else NODE_H / 2 + 4;
+            // For the root node (depth==0): size circle to fit the label.
+            // Label may contain an embedded newline; use the longer line for sizing.
+            const r = if (depth == 0) blk: {
+                var max_len: usize = 0;
+                var it = std.mem.splitScalar(u8, label, '\n');
+                while (it.next()) |line| {
+                    if (line.len > max_len) max_len = line.len;
+                }
+                // ~3.5px half-width per char at font-size 12, plus 10px padding
+                const est = @as(f32, @floatFromInt(max_len)) * 3.5 + 10.0;
+                break :blk @max(ROOT_R, est);
+            } else NODE_H / 2 + 4;
             try svg.circle(x, y, r, fill, stroke, 2.0);
-            try svg.text(x, y + 4, label, text_color, theme.font_size_small, .middle, "normal");
+            // Render multi-line text with tspan if label contains newlines
+            const nl_pos = std.mem.indexOfScalar(u8, label, '\n');
+            if (nl_pos != null) {
+                var buf: [1024]u8 = undefined;
+                var fbs = std.io.fixedBufferStream(&buf);
+                const w = fbs.writer();
+                try w.print(
+                    "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" " ++
+                    "text-anchor=\"middle\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
+                    .{ x, y, text_color, theme.font_size_small });
+                var lit = std.mem.splitScalar(u8, label, '\n');
+                var line_idx: usize = 0;
+                const total_lines = std.mem.count(u8, label, "\n") + 1;
+                const dy_start: f32 = -(@as(f32, @floatFromInt(total_lines)) - 1.0) * 0.6;
+                while (lit.next()) |line| {
+                    if (line_idx == 0) {
+                        try w.print("<tspan x=\"{d:.1}\" dy=\"{d:.2}em\">", .{ x, dy_start });
+                    } else {
+                        try w.print("<tspan x=\"{d:.1}\" dy=\"1.2em\">", .{x});
+                    }
+                    // XML-escape
+                    for (line) |c| {
+                        switch (c) {
+                            '&' => try w.writeAll("&amp;"),
+                            '<' => try w.writeAll("&lt;"),
+                            '>' => try w.writeAll("&gt;"),
+                            else => try w.writeByte(c),
+                        }
+                    }
+                    try w.writeAll("</tspan>");
+                    line_idx += 1;
+                }
+                try w.writeAll("</text>\n");
+                try svg.raw(fbs.getWritten());
+            } else {
+                try svg.text(x, y + 4, label, text_color, theme.font_size_small, .middle, "normal");
+            }
         },
         .rect => {
             try svg.rect(x - NODE_W / 2, y - NODE_H / 2, NODE_W, NODE_H, 0, fill, stroke, 1.5);

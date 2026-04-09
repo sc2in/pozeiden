@@ -436,8 +436,8 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
                 const id = s[0..i];
                 // Subroutine: [[label]]
                 if (i + 1 < s.len and s[i + 1] == '[') {
-                    const end = std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1;
-                    return .{ id, s[i + 2 .. @min(end, s.len)], "subroutine" };
+                    const end = std.mem.indexOf(u8, s[i..], "]]") orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "subroutine" };
                 }
                 // Cylinder: [(label)]  -- note: starts with `[` then `(`
                 if (i + 1 < s.len and s[i + 1] == '(') {
@@ -457,8 +457,8 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
                 const id = s[0..i];
                 // Circle: ((label))
                 if (i + 1 < s.len and s[i + 1] == '(') {
-                    const end = std.mem.lastIndexOfScalar(u8, s, ')') orelse s.len - 1;
-                    return .{ id, s[i + 2 .. @min(end, s.len)], "circle" };
+                    const end = std.mem.indexOf(u8, s[i..], "))") orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "circle" };
                 }
                 // Stadium: ([label])  -- note: starts with `(` then `[`
                 if (i + 1 < s.len and s[i + 1] == '[') {
@@ -1110,12 +1110,16 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 std.mem.trim(u8, after[colon + 1..], " \t") else "";
 
             if (from.len == 0 or to.len == 0) continue;
-            try addState(&states, &seen, a, from, from);
-            try addState(&states, &seen, a, to, to);
+            // [*] as source = initial pseudo-state; [*] as target = final pseudo-state.
+            // Use distinct ids so the BFS places the end state below the diagram.
+            const from_id = if (std.mem.eql(u8, from, "[*]")) "[*]" else from;
+            const to_id = if (std.mem.eql(u8, to, "[*]")) "[*]-end" else to;
+            try addState(&states, &seen, a, from_id, from_id);
+            try addState(&states, &seen, a, to_id, to_id);
 
             var tn = Value.Node{ .type_name = "transition", .fields = .{} };
-            try tn.fields.put(a, "from", Value{ .string = from });
-            try tn.fields.put(a, "to", Value{ .string = to });
+            try tn.fields.put(a, "from", Value{ .string = from_id });
+            try tn.fields.put(a, "to", Value{ .string = to_id });
             try tn.fields.put(a, "label", Value{ .string = lbl });
             try transitions.append(a, Value{ .node = tn });
         }
@@ -1627,20 +1631,32 @@ fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
 
         var label: []const u8 = content;
         var shape: []const u8 = "ellipse";
-        if (std.mem.startsWith(u8, content, "((") and std.mem.endsWith(u8, content, "))")) {
-            label = content[2..content.len - 2];
+        // Strip optional leading word identifier (e.g. "root" in "root((label))")
+        var id_end: usize = 0;
+        for (content) |ch| {
+            if (std.ascii.isAlphanumeric(ch) or ch == '_') id_end += 1 else break;
+        }
+        const sc = if (id_end > 0 and id_end < content.len and
+            (content[id_end] == '(' or content[id_end] == '[' or content[id_end] == '{'))
+            content[id_end..]
+        else
+            content;
+        if (std.mem.startsWith(u8, sc, "((") and std.mem.endsWith(u8, sc, "))")) {
+            label = sc[2..sc.len - 2];
             shape = "circle";
-        } else if (std.mem.startsWith(u8, content, "{{") and std.mem.endsWith(u8, content, "}}")) {
-            label = content[2..content.len - 2];
+        } else if (std.mem.startsWith(u8, sc, "{{") and std.mem.endsWith(u8, sc, "}}")) {
+            label = sc[2..sc.len - 2];
             shape = "hexagon";
-        } else if (std.mem.startsWith(u8, content, "[") and std.mem.endsWith(u8, content, "]")) {
-            label = content[1..content.len - 1];
+        } else if (std.mem.startsWith(u8, sc, "[") and std.mem.endsWith(u8, sc, "]")) {
+            label = sc[1..sc.len - 1];
             shape = "rect";
-        } else if (std.mem.startsWith(u8, content, "(") and std.mem.endsWith(u8, content, ")")) {
-            label = content[1..content.len - 1];
+        } else if (std.mem.startsWith(u8, sc, "(") and std.mem.endsWith(u8, sc, ")")) {
+            label = sc[1..sc.len - 1];
             shape = "rounded";
         }
-        try flat.append(a, .{ .indent = indent, .label = label, .shape = shape });
+        // Replace literal \n escape with an actual newline for multi-line rendering
+        const label_clean = try std.mem.replaceOwned(u8, a, label, "\\n", "\n");
+        try flat.append(a, .{ .indent = indent, .label = label_clean, .shape = shape });
     }
 
     if (flat.items.len == 0) return mindmap_renderer.render(allocator, Value{ .null = {} });

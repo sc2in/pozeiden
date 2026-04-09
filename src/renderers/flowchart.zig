@@ -72,8 +72,46 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     try layout.layout(allocator, &graph);
 
-    const svg_w = layout.svgWidth(graph.nodes) + 80;
-    const svg_h = layout.svgHeight(graph.nodes) + 80;
+    // Compute extra right/bottom padding needed for back-edge routing.
+    // Back edges in TB/BT direction route laterally to the right of all nodes.
+    var extra_w: u32 = 0;
+    var extra_h: u32 = 0;
+    for (graph.edges) |e| {
+        const fn2 = findNode(graph.nodes, e.from) orelse continue;
+        const tn2 = findNode(graph.nodes, e.to) orelse continue;
+        const is_back: bool = switch (direction) {
+            .tb => tn2.y <= fn2.y,
+            .bt => tn2.y >= fn2.y,
+            .lr => tn2.x <= fn2.x,
+            .rl => tn2.x >= fn2.x,
+        };
+        if (!is_back) continue;
+        const layer_diff: f32 = if (fn2.layer > tn2.layer)
+            @floatFromInt(fn2.layer - tn2.layer) else @floatFromInt(tn2.layer - fn2.layer);
+        const lateral: f32 = @max(layout.H_GAP * 2.5,
+            layer_diff * fn2.w * 0.4 + layout.H_GAP);
+        switch (direction) {
+            .tb, .bt => {
+                const right = fn2.x + fn2.w + lateral + layout.H_GAP;
+                const cur_w = layout.svgWidth(graph.nodes);
+                if (right > @as(f32, @floatFromInt(cur_w))) {
+                    const needed: u32 = @intFromFloat(right - @as(f32, @floatFromInt(cur_w)));
+                    if (needed > extra_w) extra_w = needed;
+                }
+            },
+            .lr, .rl => {
+                const bot = fn2.y + fn2.h + lateral + layout.V_GAP;
+                const cur_h = layout.svgHeight(graph.nodes);
+                if (bot > @as(f32, @floatFromInt(cur_h))) {
+                    const needed: u32 = @intFromFloat(bot - @as(f32, @floatFromInt(cur_h)));
+                    if (needed > extra_h) extra_h = needed;
+                }
+            },
+        }
+    }
+
+    const svg_w = layout.svgWidth(graph.nodes) + extra_w;
+    const svg_h = layout.svgHeight(graph.nodes) + extra_h;
 
     var svg = SvgWriter.init(allocator);
     defer svg.deinit();
