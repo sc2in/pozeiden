@@ -624,6 +624,8 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     var class_defs = std.StringHashMap([]const u8).init(a);
     // node_id → class name (from "class nodeId className" or "A:::className")
     var node_class_map = std.StringHashMap([]const u8).init(a);
+    // node_id → direct style string (from "style nodeId fill:#xxx,stroke:#yyy")
+    var node_styles = std.StringHashMap([]const u8).init(a);
 
     // Subgraph tracking
     const Subgraph = struct {
@@ -674,9 +676,17 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             }
             continue;
         }
-        // Skip linkStyle and per-node style overrides (not yet supported)
-        if (std.mem.startsWith(u8, line, "style ") or
-            std.mem.startsWith(u8, line, "linkStyle ")) continue;
+        // style nodeId fill:#xxx,stroke:#yyy  (direct per-node override)
+        if (std.mem.startsWith(u8, line, "style ")) {
+            const rest = line[6..];
+            if (std.mem.indexOfAny(u8, rest, " \t")) |sp| {
+                const nid = std.mem.trim(u8, rest[0..sp], " \t");
+                const cstyle = std.mem.trim(u8, rest[sp + 1 ..], " \t");
+                if (nid.len > 0 and cstyle.len > 0) try node_styles.put(nid, cstyle);
+            }
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "linkStyle ")) continue;
 
         if (first) {
             first = false;
@@ -808,16 +818,23 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
 
     // Apply classDef styles to nodes that carry a class assignment.
     for (nodes_list.items) |*nv| {
-        // Need mutable access to the Node; check tag then take pointer.
         const is_node = switch (nv.*) { .node => true, else => false };
         if (!is_node) continue;
         const nn = &nv.node;
         const nid = nn.getString("id") orelse continue;
-        const cname = node_class_map.get(nid) orelse continue;
-        const style = class_defs.get(cname) orelse continue;
-        if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
-        if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
-        if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
+        if (node_class_map.get(nid)) |cname| {
+            if (class_defs.get(cname)) |style| {
+                if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
+                if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
+                if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
+            }
+        }
+        // Direct `style` overrides take priority over classDef.
+        if (node_styles.get(nid)) |style| {
+            if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
+            if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
+            if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
+        }
     }
 
     // Build subgraphs list for the renderer
@@ -846,11 +863,18 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
 
     var participants_list: std.ArrayList(Value) = .empty;
     var signals_list: std.ArrayList(Value) = .empty;
+    var boxes_list: std.ArrayList(Value) = .empty;
     var seen_actors = std.StringHashMap(void).init(a);
     var autonumber = false;
     var msg_count: usize = 0; // track message count for note row positions
 
-    const BlockFrame = struct { kind: []const u8, label: []const u8, start: usize };
+    const BlockFrame = struct {
+        kind: []const u8,
+        label: []const u8,
+        start: usize,
+        box_color: []const u8 = "",    // only used when kind=="box"
+        box_actor_start: usize = 0,
+    };
     var block_stack: std.ArrayList(BlockFrame) = .empty;
 
     var lines = std.mem.splitScalar(u8, text, '\n');
@@ -918,10 +942,24 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
             try block_stack.append(a, .{ .kind = "par", .label = lbl, .start = signals_list.items.len - 1 });
             continue;
         }
-        // box <color> <label> ... end: treat as a visual grouping; skip header/end,
-        // participants inside are still parsed normally.
+        // box [color] [label] ... end: colored background band behind actor columns.
         if (std.mem.startsWith(u8, line, "box ") or std.mem.eql(u8, line, "box")) {
-            try block_stack.append(a, .{ .kind = "box", .label = "", .start = signals_list.items.len });
+            const rest = if (line.len > 4) std.mem.trim(u8, line[4..], " \t") else "";
+            var color: []const u8 = "";
+            var label: []const u8 = rest;
+            if (std.mem.startsWith(u8, rest, "rgb(") or std.mem.startsWith(u8, rest, "rgba(")) {
+                const close = std.mem.indexOfScalar(u8, rest, ')') orelse rest.len - 1;
+                color = rest[0 .. close + 1];
+                label = std.mem.trim(u8, rest[close + 1 ..], " \t");
+            } else if (rest.len > 0 and rest[0] == '#') {
+                const end_c = std.mem.indexOfAny(u8, rest, " \t") orelse rest.len;
+                color = rest[0..end_c];
+                label = std.mem.trim(u8, rest[end_c..], " \t");
+            }
+            try block_stack.append(a, .{
+                .kind = "box", .label = label, .start = signals_list.items.len,
+                .box_color = color, .box_actor_start = participants_list.items.len,
+            });
             continue;
         }
         if (std.mem.eql(u8, line, "autonumber")) {
@@ -985,9 +1023,14 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         if (std.mem.eql(u8, line, "end")) {
             if (block_stack.items.len > 0) {
                 const top = block_stack.pop().?;
-                // "box" groups are visual-only; no signal emitted for them
+                // "box" groups: emit colored band record into boxes_list
                 if (std.mem.eql(u8, top.kind, "box")) {
-                    // nothing to emit
+                    var bxn = Value.Node{ .type_name = "box", .fields = .{} };
+                    try bxn.fields.put(a, "color", Value{ .string = top.box_color });
+                    try bxn.fields.put(a, "label", Value{ .string = top.label });
+                    try bxn.fields.put(a, "actor_start", Value{ .number = @floatFromInt(top.box_actor_start) });
+                    try bxn.fields.put(a, "actor_end", Value{ .number = @floatFromInt(participants_list.items.len) });
+                    try boxes_list.append(a, Value{ .node = bxn });
                 } else {
                     const end_type: []const u8 =
                         if (std.mem.eql(u8, top.kind, "loop")) "loopEnd"
@@ -1076,6 +1119,7 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     var root = Value.Node{ .type_name = "sequenceDiagram", .fields = .{} };
     try root.fields.put(a, "participants", Value{ .list = try participants_list.toOwnedSlice(a) });
     try root.fields.put(a, "signals", Value{ .list = try signals_list.toOwnedSlice(a) });
+    try root.fields.put(a, "boxes", Value{ .list = try boxes_list.toOwnedSlice(a) });
     try root.fields.put(a, "autonumber", Value{ .number = if (autonumber) 1.0 else 0.0 });
 
     return sequence_renderer.render(allocator, Value{ .node = root });

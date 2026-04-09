@@ -41,6 +41,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     defer activations.deinit(allocator);
     var notes: std.ArrayList(Note) = .empty;
     defer notes.deinit(allocator);
+    var bands: std.ArrayList(ActorBand) = .empty;
+    defer bands.deinit(allocator);
 
     const do_autonumber = (node.getNumber("autonumber") orelse 0.0) != 0.0;
 
@@ -50,6 +52,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         var it = act_stack.iterator();
         while (it.next()) |kv| kv.value_ptr.deinit(allocator);
         act_stack.deinit();
+    }
+
+    // Parse box bands
+    for (node.getList("boxes")) |bv| {
+        const bn = bv.asNode() orelse continue;
+        const color = bn.getString("color") orelse "";
+        const label = bn.getString("label") orelse "";
+        const actor_start: usize = @intFromFloat(bn.getNumber("actor_start") orelse 0);
+        const actor_end: usize = @intFromFloat(bn.getNumber("actor_end") orelse 0);
+        if (actor_end > actor_start)
+            try bands.append(allocator, .{ .color = color, .label = label, .actor_start = actor_start, .actor_end = actor_end });
     }
 
     // Parse participants
@@ -182,6 +195,18 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     try svg.defs(arrow_marker_defs);
     try svg.rect(0, 0, @floatFromInt(total_w), @floatFromInt(total_h), 0, theme.background, theme.background, 0);
 
+    // 0. Actor group bands (box rgb(...) ... end)
+    for (bands.items) |band| {
+        if (band.color.len == 0) continue;
+        const bx = MARGIN_X + @as(f32, @floatFromInt(band.actor_start)) * LANE_GAP - LANE_GAP / 4.0;
+        const bw = @as(f32, @floatFromInt(band.actor_end - band.actor_start)) * LANE_GAP + LANE_GAP / 2.0;
+        const by: f32 = ACTOR_TOP_Y;
+        const bh: f32 = @as(f32, @floatFromInt(total_h)) - ACTOR_TOP_Y - MARGIN_Y;
+        try svg.rect(bx, by, bw, bh, 6.0, band.color, "none", 0);
+        if (band.label.len > 0)
+            try svg.text(bx + bw / 2.0, by + 14, band.label, theme.text_color, theme.font_size_small, .middle, "bold");
+    }
+
     // 1. Loop/alt/opt/par blocks (background)
     for (blocks.items) |b| {
         const end = b.end_row orelse n_msgs;
@@ -189,7 +214,19 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const bh = @as(f32, @floatFromInt(end - b.start_row)) * ROW_H + 20;
         const bx: f32 = MARGIN_X - 10;
         const bw: f32 = @as(f32, @floatFromInt(total_w)) - (MARGIN_X - 10) * 2;
-        try svg.rect(bx, by, bw, bh, 4.0, theme.loop_fill, theme.loop_stroke, 1.0);
+        const blk_fill = switch (b.kind) {
+            .loop => "#f0f4ff",
+            .alt  => "#fff8f0",
+            .opt  => "#f0fff4",
+            .par  => "#fdf0ff",
+        };
+        const blk_stroke = switch (b.kind) {
+            .loop => "#b0c0e8",
+            .alt  => "#e8c8a0",
+            .opt  => "#a0d8b0",
+            .par  => "#c8a0d8",
+        };
+        try svg.rect(bx, by, bw, bh, 4.0, blk_fill, blk_stroke, 1.0);
         var kind_label_buf: [64]u8 = undefined;
         const kind_str = switch (b.kind) { .loop => "loop", .alt => "alt", .opt => "opt", .par => "par" };
         const kind_label = try std.fmt.bufPrint(&kind_label_buf, "{s} {s}", .{ kind_str, b.label });
@@ -357,6 +394,13 @@ const Block = struct {
     label: []const u8,
     start_row: usize,
     end_row: ?usize = null,
+};
+
+const ActorBand = struct {
+    color: []const u8,
+    label: []const u8,
+    actor_start: usize,
+    actor_end: usize,
 };
 
 const Message = struct {
