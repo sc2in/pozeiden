@@ -245,8 +245,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (blocks.items, 0..) |b, bi| {
         const color = theme.pie_colors[bi % theme.pie_colors.len];
         try svg.rect(b.x, b.y, b.w, CELL_H, 6.0, theme.node_fill, color, 2.0);
-        try svg.text(b.x + b.w / 2, b.y + CELL_H / 2 + 4,
-            b.label, theme.text_color, theme.font_size, .middle, "normal");
+        try svg.textWrapped(b.x + b.w / 2, b.y + CELL_H / 2 + 4,
+            b.label, b.w - 8, theme.text_color, theme.font_size, .middle, "normal");
     }
 
     try svg.footer();

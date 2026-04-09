@@ -10,6 +10,7 @@
 const std = @import("std");
 const detect = @import("detect.zig");
 const Value = @import("diagram/value.zig").Value;
+const theme = @import("svg/theme.zig");
 
 const langium_parser = @import("langium/parser.zig");
 const langium_runtime = @import("langium/runtime.zig");
@@ -87,6 +88,25 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
             return renderUnknown(allocator, mermaid_text);
         },
     }
+}
+
+/// Options for `renderWithOptions`.
+pub const RenderOptions = struct {
+    /// Runtime theme overrides.  Unset fields use the mermaid default values.
+    theme_override: theme.ThemeOverride = .{},
+};
+
+/// Like `render`, but accepts a `RenderOptions` to customise the output.
+/// Theme overrides are applied for the duration of the call and reset
+/// automatically when it returns (including on error).
+pub fn renderWithOptions(
+    allocator: std.mem.Allocator,
+    mermaid_text: []const u8,
+    options: RenderOptions,
+) ![]const u8 {
+    theme.applyOverride(options.theme_override);
+    defer theme.resetToDefaults();
+    return render(allocator, mermaid_text);
 }
 
 fn renderLangium(
@@ -426,6 +446,21 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
     return kanban_renderer.render(allocator, Value{ .node = root });
 }
 
+/// Extract a CSS-style property value from a comma-separated style string.
+/// e.g. flowchartParseProp("fill:#f9f,stroke:#333", "fill") → "#f9f"
+fn flowchartParseProp(style: []const u8, prop: []const u8) ?[]const u8 {
+    var it = std.mem.splitScalar(u8, style, ',');
+    while (it.next()) |token| {
+        const t = std.mem.trim(u8, token, " \t");
+        if (std.mem.startsWith(u8, t, prop)) {
+            const rest = t[prop.len..];
+            if (rest.len > 0 and rest[0] == ':')
+                return std.mem.trim(u8, rest[1..], " \t");
+        }
+    }
+    return null;
+}
+
 fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 } {
     const s = std.mem.trim(u8, spec, " \t\r\n");
     if (s.len == 0) return .{ "", "", "rect" };
@@ -528,6 +563,11 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     var seen_nodes = std.StringHashMap(void).init(a);
     var direction: []const u8 = "TB";
 
+    // classDef name → raw style string ("fill:#f9f,stroke:#333")
+    var class_defs = std.StringHashMap([]const u8).init(a);
+    // node_id → class name (from "class nodeId className" or "A:::className")
+    var node_class_map = std.StringHashMap([]const u8).init(a);
+
     // Subgraph tracking
     const Subgraph = struct {
         label: []const u8,
@@ -550,10 +590,35 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         if (line.len == 0) continue;
         // Skip comments
         if (std.mem.startsWith(u8, line, "%%")) continue;
-        // Skip style/classDef/linkStyle directives
+        // classDef myClass fill:#f9f,stroke:#333
+        if (std.mem.startsWith(u8, line, "classDef ")) {
+            const rest = line[9..];
+            if (std.mem.indexOfScalar(u8, rest, ' ')) |sp| {
+                const cname = rest[0..sp];
+                const cstyle = std.mem.trim(u8, rest[sp + 1 ..], " \t");
+                if (cname.len > 0 and cstyle.len > 0)
+                    try class_defs.put(cname, cstyle);
+            }
+            continue;
+        }
+        // class node1,node2 className
+        if (std.mem.startsWith(u8, line, "class ")) {
+            const rest = line[6..];
+            if (std.mem.lastIndexOfScalar(u8, rest, ' ')) |sp| {
+                const ids_part = rest[0..sp];
+                const cname = std.mem.trim(u8, rest[sp + 1 ..], " \t");
+                if (cname.len > 0) {
+                    var it = std.mem.splitScalar(u8, ids_part, ',');
+                    while (it.next()) |id_raw| {
+                        const nid = std.mem.trim(u8, id_raw, " \t");
+                        if (nid.len > 0) try node_class_map.put(nid, cname);
+                    }
+                }
+            }
+            continue;
+        }
+        // Skip linkStyle and per-node style overrides (not yet supported)
         if (std.mem.startsWith(u8, line, "style ") or
-            std.mem.startsWith(u8, line, "classDef ") or
-            std.mem.startsWith(u8, line, "class ") or
             std.mem.startsWith(u8, line, "linkStyle ")) continue;
 
         if (first) {
@@ -587,6 +652,18 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             var from_raw = std.mem.trim(u8, line[0..arrow[0]], " \t");
             var to_part = std.mem.trim(u8, line[arrow[1]..], " \t");
 
+            // Strip inline class annotations: A[label]:::myClass
+            var from_inline_class: ?[]const u8 = null;
+            if (std.mem.indexOf(u8, from_raw, ":::")) |cp| {
+                from_inline_class = std.mem.trim(u8, from_raw[cp + 3 ..], " \t");
+                from_raw = from_raw[0..cp];
+            }
+            var to_inline_class: ?[]const u8 = null;
+            if (std.mem.indexOf(u8, to_part, ":::")) |cp| {
+                to_inline_class = std.mem.trim(u8, to_part[cp + 3 ..], " \t");
+                to_part = to_part[0..cp];
+            }
+
             // Edge label: |label| between arrow and destination (A --> |label| B)
             var edge_label: ?[]const u8 = null;
             if (to_part.len > 0 and to_part[0] == '|') {
@@ -613,6 +690,10 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             const to_id, const to_label, const to_shape = parseNodeSpec(to_part);
 
             if (from_id.len == 0 or to_id.len == 0) continue;
+
+            // Record inline class assignments
+            if (from_inline_class) |cn| try node_class_map.put(from_id, cn);
+            if (to_inline_class) |cn| try node_class_map.put(to_id, cn);
 
             // Add nodes if not seen
             if (seen_nodes.get(from_id) == null) {
@@ -644,8 +725,14 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             }
             try edges_list.append(a, Value{ .node = e });
         } else if (line.len > 0 and !std.mem.eql(u8, line, "end")) {
-            // Standalone node definition
-            const node_id, const node_label, const node_shape = parseNodeSpec(line);
+            // Standalone node definition — strip optional :::className first
+            var standalone = line;
+            var standalone_class: ?[]const u8 = null;
+            if (std.mem.indexOf(u8, standalone, ":::")) |cp| {
+                standalone_class = std.mem.trim(u8, standalone[cp + 3 ..], " \t");
+                standalone = standalone[0..cp];
+            }
+            const node_id, const node_label, const node_shape = parseNodeSpec(standalone);
             if (node_id.len > 0 and seen_nodes.get(node_id) == null) {
                 try seen_nodes.put(node_id, {});
                 var n = Value.Node{ .type_name = "node", .fields = .{} };
@@ -654,8 +741,23 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "shape", Value{ .string = node_shape });
                 try nodes_list.append(a, Value{ .node = n });
                 try addNodeToSubgraph(&subgraphs, cur_subgraph, a, node_id);
+                if (standalone_class) |cn| try node_class_map.put(node_id, cn);
             }
         }
+    }
+
+    // Apply classDef styles to nodes that carry a class assignment.
+    for (nodes_list.items) |*nv| {
+        // Need mutable access to the Node; check tag then take pointer.
+        const is_node = switch (nv.*) { .node => true, else => false };
+        if (!is_node) continue;
+        const nn = &nv.node;
+        const nid = nn.getString("id") orelse continue;
+        const cname = node_class_map.get(nid) orelse continue;
+        const style = class_defs.get(cname) orelse continue;
+        if (flowchartParseProp(style, "fill"))   |v| try nn.fields.put(a, "fill",       Value{ .string = v });
+        if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
+        if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
     }
 
     // Build subgraphs list for the renderer
@@ -1921,7 +2023,6 @@ fn stripQuotes(s: []const u8) []const u8 {
 
 fn renderUnknown(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     const writer_mod = @import("svg/writer.zig");
-    const theme = @import("svg/theme.zig");
     var svg = writer_mod.SvgWriter.init(allocator);
     defer svg.deinit();
     try svg.header(400, 120);

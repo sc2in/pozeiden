@@ -210,6 +210,72 @@ pub const SvgWriter = struct {
         );
     }
 
+    /// Emit a `<text>` element with automatic word-wrapping via `<tspan>`.
+    /// Text wider than `max_w` pixels wraps to a second line; any overflow
+    /// beyond two lines is truncated with an ellipsis. Character width is
+    /// approximated as `font_size * 0.55`.
+    pub fn textWrapped(
+        self: *SvgWriter,
+        x: f32,
+        cy: f32,
+        content: []const u8,
+        max_w: f32,
+        fill: []const u8,
+        font_size: u32,
+        anchor: TextAnchor,
+        font_weight: []const u8,
+    ) !void {
+        const char_w: f32 = @as(f32, @floatFromInt(font_size)) * 0.55;
+        const chars_per_line: usize = @max(1, @as(usize, @intFromFloat(max_w / char_w)));
+
+        if (content.len <= chars_per_line) {
+            return self.text(x, cy, content, fill, font_size, anchor, font_weight);
+        }
+
+        // Find last word boundary at or before chars_per_line.
+        const search_end = @min(chars_per_line + 1, content.len);
+        const split_at: usize = blk: {
+            if (std.mem.lastIndexOfScalar(u8, content[0..search_end], ' ')) |sp| break :blk sp;
+            break :blk chars_per_line; // hard split — no space found
+        };
+        const line1 = content[0..split_at];
+        const line2_start = if (split_at < content.len and content[split_at] == ' ')
+            split_at + 1
+        else
+            split_at;
+        const rest = content[line2_start..];
+
+        // Truncate line2 if still too wide.
+        var trunc_buf: [128]u8 = undefined;
+        const line2: []const u8 = if (rest.len > chars_per_line) blk: {
+            var cut = if (chars_per_line > 3) chars_per_line - 3 else 0;
+            while (cut > 0 and rest[cut] != ' ') : (cut -= 1) {}
+            if (cut == 0 and chars_per_line > 3) cut = chars_per_line - 3;
+            const truncated = std.fmt.bufPrint(&trunc_buf, "{s}...", .{rest[0..cut]}) catch rest[0..@min(rest.len, chars_per_line)];
+            break :blk truncated;
+        } else rest;
+
+        const line_h: f32 = @as(f32, @floatFromInt(font_size)) + 2.0;
+        const y1 = cy - line_h / 2.0;
+        const y2 = cy + line_h / 2.0;
+        const anchor_str: []const u8 = switch (anchor) {
+            .start => "start",
+            .middle => "middle",
+            .end => "end",
+        };
+        const w = self.buf.writer(self.allocator);
+        try w.print(
+            "<text fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
+            .{ fill, font_size, anchor_str, font_weight },
+        );
+        try w.print("<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y1 });
+        try xmlEscape(w, line1);
+        try w.writeAll("</tspan>");
+        try w.print("<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y2 });
+        try xmlEscape(w, line2);
+        try w.writeAll("</tspan></text>\n");
+    }
+
     /// Append a raw SVG fragment verbatim.  Use sparingly: no escaping or
     /// validation is applied.  Useful for SVG features (e.g. rotated text)
     /// that do not have a dedicated method.

@@ -37,6 +37,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .id = id,
             .label = label,
             .shape = shape,
+            .fill = nn.getString("fill"),
+            .stroke = nn.getString("stroke"),
+            .label_color = nn.getString("text_color"),
         });
     }
 
@@ -426,6 +429,10 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
     const h = n.h;
     const cx = x + w / 2;
     const cy = y + h / 2;
+    // Per-node style from classDef; fall back to theme defaults.
+    const nfill   = n.fill   orelse theme.node_fill;
+    const nstroke = n.stroke orelse theme.node_stroke;
+    const ntextc  = n.label_color orelse theme.text_color;
 
     switch (n.shape) {
         .diamond => {
@@ -433,16 +440,16 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ cx, y, x + w, cy, cx, y + h, x, cy });
-            try svg.polygon(pts, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .circle => {
-            try svg.circle(cx, cy, h / 2, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.circle(cx, cy, h / 2, nfill, nstroke, theme.node_stroke_width);
         },
         .stadium => {
-            try svg.rect(x, y, w, h, h / 2, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.rect(x, y, w, h, h / 2, nfill, nstroke, theme.node_stroke_width);
         },
         .round => {
-            try svg.rect(x, y, w, h, 8.0, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.rect(x, y, w, h, 8.0, nfill, nstroke, theme.node_stroke_width);
         },
         .hexagon => {
             // Flat-sided hexagon: pointed left and right, flat top and bottom
@@ -451,66 +458,60 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ x + dx, y, x + w - dx, y, x + w, cy, x + w - dx, y + h, x + dx, y + h, x, cy });
-            try svg.polygon(pts, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .cylinder => {
             // Cylinder: rect body with elliptical top cap
             const ry: f32 = h * 0.18;
-            // Body rect (below top cap center)
-            try svg.rect(x, y + ry, w, h - ry, 0, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
-            // Top ellipse (drawn last to cover the top edge of the rect)
+            try svg.rect(x, y + ry, w, h - ry, 0, nfill, nstroke, theme.node_stroke_width);
             var buf: [384]u8 = undefined;
             const top_ellipse = try std.fmt.bufPrint(&buf,
                 "<ellipse cx=\"{d:.1}\" cy=\"{d:.1}\" rx=\"{d:.1}\" ry=\"{d:.1}\" " ++
                 "fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-                .{ cx, y + ry, w / 2, ry, theme.node_fill, theme.node_stroke, theme.node_stroke_width });
+                .{ cx, y + ry, w / 2, ry, nfill, nstroke, theme.node_stroke_width });
             try svg.raw(top_ellipse);
-            // Bottom arc (stroke only, lower half of ellipse)
             const bot_d = try std.fmt.bufPrint(&buf,
                 "M {d:.1},{d:.1} A {d:.1},{d:.1},0,0,1,{d:.1},{d:.1}",
                 .{ x, y + h - ry, w / 2, ry, x + w, y + h - ry });
-            try svg.path(bot_d, "none", theme.node_stroke, theme.node_stroke_width, "");
+            try svg.path(bot_d, "none", nstroke, theme.node_stroke_width, "");
         },
         .subroutine => {
-            // Rect with inner vertical lines near left and right edges
-            try svg.rect(x, y, w, h, 0, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.rect(x, y, w, h, 0, nfill, nstroke, theme.node_stroke_width);
             const inset: f32 = 8.0;
-            try svg.line(x + inset, y, x + inset, y + h, theme.node_stroke, theme.node_stroke_width);
-            try svg.line(x + w - inset, y, x + w - inset, y + h, theme.node_stroke, theme.node_stroke_width);
+            try svg.line(x + inset, y, x + inset, y + h, nstroke, theme.node_stroke_width);
+            try svg.line(x + w - inset, y, x + w - inset, y + h, nstroke, theme.node_stroke_width);
         },
         .parallelogram => {
-            // Slanted parallelogram (slant to the right)
             const slant: f32 = h * 0.3;
             var pts_buf: [256]u8 = undefined;
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ x + slant, y, x + w, y, x + w - slant, y + h, x, y + h });
-            try svg.polygon(pts, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .asymmetric => {
-            // Flag/arrow shape: rectangle with a pointed right side notch on left
             const notch: f32 = h * 0.35;
             var pts_buf: [256]u8 = undefined;
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ x, y, x + w, y, x + w, y + h, x, y + h, x + notch, cy });
-            try svg.polygon(pts, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .ellipse => {
             var buf: [256]u8 = undefined;
             const ellipse_svg = try std.fmt.bufPrint(&buf,
                 "<ellipse cx=\"{d:.1}\" cy=\"{d:.1}\" rx=\"{d:.1}\" ry=\"{d:.1}\" " ++
                 "fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-                .{ cx, cy, w / 2, h / 2, theme.node_fill, theme.node_stroke, theme.node_stroke_width });
+                .{ cx, cy, w / 2, h / 2, nfill, nstroke, theme.node_stroke_width });
             try svg.raw(ellipse_svg);
         },
         else => {
-            try svg.rect(x, y, w, h, 4.0, theme.node_fill, theme.node_stroke, theme.node_stroke_width);
+            try svg.rect(x, y, w, h, 4.0, nfill, nstroke, theme.node_stroke_width);
         },
     }
 
-    // Node label
-    try svg.text(cx, cy + 4, n.label, theme.text_color, theme.font_size, .middle, "normal");
+    // Node label (wrapped if too wide)
+    try svg.textWrapped(cx, cy + 4, n.label, w - 8, ntextc, theme.font_size, .middle, "normal");
 }
 
 fn renderFallback(allocator: std.mem.Allocator, msg: []const u8) ![]const u8 {

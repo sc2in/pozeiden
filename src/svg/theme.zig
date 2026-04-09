@@ -1,36 +1,42 @@
 //! Mermaid default theme constants.
 //! Colors sourced from mermaid's default theme CSS variables.
+//!
+//! Most fields are runtime-mutable `var`s so that `renderWithOptions` can
+//! temporarily apply a `ThemeOverride` without touching any renderer code.
+//! Fields that are arrays or rarely overridden remain compile-time `const`.
+//! This is intentionally not thread-safe; pozeiden targets single-threaded
+//! (WASM) use.
 
+pub var font_size: u32 = 14;
+pub var font_size_small: u32 = 12;
 pub const font_family = "trebuchet ms, verdana, arial, sans-serif";
-pub const font_size: u32 = 14;
-pub const font_size_small: u32 = 12;
 
-pub const background = "#ffffff";
-pub const text_color = "#333333";
-pub const line_color = "#333333";
+pub var background: []const u8 = "#ffffff";
+pub var text_color: []const u8 = "#333333";
+pub var line_color: []const u8 = "#333333";
 
 // Node fill/stroke (flowchart)
-pub const node_fill = "#ececff";
-pub const node_stroke = "#9370db";
+pub var node_fill: []const u8 = "#ececff";
+pub var node_stroke: []const u8 = "#9370db";
 pub const node_stroke_width: f32 = 1.5;
 
 // Edge color
-pub const edge_color = "#333333";
+pub var edge_color: []const u8 = "#333333";
 pub const edge_stroke_width: f32 = 1.5;
 
 // Subgraph
-pub const subgraph_fill = "#fafafa";
-pub const subgraph_stroke = "#cccccc";
+pub var subgraph_fill: []const u8 = "#fafafa";
+pub var subgraph_stroke: []const u8 = "#cccccc";
 
 // Sequence diagram
-pub const actor_fill = "#ececff";
-pub const actor_stroke = "#9370db";
-pub const signal_color = "#333333";
-pub const label_background = "#ffffff";
-pub const loop_fill = "#fafafa";
-pub const loop_stroke = "#aaaaaa";
-pub const note_fill = "#fff5ad";
-pub const note_stroke = "#aaaaaa";
+pub var actor_fill: []const u8 = "#ececff";
+pub var actor_stroke: []const u8 = "#9370db";
+pub var signal_color: []const u8 = "#333333";
+pub var label_background: []const u8 = "#ffffff";
+pub var loop_fill: []const u8 = "#fafafa";
+pub var loop_stroke: []const u8 = "#aaaaaa";
+pub var note_fill: []const u8 = "#fff5ad";
+pub var note_stroke: []const u8 = "#aaaaaa";
 
 // Git graph
 pub const git_branch_colors = [_][]const u8{
@@ -60,3 +66,56 @@ pub const pie_width: u32 = 600;
 pub const pie_height: u32 = 400;
 pub const pie_cx: f32 = 220.0;
 pub const pie_cy: f32 = 200.0;
+
+// ── Runtime theme override ─────────────────────────────────────────────────
+
+/// Optional overrides for the most commonly customised theme fields.
+/// Pass to `renderWithOptions` via `RenderOptions`.
+pub const ThemeOverride = struct {
+    background:       ?[]const u8 = null,
+    text_color:       ?[]const u8 = null,
+    node_fill:        ?[]const u8 = null,
+    node_stroke:      ?[]const u8 = null,
+    edge_color:       ?[]const u8 = null,
+    font_size:        ?u32 = null,
+    font_size_small:  ?u32 = null,
+};
+
+/// Apply `ov` to the module-level theme vars.  Call `resetToDefaults` when
+/// rendering is complete.  Not thread-safe.
+pub fn applyOverride(ov: ThemeOverride) void {
+    if (ov.background)      |v| background      = v;
+    if (ov.text_color)      |v| text_color       = v;
+    if (ov.node_fill)       |v| node_fill        = v;
+    if (ov.node_stroke)     |v| node_stroke      = v;
+    if (ov.edge_color)      |v| edge_color       = v;
+    if (ov.font_size)       |v| font_size        = v;
+    if (ov.font_size_small) |v| font_size_small  = v;
+    // Derived fields that mirror overridden values for visual consistency.
+    if (ov.background)      |v| label_background = v;
+    if (ov.text_color)      |v| { signal_color = v; line_color = v; }
+    if (ov.node_fill)       |v| { actor_fill = v; }
+    if (ov.node_stroke)     |v| { actor_stroke = v; }
+}
+
+/// Reset all overridable vars to their mermaid default values.
+pub fn resetToDefaults() void {
+    font_size        = 14;
+    font_size_small  = 12;
+    background       = "#ffffff";
+    text_color       = "#333333";
+    line_color       = "#333333";
+    node_fill        = "#ececff";
+    node_stroke      = "#9370db";
+    edge_color       = "#333333";
+    subgraph_fill    = "#fafafa";
+    subgraph_stroke  = "#cccccc";
+    actor_fill       = "#ececff";
+    actor_stroke     = "#9370db";
+    signal_color     = "#333333";
+    label_background = "#ffffff";
+    loop_fill        = "#fafafa";
+    loop_stroke      = "#aaaaaa";
+    note_fill        = "#fff5ad";
+    note_stroke      = "#aaaaaa";
+}

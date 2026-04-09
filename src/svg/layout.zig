@@ -30,6 +30,10 @@ pub const GraphNode = struct {
     h: f32 = 40,
     layer: usize = 0,
     order: usize = 0,
+    /// Optional per-node style from `classDef`/`class`. Null = use theme default.
+    fill: ?[]const u8 = null,
+    stroke: ?[]const u8 = null,
+    label_color: ?[]const u8 = null,
 };
 
 /// Mermaid flowchart node shapes.
@@ -53,6 +57,9 @@ pub const GraphEdge = struct {
     to: []const u8,
     label: ?[]const u8,
     style: EdgeStyle,
+    /// Set by `breakCycles`: edge points against the DAG flow and is treated
+    /// as logically reversed (to→from) during layer assignment.
+    reversed: bool = false,
 };
 
 /// Edge line style.
@@ -69,17 +76,20 @@ pub const Graph = struct {
     direction: Direction,
 };
 
-/// Assign `(x, y)` coordinates to every node in `graph` using a simplified
-/// three-phase Sugiyama algorithm (layer assignment → ordering → coordinates).
-/// Modifies `graph.nodes` in place; `graph.edges` is read-only.
+/// Assign `(x, y)` coordinates to every node in `graph` using a three-phase
+/// Sugiyama algorithm: cycle-breaking → layer assignment → barycenter ordering
+/// → coordinates. Modifies `graph.nodes` and `graph.edges` in place.
 pub fn layout(allocator: std.mem.Allocator, graph: *Graph) !void {
     if (graph.nodes.len == 0) return;
 
-    // 1. Assign layers using longest path from sources
+    // 0. Break cycles: mark back edges as reversed so BFS layer assignment works
+    try breakCycles(allocator, graph);
+
+    // 1. Assign layers using longest path from sources (respects reversed edges)
     try assignLayers(allocator, graph);
 
-    // 2. Order nodes within each layer (simple: stable sort by id)
-    orderNodes(graph);
+    // 2. Order nodes with barycenter heuristic to reduce edge crossings
+    try orderNodes(allocator, graph);
 
     // 3. Assign coordinates
     assignCoordinates(graph);
@@ -105,7 +115,9 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
     }
 
     for (graph.edges) |e| {
-        const to_idx = idx_map.get(e.to) orelse continue;
+        // Reversed edges contribute in-degree to the *from* node (logical target).
+        const target = if (e.reversed) e.from else e.to;
+        const to_idx = idx_map.get(target) orelse continue;
         in_degree[to_idx] += 1;
     }
 
@@ -130,9 +142,12 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
         if (cur_layer > max_layer) max_layer = cur_layer;
 
         for (graph.edges) |e| {
-            const from_idx = idx_map.get(e.from) orelse continue;
+            // For reversed edges treat the direction as to→from.
+            const logical_from = if (e.reversed) e.to else e.from;
+            const logical_to   = if (e.reversed) e.from else e.to;
+            const from_idx = idx_map.get(logical_from) orelse continue;
             if (from_idx != cur) continue;
-            const to_idx = idx_map.get(e.to) orelse continue;
+            const to_idx = idx_map.get(logical_to) orelse continue;
             if (layers[to_idx] < cur_layer + 1) {
                 layers[to_idx] = cur_layer + 1;
                 if (layers[to_idx] > max_layer) max_layer = layers[to_idx];
@@ -149,16 +164,79 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
     }
 }
 
-fn orderNodes(graph: *Graph) void {
-    // Sort by (layer, id) to get a stable order within each layer
+/// DFS-based cycle-breaking: marks back edges with `reversed = true` so that
+/// `assignLayers` can treat them as forward edges and produce correct depths.
+fn breakCycles(allocator: std.mem.Allocator, graph: *Graph) !void {
+    const n = graph.nodes.len;
+    if (n == 0) return;
+
+    var idx_map = std.StringHashMap(usize).init(allocator);
+    defer idx_map.deinit();
+    for (graph.nodes, 0..) |nd, i| try idx_map.put(nd.id, i);
+
+    // 3-colour DFS: 0 = white, 1 = gray (on stack), 2 = black (done)
+    var color = try allocator.alloc(u8, n);
+    defer allocator.free(color);
+    @memset(color, 0);
+
+    // Iterative DFS to avoid call-stack overflow on large graphs.
+    // Each frame stores the node index and our current scan position in the
+    // global edge slice (we scan all edges looking for outgoing from this node).
+    const Frame = struct { u: usize, ei: usize };
+    var stack: std.ArrayList(Frame) = .empty;
+    defer stack.deinit(allocator);
+
+    for (0..n) |start| {
+        if (color[start] != 0) continue;
+        color[start] = 1;
+        try stack.append(allocator, .{ .u = start, .ei = 0 });
+
+        outer: while (stack.items.len > 0) {
+            const top = stack.items.len - 1;
+            const u = stack.items[top].u;
+            var ei = stack.items[top].ei;
+
+            while (ei < graph.edges.len) {
+                const e = &graph.edges[ei];
+                ei += 1;
+                // Only follow edges that are not already reversed.
+                const from_idx = idx_map.get(e.from) orelse continue;
+                if (from_idx != u) continue;
+                const to_idx = idx_map.get(e.to) orelse continue;
+
+                if (color[to_idx] == 1) {
+                    e.reversed = true; // back edge
+                } else if (color[to_idx] == 0) {
+                    // Tree edge — push and continue DFS from to_idx.
+                    stack.items[top].ei = ei; // save scan position
+                    color[to_idx] = 1;
+                    try stack.append(allocator, .{ .u = to_idx, .ei = 0 });
+                    continue :outer;
+                }
+                // color == 2: cross/forward edge, nothing to do
+            }
+            // All outgoing edges processed — finish this node.
+            color[u] = 2;
+            _ = stack.pop();
+        }
+    }
+}
+
+/// Order nodes within each layer using the barycenter heuristic (3 alternating
+/// down/up passes) to reduce edge crossings, initialised with a stable
+/// alphabetical sort so results are deterministic.
+fn orderNodes(allocator: std.mem.Allocator, graph: *Graph) !void {
     const nodes = graph.nodes;
-    // Bubble sort (small N)
-    var i: usize = 0;
-    while (i < nodes.len) : (i += 1) {
-        var j: usize = i + 1;
-        while (j < nodes.len) : (j += 1) {
-            if (nodes[i].layer == nodes[j].layer) {
-                if (std.mem.order(u8, nodes[i].id, nodes[j].id) == .gt) {
+
+    // Phase 1: initial alphabetical sort within each layer.
+    {
+        var i: usize = 0;
+        while (i < nodes.len) : (i += 1) {
+            var j: usize = i + 1;
+            while (j < nodes.len) : (j += 1) {
+                if (nodes[i].layer == nodes[j].layer and
+                    std.mem.order(u8, nodes[i].id, nodes[j].id) == .gt)
+                {
                     const tmp = nodes[i];
                     nodes[i] = nodes[j];
                     nodes[j] = tmp;
@@ -166,11 +244,79 @@ fn orderNodes(graph: *Graph) void {
             }
         }
     }
-    // Assign order within layer
-    var layer_count = std.mem.zeroes([64]usize);
-    for (nodes) |*n| {
-        n.order = layer_count[n.layer % 64];
-        layer_count[n.layer % 64] += 1;
+    var lc = std.mem.zeroes([64]usize);
+    for (nodes) |*nd| {
+        nd.order = lc[nd.layer % 64];
+        lc[nd.layer % 64] += 1;
+    }
+
+    var max_layer: usize = 0;
+    for (nodes) |nd| if (nd.layer > max_layer) { max_layer = nd.layer; };
+    if (max_layer == 0) return; // single layer — no crossings possible
+
+    // Phase 2: barycenter heuristic — 3 down + 3 up alternating sweeps.
+    var bary = try allocator.alloc(f32, nodes.len);
+    defer allocator.free(bary);
+
+    for (0..6) |pass| {
+        const down = (pass % 2 == 0);
+        for (0..max_layer + 1) |li| {
+            const layer: usize = if (down) li else max_layer - li;
+            // Reference layer: the already-fixed adjacent layer in sweep direction.
+            const ref_signed: i64 = @as(i64, @intCast(layer)) + if (down) @as(i64, -1) else @as(i64, 1);
+            if (ref_signed < 0 or ref_signed > @as(i64, @intCast(max_layer))) continue;
+            const ref_layer: usize = @intCast(ref_signed);
+
+            // Compute barycenter for each node in `layer`.
+            for (nodes, 0..) |*nd, ni| {
+                if (nd.layer != layer) { bary[ni] = -1; continue; }
+                var sum: f32 = 0;
+                var cnt: u32 = 0;
+                for (graph.edges) |e| {
+                    // Use logical direction (accounting for reversed edges).
+                    const fid = if (e.reversed) e.to else e.from;
+                    const tid = if (e.reversed) e.from else e.to;
+                    const nbr_id: []const u8 = if (std.mem.eql(u8, nd.id, fid))
+                        tid
+                    else if (std.mem.eql(u8, nd.id, tid))
+                        fid
+                    else
+                        continue;
+                    for (nodes) |nb| {
+                        if (nb.layer == ref_layer and std.mem.eql(u8, nb.id, nbr_id)) {
+                            sum += @floatFromInt(nb.order);
+                            cnt += 1;
+                            break;
+                        }
+                    }
+                }
+                bary[ni] = if (cnt > 0) sum / @as(f32, @floatFromInt(cnt)) else @as(f32, @floatFromInt(nd.order));
+            }
+
+            // Collect indices of nodes in this layer, sort by bary, reassign order.
+            var idxs: [128]usize = undefined;
+            var ic: usize = 0;
+            for (nodes, 0..) |nd, ni| {
+                if (nd.layer == layer and ic < idxs.len) {
+                    idxs[ic] = ni;
+                    ic += 1;
+                }
+            }
+            // Insertion sort on idxs by bary value.
+            var s: usize = 1;
+            while (s < ic) : (s += 1) {
+                const key_i = idxs[s];
+                const key_b = bary[key_i];
+                var t: usize = s;
+                while (t > 0 and bary[idxs[t - 1]] > key_b) : (t -= 1) {
+                    idxs[t] = idxs[t - 1];
+                }
+                idxs[t] = key_i;
+            }
+            for (idxs[0..ic], 0..) |ni, ord| {
+                nodes[ni].order = ord;
+            }
+        }
     }
 }
 

@@ -304,7 +304,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try svg.polygon(pts, theme.node_fill, theme.node_stroke, 1.5);
         } else {
             try svg.rect(cx - STATE_W / 2, cy - STATE_H / 2, STATE_W, STATE_H, 18.0, theme.node_fill, theme.node_stroke, 1.5);
-            try svg.text(cx, cy + 5, s.label, theme.text_color, theme.font_size, .middle, "normal");
+            try svg.textWrapped(cx, cy + 5, s.label, STATE_W - 8, theme.text_color, theme.font_size, .middle, "normal");
         }
     }
 
