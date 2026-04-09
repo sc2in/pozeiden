@@ -45,6 +45,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     defer bands.deinit(allocator);
     var separators: std.ArrayList(Separator) = .empty;
     defer separators.deinit(allocator);
+    var destroys = std.StringHashMap(usize).init(allocator); // actor → row where destroyed
+    defer destroys.deinit();
 
     const do_autonumber = (node.getNumber("autonumber") orelse 0.0) != 0.0;
 
@@ -67,12 +69,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try bands.append(allocator, .{ .color = color, .label = label, .actor_start = actor_start, .actor_end = actor_end });
     }
 
-    // Parse participants
+    // Parse participants — track which are actor-type (stickman) vs participant (box)
+    var actor_kinds = std.StringHashMap(bool).init(allocator); // true = actor stickman
+    defer actor_kinds.deinit();
+
     const parts = node.getList("participants");
     for (parts) |pv| {
         if (pv.asNode()) |pn| {
             const name = pn.getString("actor") orelse continue;
             if (!hasActor(actors.items, name)) try actors.append(allocator, name);
+            const is_actor_type = (pn.getString("is_actor") != null);
+            try actor_kinds.put(name, is_actor_type);
         } else if (pv.asString()) |s| {
             if (!hasActor(actors.items, s)) try actors.append(allocator, s);
         }
@@ -190,6 +197,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const lbl = sn.getString("label") orelse "";
             const row: usize = @intFromFloat(sn.getNumber("row") orelse @as(f64, @floatFromInt(messages.items.len)));
             try separators.append(allocator, Separator{ .label = lbl, .row = row });
+        } else if (std.mem.eql(u8, msg_type, "destroy")) {
+            const actor_name = sn.getString("actor") orelse continue;
+            const row: usize = @intFromFloat(sn.getNumber("row") orelse @as(f64, @floatFromInt(messages.items.len)));
+            try destroys.put(actor_name, row);
         }
     }
 
@@ -304,23 +315,44 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.dashedLine(line_x, line_top, line_x, line_bot, theme.signal_color, 1.0, "4,4");
     }
 
-    // 3. Activation bars (narrow rectangles on lifelines)
-    for (activations.items) |act| {
+    // 3. Activation bars (narrow rectangles on lifelines, stacked for nested activations)
+    for (activations.items, 0..) |act, ai_idx| {
         const ai = actorIndex(actors.items, act.actor) orelse continue;
         const lx = MARGIN_X + @as(f32, @floatFromInt(ai)) * LANE_GAP;
         const cx = lx + ACTOR_W / 2;
+        // Compute nesting depth: count earlier activations on same actor that contain this one
+        var depth: f32 = 0;
+        for (activations.items[0..ai_idx]) |prev| {
+            if (!std.mem.eql(u8, prev.actor, act.actor)) continue;
+            if (prev.start_row <= act.start_row and prev.end_row >= act.end_row) depth += 1;
+        }
+        const bar_x = cx - ACT_BAR_W / 2 + depth * (ACT_BAR_W + 2);
         const bar_y = FIRST_MSG_Y + @as(f32, @floatFromInt(act.start_row)) * ROW_H - ROW_H / 2;
         const bar_h = @as(f32, @floatFromInt(act.end_row - act.start_row)) * ROW_H + ROW_H / 2;
-        try svg.rect(cx - ACT_BAR_W / 2, bar_y, ACT_BAR_W, bar_h, 2.0,
+        try svg.rect(bar_x, bar_y, ACT_BAR_W, bar_h, 2.0,
             theme.actor_fill, theme.actor_stroke, 1.0);
     }
 
-    // 4. Actor boxes
+    // 4. Actor boxes / stickman figures + destroy X markers
     for (actors.items, 0..) |actor, i| {
         const lx = MARGIN_X + @as(f32, @floatFromInt(i)) * LANE_GAP;
         const line_bot = @as(f32, @floatFromInt(total_h)) - ACTOR_H - MARGIN_Y;
-        try drawActorBox(&svg, lx, ACTOR_TOP_Y, actor);
-        try drawActorBox(&svg, lx, line_bot, actor);
+        const is_stickman = actor_kinds.get(actor) orelse false;
+        if (is_stickman) {
+            try drawActorStickman(&svg, lx + ACTOR_W / 2, ACTOR_TOP_Y, actor);
+            try drawActorStickman(&svg, lx + ACTOR_W / 2, line_bot, actor);
+        } else {
+            try drawActorBox(&svg, lx, ACTOR_TOP_Y, actor);
+            try drawActorBox(&svg, lx, line_bot, actor);
+        }
+        // Destroy marker: X on the lifeline at the destroy row
+        if (destroys.get(actor)) |destroy_row| {
+            const dx = lx + ACTOR_W / 2;
+            const dy = FIRST_MSG_Y + @as(f32, @floatFromInt(destroy_row)) * ROW_H;
+            const hs: f32 = 8;
+            try svg.line(dx - hs, dy - hs, dx + hs, dy + hs, "#cc0000", 2.0);
+            try svg.line(dx + hs, dy - hs, dx - hs, dy + hs, "#cc0000", 2.0);
+        }
     }
 
     // 5. Notes (rounded rect boxes at their row positions)
@@ -395,18 +427,24 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const dir: f32 = if (tx > fx) 1.0 else -1.0;
             const arr: f32 = 8.0;
             var pts_buf: [128]u8 = undefined;
-            const pts = switch (msg.arrow_kind) {
-                .open => try std.fmt.bufPrint(&pts_buf,
-                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                    .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
-                .filled => try std.fmt.bufPrint(&pts_buf,
-                    "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                    .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
-                .cross => try std.fmt.bufPrint(&pts_buf,
-                    "{d:.1},{d:.1} {d:.1},{d:.1}",
-                    .{ tx - dir * arr, my - arr / 2, tx, my }),
-            };
-            try svg.polygon(pts, theme.signal_color, theme.signal_color, 1.0);
+            if (msg.arrow_kind == .point) {
+                // Point arrowhead: small filled circle at target
+                try svg.circle(tx, my, arr / 2, theme.signal_color, theme.signal_color, 0);
+            } else {
+                const pts = switch (msg.arrow_kind) {
+                    .open => try std.fmt.bufPrint(&pts_buf,
+                        "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                        .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
+                    .filled => try std.fmt.bufPrint(&pts_buf,
+                        "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                        .{ tx - dir * arr, my - arr / 2, tx, my, tx - dir * arr, my + arr / 2 }),
+                    .cross => try std.fmt.bufPrint(&pts_buf,
+                        "{d:.1},{d:.1} {d:.1},{d:.1}",
+                        .{ tx - dir * arr, my - arr / 2, tx, my }),
+                    .point => unreachable,
+                };
+                try svg.polygon(pts, theme.signal_color, theme.signal_color, 1.0);
+            }
             try svg.text((fx + tx) / 2, my - 6, display_text, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
@@ -418,6 +456,22 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 fn drawActorBox(svg: *SvgWriter, x: f32, y: f32, name: []const u8) !void {
     try svg.rect(x, y, ACTOR_W, ACTOR_H, 4.0, theme.actor_fill, theme.actor_stroke, 1.5);
     try svg.text(x + ACTOR_W / 2, y + ACTOR_H / 2 + 4, name, theme.text_color, theme.font_size, .middle, "normal");
+}
+
+fn drawActorStickman(svg: *SvgWriter, cx: f32, top_y: f32, name: []const u8) !void {
+    // Stickman: head circle, body line, arms, legs.  Total height = ACTOR_H.
+    const head_r: f32 = 8;
+    const body_top = top_y + head_r * 2;
+    const body_bot = top_y + ACTOR_H - 10;
+    const arm_y   = body_top + (body_bot - body_top) * 0.35;
+    const arm_span: f32 = 14;
+    const leg_span: f32 = 10;
+    try svg.circle(cx, top_y + head_r, head_r, theme.actor_fill, theme.actor_stroke, 1.5);
+    try svg.line(cx, body_top, cx, body_bot, theme.actor_stroke, 1.5);
+    try svg.line(cx - arm_span, arm_y, cx + arm_span, arm_y, theme.actor_stroke, 1.5);
+    try svg.line(cx, body_bot, cx - leg_span, top_y + ACTOR_H, theme.actor_stroke, 1.5);
+    try svg.line(cx, body_bot, cx + leg_span, top_y + ACTOR_H, theme.actor_stroke, 1.5);
+    try svg.text(cx, top_y + ACTOR_H + 12, name, theme.text_color, theme.font_size_small, .middle, "normal");
 }
 
 fn hasActor(actors: []const []const u8, name: []const u8) bool {
@@ -435,11 +489,12 @@ fn isDotted(signal_type: []const u8) bool {
     return n % 2 == 1;
 }
 
-const ArrowKind = enum { filled, open, cross };
+const ArrowKind = enum { filled, open, cross, point };
 
 fn arrowKind(signal_type: []const u8) ArrowKind {
     if (std.mem.indexOf(u8, signal_type, "CROSS") != null) return .cross;
     if (std.mem.indexOf(u8, signal_type, "OPEN") != null) return .open;
+    if (std.mem.indexOf(u8, signal_type, "POINT") != null) return .point;
     return .filled;
 }
 

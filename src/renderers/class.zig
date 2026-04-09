@@ -145,6 +145,37 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }.get;
 
+    // Draw namespace boundary boxes (behind everything)
+    for (node.getList("namespaces")) |nsv| {
+        const nsn = nsv.asNode() orelse continue;
+        const ns_name = nsn.getString("name") orelse continue;
+        const members = nsn.getList("members");
+        if (members.len == 0) continue;
+        // Find bounding box over all member classes
+        var min_col: usize = std.math.maxInt(usize);
+        var max_col: usize = 0;
+        var min_row: usize = std.math.maxInt(usize);
+        var max_row: usize = 0;
+        for (members) |mv| {
+            const mname = mv.asString() orelse continue;
+            const ci = classIndex(classes.items, mname) orelse continue;
+            const cl = classes.items[ci];
+            if (cl.col < min_col) min_col = cl.col;
+            if (cl.col > max_col) max_col = cl.col;
+            if (cl.row < min_row) min_row = cl.row;
+            if (cl.row > max_row) max_row = cl.row;
+        }
+        if (min_col == std.math.maxInt(usize)) continue;
+        const pad: f32 = 12;
+        const bx = classX(min_col) - pad;
+        const by = row_y[min_row] - pad;
+        const bw = classX(max_col) + CLASS_W - bx + pad;
+        const max_h = CLASS_HEADER_H + @as(f32, @floatFromInt(max_members_per_row[max_row])) * MEMBER_H + 10;
+        const bh = row_y[max_row] + max_h - by + pad;
+        try svg.rect(bx, by, bw, bh, 8.0, "#f0f4ff", "#8888cc", 1.5);
+        try svg.text(bx + 8, by + 14, ns_name, "#6666aa", theme.font_size_small, .start, "bold");
+    }
+
     // Draw relations first (behind boxes)
     for (relations.items) |rel| {
         const fi = classIndex(classes.items, rel.from) orelse continue;
@@ -244,6 +275,32 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 std.fmt.bufPrint(buf[256..], "{s}{s}", .{ vis, name_display }) catch m.name;
             try svg.text(bx + 8, my, label, theme.text_color, theme.font_size_small, .start, "normal");
         }
+    }
+
+    // Draw notes (yellow annotation boxes, right of target class or top-right corner)
+    const NOTE_W: f32 = 120;
+    const NOTE_H: f32 = 36;
+    for (node.getList("notes")) |nv| {
+        const nn = nv.asNode() orelse continue;
+        const text = nn.getString("text") orelse continue;
+        const target = nn.getString("target") orelse "";
+        var nx: f32 = @as(f32, @floatFromInt(total_w)) - NOTE_W - MARGIN;
+        var ny: f32 = MARGIN;
+        if (target.len > 0) {
+            if (classIndex(classes.items, target)) |ci| {
+                const cl = classes.items[ci];
+                nx = classX(cl.col) + CLASS_W + 12;
+                const ste_h: f32 = if (cl.stereotype.len > 0) MEMBER_H else 0;
+                const bh = CLASS_HEADER_H + ste_h + @as(f32, @floatFromInt(cl.members.len)) * MEMBER_H + 10;
+                ny = row_y[cl.row] + bh / 2 - NOTE_H / 2;
+                // Connector line from note to class right edge
+                try svg.dashedLine(classX(cl.col) + CLASS_W, row_y[cl.row] + bh / 2,
+                    nx, ny + NOTE_H / 2, "#aaaaaa", 1.0, "4,3");
+            }
+        }
+        try svg.rect(nx, ny, NOTE_W, NOTE_H, 4.0, "#fffde7", "#f0c040", 1.2);
+        try svg.text(nx + NOTE_W / 2, ny + NOTE_H / 2 + 4, text,
+            theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
     try svg.footer();

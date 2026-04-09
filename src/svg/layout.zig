@@ -35,6 +35,7 @@ pub const GraphNode = struct {
     stroke: ?[]const u8 = null,
     label_color: ?[]const u8 = null,
     font_weight: ?[]const u8 = null,
+    href: ?[]const u8 = null,
 };
 
 /// Mermaid flowchart node shapes.
@@ -43,12 +44,16 @@ pub const NodeShape = enum {
     round,
     diamond,
     circle,
+    double_circle,
     stadium,
     subroutine,
     cylinder,
     hexagon,
     ellipse,
     parallelogram,
+    parallelogram_alt,
+    trapezoid,
+    trapezoid_alt,
     asymmetric,
 };
 

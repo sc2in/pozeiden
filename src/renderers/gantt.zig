@@ -47,6 +47,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     const title = node.getString("title") orelse "gantt";
     const show_today = std.mem.eql(u8, node.getString("show_today") orelse "0", "1");
+    const excludes_weekends = std.mem.eql(u8, node.getString("excludes_weekends") orelse "0", "1");
     var tasks: std.ArrayList(Task) = .empty;
     var sections: std.ArrayList(Section) = .empty;
 
@@ -117,11 +118,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
-    // Grid lines (5 vertical divisions)
+    // Grid lines (5 vertical divisions) + optional weekend shading (2 of every 7 slots)
     const divisions: usize = 5;
     for (0..divisions + 1) |gi| {
         const gx = bar_x + BAR_AREA_W * @as(f32, @floatFromInt(gi)) / @as(f32, @floatFromInt(divisions));
         try svg.dashedLine(gx, bar_top, gx, bar_bot, "#ced4da", 1.0, "4,4");
+    }
+    if (excludes_weekends) {
+        // Shade 2/7 of each grid division to approximate weekend blocks
+        const slot_w = BAR_AREA_W / @as(f32, @floatFromInt(divisions));
+        const weekend_w = slot_w * 2.0 / 7.0;
+        for (0..divisions) |gi| {
+            const gx = bar_x + slot_w * @as(f32, @floatFromInt(gi)) + slot_w - weekend_w;
+            try svg.rect(gx, bar_top, weekend_w, bar_bot - bar_top, 0, "#eeeeee", "none", 0);
+        }
     }
 
     // Rows

@@ -308,6 +308,31 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
+    // Draw notes (sticky-note boxes anchored to the right or left of their target state)
+    for (node.getList("notes")) |nv| {
+        const nn = nv.asNode() orelse continue;
+        const state_id = nn.getString("state") orelse continue;
+        const text = nn.getString("text") orelse continue;
+        const position = nn.getString("position") orelse "right";
+        const si = stateIndex(states.items, state_id) orelse continue;
+        const s = states.items[si];
+        const sx = stateX(s.col);
+        const sy = stateY(s.depth);
+        const NOTE_W: f32 = 110;
+        const NOTE_H2: f32 = 32;
+        const nx: f32 = if (std.mem.eql(u8, position, "left"))
+            sx - STATE_W / 2 - NOTE_W - 12
+        else
+            sx + STATE_W / 2 + 12;
+        try svg.rect(nx, sy - NOTE_H2 / 2, NOTE_W, NOTE_H2, 4.0, "#fffde7", "#f0c040", 1.2);
+        // Connector line from note to state edge
+        const conn_x: f32 = if (std.mem.eql(u8, position, "left")) nx + NOTE_W else nx;
+        const state_edge_x: f32 = if (std.mem.eql(u8, position, "left"))
+            sx - STATE_W / 2 else sx + STATE_W / 2;
+        try svg.dashedLine(conn_x, sy, state_edge_x, sy, "#aaaaaa", 1.0, "4,3");
+        try svg.text(nx + NOTE_W / 2, sy + 5, text, theme.text_color, theme.font_size_small, .middle, "normal");
+    }
+
     try svg.footer();
     return svg.toOwnedSlice();
 }

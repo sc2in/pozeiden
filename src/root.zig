@@ -625,10 +625,28 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
                     const end = std.mem.lastIndexOfScalar(u8, s, ')') orelse s.len - 1;
                     return .{ id, s[i + 2 .. @min(end, s.len)], "cylinder" };
                 }
-                // Parallelogram: [/label/]
+                // Parallelogram [/label/] or trapezoid [/label\]
                 if (i + 1 < s.len and s[i + 1] == '/') {
-                    const end = std.mem.indexOf(u8, s[i..], "/]") orelse (s.len - i - 1);
+                    // trapezoid closes with \] ; parallelogram closes with /]
+                    const close_trap = std.mem.indexOf(u8, s[i..], "\\]");
+                    const close_para = std.mem.indexOf(u8, s[i..], "/]");
+                    if (close_trap != null and (close_para == null or close_trap.? < close_para.?)) {
+                        const end = close_trap.?;
+                        return .{ id, s[i + 2 .. @min(i + end, s.len)], "trapezoid" };
+                    }
+                    const end = close_para orelse (s.len - i - 1);
                     return .{ id, s[i + 2 .. @min(i + end, s.len)], "parallelogram" };
+                }
+                // Inverted parallelogram [\label\] or trapezoid-alt [\label/]
+                if (i + 1 < s.len and s[i + 1] == '\\') {
+                    const close_trap = std.mem.indexOf(u8, s[i..], "/]");
+                    const close_para = std.mem.indexOf(u8, s[i..], "\\]");
+                    if (close_trap != null and (close_para == null or close_trap.? < close_para.?)) {
+                        const end = close_trap.?;
+                        return .{ id, s[i + 2 .. @min(i + end, s.len)], "trapezoid_alt" };
+                    }
+                    const end = close_para orelse (s.len - i - 1);
+                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "parallelogram_alt" };
                 }
                 // Rect: [label]
                 const end = std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1;
@@ -636,6 +654,11 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
             },
             '(' => {
                 const id = s[0..i];
+                // Double-circle: (((label)))  — check before ((
+                if (i + 2 < s.len and s[i + 1] == '(' and s[i + 2] == '(') {
+                    const end = std.mem.indexOf(u8, s[i..], ")))") orelse (s.len - i - 1);
+                    return .{ id, s[i + 3 .. @min(i + end, s.len)], "double_circle" };
+                }
                 // Circle: ((label))
                 if (i + 1 < s.len and s[i + 1] == '(') {
                     const end = std.mem.indexOf(u8, s[i..], "))") orelse (s.len - i - 1);
@@ -717,6 +740,8 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     var node_styles = std.StringHashMap([]const u8).init(a);
     // edge index → style string (from "linkStyle N stroke:#xxx,stroke-width:2px")
     var link_styles = std.AutoHashMap(usize, []const u8).init(a);
+    // node_id → href URL (from "click A href \"url\"")
+    var node_hrefs = std.StringHashMap([]const u8).init(a);
 
     // Subgraph tracking
     const Subgraph = struct {
@@ -774,6 +799,16 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 const nid = std.mem.trim(u8, rest[0..sp], " \t");
                 const cstyle = std.mem.trim(u8, rest[sp + 1 ..], " \t");
                 if (nid.len > 0 and cstyle.len > 0) try node_styles.put(nid, cstyle);
+            }
+            continue;
+        }
+        // click A href "url"  (node hyperlink)
+        if (std.mem.startsWith(u8, line, "click ")) {
+            const rest = line[6..];
+            if (std.mem.indexOf(u8, rest, " href ")) |hp| {
+                const nid = std.mem.trim(u8, rest[0..hp], " \t");
+                const url_raw = std.mem.trim(u8, rest[hp + 6..], " \t\"");
+                if (nid.len > 0 and url_raw.len > 0) try node_hrefs.put(nid, url_raw);
             }
             continue;
         }
@@ -943,6 +978,10 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             if (flowchartParseProp(style, "color"))        |v| try nn.fields.put(a, "text_color",  Value{ .string = v });
             if (flowchartParseProp(style, "font-weight"))  |v| try nn.fields.put(a, "font_weight", Value{ .string = v });
         }
+        // Hyperlink from click directive
+        if (node_hrefs.get(nid)) |url| {
+            try nn.fields.put(a, "href", Value{ .string = url });
+        }
     }
 
     // Apply linkStyle overrides to edges by insertion index.
@@ -1005,9 +1044,14 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         }
 
         // participant/actor declaration
-        if (std.mem.startsWith(u8, line, "participant ") or std.mem.startsWith(u8, line, "actor ")) {
-            const rest = if (std.mem.startsWith(u8, line, "participant "))
-                line[12..] else line[6..];
+        const is_actor_kw = std.mem.startsWith(u8, line, "actor ");
+        const is_create_kw = std.mem.startsWith(u8, line, "create participant ") or
+                             std.mem.startsWith(u8, line, "create actor ");
+        if (std.mem.startsWith(u8, line, "participant ") or is_actor_kw or is_create_kw) {
+            const rest = if (std.mem.startsWith(u8, line, "participant ")) line[12..]
+                else if (is_create_kw and std.mem.startsWith(u8, line, "create participant ")) line[19..]
+                else if (is_create_kw and std.mem.startsWith(u8, line, "create actor ")) line[13..]
+                else line[6..];
             // Handle "Name as Alias"
             const name = if (std.mem.indexOf(u8, rest, " as ")) |ai|
                 std.mem.trim(u8, rest[0..ai], " \t")
@@ -1015,8 +1059,24 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                 std.mem.trim(u8, rest, " \t");
             if (seen_actors.get(name) == null) {
                 try seen_actors.put(name, {});
-                try participants_list.append(a, Value{ .string = name });
+                // Emit a Value.node with actor/name so the renderer can tell the kind
+                const is_actor_type = is_actor_kw or
+                    std.mem.startsWith(u8, line, "create actor ");
+                var pn = Value.Node{ .type_name = "participant", .fields = .{} };
+                try pn.fields.put(a, "actor", Value{ .string = name });
+                if (is_actor_type) try pn.fields.put(a, "is_actor", Value{ .string = "1" });
+                try participants_list.append(a, Value{ .node = pn });
             }
+            continue;
+        }
+        // destroy: marks the end of an actor's lifeline
+        if (std.mem.startsWith(u8, line, "destroy ")) {
+            const actor_name = std.mem.trim(u8, line[8..], " \t");
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "destroy" });
+            try sig.fields.put(a, "actor", Value{ .string = actor_name });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            try signals_list.append(a, Value{ .node = sig });
             continue;
         }
 
@@ -1315,6 +1375,14 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     };
 
     var current_class: ?[]const u8 = null; // inside a `class X {` block
+    var current_namespace: ?[]const u8 = null; // inside a `namespace Foo {` block
+    var namespace_depth: usize = 0; // brace nesting inside namespace
+    // namespace_name → list of class names
+    var namespace_map = std.StringArrayHashMap(std.ArrayList([]const u8)).init(a);
+    // class_name → namespace (for renderer lookup)
+    var class_namespace = std.StringHashMap([]const u8).init(a);
+    var class_notes: std.ArrayList(Value) = .empty;
+
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
@@ -1322,8 +1390,26 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
         if (first) { first = false; continue; } // skip "classDiagram"
 
-        // End of class block
-        if (std.mem.eql(u8, line, "}")) { current_class = null; continue; }
+        // namespace Foo { ... }
+        if (std.mem.startsWith(u8, line, "namespace ") and std.mem.indexOf(u8, line, "{") != null) {
+            const rest = std.mem.trim(u8, line[10..], " \t{");
+            current_namespace = rest;
+            namespace_depth = 1;
+            const entry = try namespace_map.getOrPut(rest);
+            if (!entry.found_existing) entry.value_ptr.* = .empty;
+            continue;
+        }
+
+        // End of class or namespace block
+        if (std.mem.eql(u8, line, "}")) {
+            if (current_class != null) { current_class = null; continue; }
+            if (current_namespace != null) {
+                if (namespace_depth > 0) namespace_depth -= 1;
+                if (namespace_depth == 0) current_namespace = null;
+                continue;
+            }
+            continue;
+        }
 
         // Start of class block: "class Foo {" or "class Foo <<interface>>"
         if (std.mem.startsWith(u8, line, "class ")) {
@@ -1338,6 +1424,14 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 if (std.mem.startsWith(u8, after, "<<") and std.mem.indexOf(u8, after, ">>") != null) {
                     const ste_end = (std.mem.indexOf(u8, after, ">>") orelse after.len - 2) + 2;
                     try entry.value_ptr.append(a, after[0..ste_end]);
+                }
+            }
+            // Track namespace membership
+            if (current_namespace) |ns| {
+                if (!class_namespace.contains(name)) {
+                    try class_namespace.put(name, ns);
+                    const ns_entry = namespace_map.getPtr(ns) orelse continue;
+                    try ns_entry.append(a, name);
                 }
             }
             if (std.mem.indexOf(u8, line, "{") != null) {
@@ -1371,6 +1465,30 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 try entry.append(a, member);
                 continue;
             }
+        }
+
+        // note "text" or note for ClassName "text"
+        if (std.mem.startsWith(u8, line, "note ")) {
+            const rest = std.mem.trim(u8, line[5..], " \t");
+            var target: []const u8 = "";
+            var note_text: []const u8 = "";
+            if (std.mem.startsWith(u8, rest, "for ")) {
+                const after_for = std.mem.trim(u8, rest[4..], " \t");
+                const sp = std.mem.indexOfScalar(u8, after_for, ' ') orelse after_for.len;
+                target = after_for[0..sp];
+                const txt_rest = std.mem.trim(u8, after_for[sp..], " \t\"");
+                note_text = txt_rest;
+            } else {
+                // note "text"
+                const q1 = std.mem.indexOfScalar(u8, rest, '"') orelse rest.len;
+                const q2 = if (q1 < rest.len) (std.mem.indexOfScalar(u8, rest[q1 + 1..], '"') orelse (rest.len - q1 - 1)) + q1 + 1 else rest.len;
+                note_text = if (q1 < rest.len) rest[q1 + 1..@min(q2, rest.len)] else rest;
+            }
+            var nn = Value.Node{ .type_name = "note", .fields = .{} };
+            try nn.fields.put(a, "text", Value{ .string = note_text });
+            try nn.fields.put(a, "target", Value{ .string = target });
+            try class_notes.append(a, Value{ .node = nn });
+            continue;
         }
 
         // Relationship line: detect pattern
@@ -1413,12 +1531,28 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
         var cn = Value.Node{ .type_name = "class", .fields = .{} };
         try cn.fields.put(a, "name", Value{ .string = entry.key_ptr.* });
         try cn.fields.put(a, "members", Value{ .list = try members_list.toOwnedSlice(a) });
+        if (class_namespace.get(entry.key_ptr.*)) |ns|
+            try cn.fields.put(a, "namespace", Value{ .string = ns });
         try class_list.append(a, Value{ .node = cn });
+    }
+
+    // Build namespace boundary list
+    var ns_list: std.ArrayList(Value) = .empty;
+    var ns_it = namespace_map.iterator();
+    while (ns_it.next()) |entry| {
+        var member_vals: std.ArrayList(Value) = .empty;
+        for (entry.value_ptr.items) |m| try member_vals.append(a, Value{ .string = m });
+        var nsn = Value.Node{ .type_name = "namespace", .fields = .{} };
+        try nsn.fields.put(a, "name", Value{ .string = entry.key_ptr.* });
+        try nsn.fields.put(a, "members", Value{ .list = try member_vals.toOwnedSlice(a) });
+        try ns_list.append(a, Value{ .node = nsn });
     }
 
     var root = Value.Node{ .type_name = "classDiagram", .fields = .{} };
     try root.fields.put(a, "classes", Value{ .list = try class_list.toOwnedSlice(a) });
     try root.fields.put(a, "relations", Value{ .list = try relations.toOwnedSlice(a) });
+    try root.fields.put(a, "namespaces", Value{ .list = try ns_list.toOwnedSlice(a) });
+    try root.fields.put(a, "notes", Value{ .list = try class_notes.toOwnedSlice(a) });
     return class_renderer.render(allocator, Value{ .node = root });
 }
 
@@ -1431,6 +1565,7 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
 
     var states: std.ArrayList(Value) = .empty;
     var transitions: std.ArrayList(Value) = .empty;
+    var notes_list: std.ArrayList(Value) = .empty;
     var seen = std.StringHashMap(void).init(a);
 
     const addState = struct {
@@ -1485,8 +1620,31 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
 
         // Skip compound state opens/closes
         if (std.mem.eql(u8, line, "}") or std.mem.indexOf(u8, line, "{") != null) continue;
-        // Skip note lines
-        if (std.mem.startsWith(u8, line, "note")) continue;
+        // Concurrent state separator (---): rendered as visual divider; treated as no-op in flat parser
+        if (std.mem.eql(u8, line, "---")) continue;
+        // note right of StateId: text  /  note left of StateId: text
+        if (std.mem.startsWith(u8, line, "note ")) {
+            const rest = line[5..];
+            const colon = std.mem.indexOfScalar(u8, rest, ':') orelse rest.len;
+            const pos_part = std.mem.trim(u8, rest[0..colon], " \t");
+            const note_text = if (colon < rest.len) std.mem.trim(u8, rest[colon + 1..], " \t") else "";
+            var state_id: []const u8 = "";
+            var position: []const u8 = "right";
+            if (std.mem.startsWith(u8, pos_part, "right of ")) {
+                state_id = std.mem.trim(u8, pos_part[9..], " \t");
+            } else if (std.mem.startsWith(u8, pos_part, "left of ")) {
+                state_id = std.mem.trim(u8, pos_part[8..], " \t");
+                position = "left";
+            }
+            if (state_id.len > 0 and note_text.len > 0) {
+                var nn = Value.Node{ .type_name = "note", .fields = .{} };
+                try nn.fields.put(a, "state", Value{ .string = state_id });
+                try nn.fields.put(a, "text", Value{ .string = note_text });
+                try nn.fields.put(a, "position", Value{ .string = position });
+                try notes_list.append(a, Value{ .node = nn });
+            }
+            continue;
+        }
 
         // Transition: `A --> B` or `A --> B : label`
         if (std.mem.indexOf(u8, line, "-->")) |arrow_pos| {
@@ -1516,6 +1674,7 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var root = Value.Node{ .type_name = "stateDiagram", .fields = .{} };
     try root.fields.put(a, "states", Value{ .list = try states.toOwnedSlice(a) });
     try root.fields.put(a, "transitions", Value{ .list = try transitions.toOwnedSlice(a) });
+    try root.fields.put(a, "notes", Value{ .list = try notes_list.toOwnedSlice(a) });
     return state_renderer.render(allocator, Value{ .node = root });
 }
 
@@ -1649,6 +1808,7 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var cur_section_label: []const u8 = "Tasks";
     var cur_tasks: std.ArrayList(Value) = .empty;
     var show_today: bool = false;
+    var excludes_weekends: bool = false;
 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
@@ -1661,9 +1821,18 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             title = std.mem.trim(u8, line[6..], " \t");
             continue;
         }
+        if (std.mem.startsWith(u8, line, "excludes")) {
+            const rest2 = std.mem.trim(u8, line[8..], " \t");
+            if (std.mem.indexOf(u8, rest2, "weekends") != null or
+                std.mem.indexOf(u8, rest2, "saturday") != null or
+                std.mem.indexOf(u8, rest2, "sunday") != null)
+            {
+                excludes_weekends = true;
+            }
+            continue;
+        }
         if (std.mem.startsWith(u8, line, "dateFormat") or
             std.mem.startsWith(u8, line, "axisFormat") or
-            std.mem.startsWith(u8, line, "excludes") or
             std.mem.startsWith(u8, line, "tickInterval"))
         {
             continue; // skip format directives
@@ -1733,6 +1902,7 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     try root.fields.put(a, "title", Value{ .string = title });
     try root.fields.put(a, "sections", Value{ .list = try sections.toOwnedSlice(a) });
     try root.fields.put(a, "show_today", Value{ .string = if (show_today) "1" else "0" });
+    try root.fields.put(a, "excludes_weekends", Value{ .string = if (excludes_weekends) "1" else "0" });
     return gantt_renderer.render(allocator, Value{ .node = root });
 }
 
@@ -2040,6 +2210,14 @@ fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
         } else if (std.mem.startsWith(u8, sc, "{{") and std.mem.endsWith(u8, sc, "}}")) {
             label = sc[2..sc.len - 2];
             shape = "hexagon";
+        } else if (std.mem.startsWith(u8, sc, "))") and std.mem.endsWith(u8, sc, "((")) {
+            // Bang/starburst: ))label((
+            label = sc[2..sc.len - 2];
+            shape = "bang";
+        } else if (std.mem.startsWith(u8, sc, ")") and std.mem.endsWith(u8, sc, "(")) {
+            // Cloud: )label(
+            label = sc[1..sc.len - 1];
+            shape = "cloud";
         } else if (std.mem.startsWith(u8, sc, "[") and std.mem.endsWith(u8, sc, "]")) {
             label = sc[1..sc.len - 1];
             shape = "rect";

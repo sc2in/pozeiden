@@ -13,7 +13,7 @@ const NODE_W: f32 = 88;
 const NODE_H: f32 = 28;
 const MARGIN: f32 = 60;
 
-const MmShape = enum { circle, rect, rounded, hexagon, ellipse };
+const MmShape = enum { circle, rect, rounded, hexagon, ellipse, cloud, bang };
 
 const MmNode = struct {
     label: []const u8,
@@ -273,6 +273,47 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
             try svg.path(d, fill, stroke, 1.5, "");
             try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
         },
+        .cloud => {
+            // Cloud: rounded rect with wavy top via multiple small arcs
+            const rw = NODE_W / 2 + 4;
+            const rh = NODE_H / 2 + 6;
+            var path_buf: [512]u8 = undefined;
+            const d = try std.fmt.bufPrint(&path_buf,
+                "M {d:.1},{d:.1} " ++
+                "A 12,12 0 0 1 {d:.1},{d:.1} A 10,10 0 0 1 {d:.1},{d:.1} " ++
+                "A 12,12 0 0 1 {d:.1},{d:.1} A 14,14 0 0 1 {d:.1},{d:.1} " ++
+                "L {d:.1},{d:.1} Z",
+                .{
+                    x - rw + 10, y - rh / 2 + 4,
+                    x - rw / 4,  y - rh,
+                    x + rw / 4,  y - rh,
+                    x + rw - 10, y - rh / 2 + 4,
+                    x + rw,      y + rh / 2,
+                    x - rw,      y + rh / 2,
+                });
+            try svg.path(d, fill, stroke, 1.5, "");
+            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+        },
+        .bang => {
+            // Bang/starburst: 8-point star polygon
+            const or_: f32 = NODE_W / 2 + 4;
+            const ir_: f32 = NODE_H / 2;
+            var pts_buf: [512]u8 = undefined;
+            var fbs = std.io.fixedBufferStream(&pts_buf);
+            const wr = fbs.writer();
+            const n_pts: usize = 8;
+            var pi_: usize = 0;
+            while (pi_ < n_pts * 2) : (pi_ += 1) {
+                const angle = std.math.pi * @as(f32, @floatFromInt(pi_)) / @as(f32, @floatFromInt(n_pts));
+                const r = if (pi_ % 2 == 0) or_ else ir_;
+                const px = x + r * @cos(angle - std.math.pi / 2.0);
+                const py = y + r * @sin(angle - std.math.pi / 2.0);
+                if (pi_ > 0) try wr.writeByte(' ');
+                try wr.print("{d:.1},{d:.1}", .{ px, py });
+            }
+            try svg.polygon(fbs.getWritten(), fill, stroke, 1.5);
+            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+        },
     }
 }
 
@@ -281,6 +322,8 @@ fn parseShape(s: []const u8) MmShape {
     if (std.mem.eql(u8, s, "rect")) return .rect;
     if (std.mem.eql(u8, s, "rounded")) return .rounded;
     if (std.mem.eql(u8, s, "hexagon")) return .hexagon;
+    if (std.mem.eql(u8, s, "cloud")) return .cloud;
+    if (std.mem.eql(u8, s, "bang")) return .bang;
     return .ellipse;
 }
 

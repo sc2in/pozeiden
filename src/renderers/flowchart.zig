@@ -41,6 +41,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             .stroke = nn.getString("stroke"),
             .label_color = nn.getString("text_color"),
             .font_weight = nn.getString("font_weight"),
+            .href = nn.getString("href"),
         });
     }
 
@@ -416,9 +417,18 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
-    // Draw nodes
+    // Draw nodes (wrapped in <a> if a click href was specified)
     for (graph.nodes) |n| {
-        try drawNode(&svg, n);
+        if (n.href) |url| {
+            var link_buf: [512]u8 = undefined;
+            const open_tag = try std.fmt.bufPrint(&link_buf,
+                "<a href=\"{s}\" target=\"_blank\">", .{url});
+            try svg.raw(open_tag);
+            try drawNode(&svg, n);
+            try svg.raw("</a>\n");
+        } else {
+            try drawNode(&svg, n);
+        }
     }
 
     try svg.footer();
@@ -485,12 +495,40 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
             try svg.line(x + inset, y, x + inset, y + h, nstroke, theme.node_stroke_width);
             try svg.line(x + w - inset, y, x + w - inset, y + h, nstroke, theme.node_stroke_width);
         },
+        .double_circle => {
+            try svg.circle(cx, cy, h / 2, nfill, nstroke, theme.node_stroke_width);
+            try svg.circle(cx, cy, h / 2 - 3, "none", nstroke, theme.node_stroke_width);
+        },
         .parallelogram => {
             const slant: f32 = h * 0.3;
             var pts_buf: [256]u8 = undefined;
             const pts = try std.fmt.bufPrint(&pts_buf,
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ x + slant, y, x + w, y, x + w - slant, y + h, x, y + h });
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
+        },
+        .parallelogram_alt => {
+            const slant: f32 = h * 0.3;
+            var pts_buf: [256]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ x, y, x + w - slant, y, x + w, y + h, x + slant, y + h });
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
+        },
+        .trapezoid => {
+            const slant: f32 = h * 0.3;
+            var pts_buf: [256]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ x + slant, y, x + w - slant, y, x + w, y + h, x, y + h });
+            try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
+        },
+        .trapezoid_alt => {
+            const slant: f32 = h * 0.3;
+            var pts_buf: [256]u8 = undefined;
+            const pts = try std.fmt.bufPrint(&pts_buf,
+                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
+                .{ x, y, x + w, y, x + w - slant, y + h, x + slant, y + h });
             try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .asymmetric => {
@@ -544,6 +582,10 @@ fn parseShape(s: []const u8) layout.NodeShape {
     if (std.mem.eql(u8, s, "hexagon")) return .hexagon;
     if (std.mem.eql(u8, s, "ellipse")) return .ellipse;
     if (std.mem.eql(u8, s, "parallelogram")) return .parallelogram;
+    if (std.mem.eql(u8, s, "parallelogram_alt")) return .parallelogram_alt;
+    if (std.mem.eql(u8, s, "trapezoid")) return .trapezoid;
+    if (std.mem.eql(u8, s, "trapezoid_alt")) return .trapezoid_alt;
+    if (std.mem.eql(u8, s, "double_circle")) return .double_circle;
     if (std.mem.eql(u8, s, "asymmetric")) return .asymmetric;
     return .rect;
 }
