@@ -1,23 +1,80 @@
 requirementDiagram
-    requirement auth_req {
-        id: 1
-        text: "Users must authenticate"
+
+    requirement sys_req {
+        id: SYS-001
+        text: "The system shall support 10,000 concurrent users"
         risk: high
         verifyMethod: test
     }
-    requirement perf_req {
-        id: 2
-        text: "Response under 200ms"
+
+    functionalRequirement auth_req {
+        id: FUNC-001
+        text: "Users must authenticate via OAuth2 or username/password"
+        risk: high
+        verifyMethod: test
+    }
+
+    functionalRequirement data_req {
+        id: FUNC-002
+        text: "All user data must be encrypted at rest and in transit"
+        risk: high
+        verifyMethod: inspection
+    }
+
+    performanceRequirement perf_req {
+        id: PERF-001
+        text: "API p99 latency must remain below 200ms under peak load"
         risk: medium
         verifyMethod: analysis
     }
+
+    performanceRequirement avail_req {
+        id: PERF-002
+        text: "System availability must be at least 99.9% per calendar month"
+        risk: high
+        verifyMethod: analysis
+    }
+
+    interfaceRequirement api_req {
+        id: INTF-001
+        text: "Public API must conform to OpenAPI 3.1 specification"
+        risk: low
+        verifyMethod: inspection
+    }
+
+    designConstraint cloud_req {
+        id: DC-001
+        text: "All infrastructure must be deployable to AWS or GCP"
+        risk: medium
+        verifyMethod: demonstration
+    }
+
     element auth_service {
         type: software
-        docRef: /docs/auth
+        docRef: /docs/services/auth
     }
+
+    element api_gateway {
+        type: software
+        docRef: /docs/services/gateway
+    }
+
     element load_balancer {
         type: hardware
+        docRef: /docs/infra/lb
     }
+
+    element encryption_module {
+        type: software
+        docRef: /docs/security/encryption
+    }
+
     auth_service - satisfies -> auth_req
-    load_balancer - satisfies -> perf_req
-    auth_service - refines -> perf_req
+    auth_service - refines -> sys_req
+    api_gateway - satisfies -> api_req
+    api_gateway - satisfies -> perf_req
+    load_balancer - satisfies -> avail_req
+    load_balancer - satisfies -> sys_req
+    encryption_module - satisfies -> data_req
+    api_gateway - refines -> perf_req
+    auth_service - traces -> cloud_req

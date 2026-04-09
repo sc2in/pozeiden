@@ -1,10 +1,35 @@
 block-beta
-    columns 3
-    A["Frontend"] B["API Gateway"] C["Auth Service"]
-    D["User DB"] E["Cache"] F["Email Service"]
-    A --> B
-    B --> C
-    B --> D
-    B --> E
-    C --> D
-    B --> F
+    columns 4
+
+    Internet(["🌐 Internet"]):1 space LB["Load Balancer"]:1 space
+
+    subgraph API["API Tier"]
+        API1["API Server 1"]:1 API2["API Server 2"]:1
+    end
+
+    subgraph Cache["Cache Tier"]
+        R1["Redis Primary"]:1 R2["Redis Replica"]:1
+    end
+
+    subgraph DB["Database Tier"]
+        PG["Postgres Primary"]:2 PGR["Postgres Replica"]:2
+    end
+
+    subgraph Jobs["Background Jobs"]
+        W1["Worker 1"]:1 W2["Worker 2"]:1 Q["Job Queue"]:2
+    end
+
+    Internet --> LB
+    LB --> API1
+    LB --> API2
+    API1 --> R1
+    API2 --> R1
+    R1 --> R2
+    API1 --> PG
+    API2 --> PG
+    PG --> PGR
+    API1 --> Q
+    Q --> W1
+    Q --> W2
+    W1 --> PG
+    W2 --> PG

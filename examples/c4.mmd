@@ -1,17 +1,40 @@
-C4Context
-  title System Context for Online Shop
-  Person(customer, "Customer", "A shopper browsing and buying products")
-  Person(admin, "Admin", "Manages inventory and orders")
-  Enterprise_Boundary(b0, "Online Shop") {
-    System(webapp, "Web Application", "Serves the storefront and checkout")
-    System(orderSvc, "Order Service", "Processes and tracks orders")
-    SystemDb(db, "Product DB", "Stores product and order data")
-  }
-  System_Ext(payment, "Payment Gateway", "Handles card payments")
-  System_Ext(email, "Email System", "Sends order confirmations")
-  Rel(customer, webapp, "Browses and orders")
-  Rel(admin, webapp, "Manages catalogue")
-  Rel(webapp, orderSvc, "Places orders", "REST")
-  Rel(orderSvc, db, "Reads/writes", "SQL")
-  Rel(orderSvc, payment, "Charges card", "HTTPS")
-  Rel(orderSvc, email, "Sends confirmation", "SMTP")
+C4Container
+    title Container Diagram — Multi-Tenant SaaS Platform
+
+    Person(dev, "Developer", "Builds and deploys applications via the platform")
+    Person(enduser, "End User", "Uses applications deployed on the platform")
+    Person(ops, "Platform Operator", "Monitors and manages the platform")
+
+    Enterprise_Boundary(platform, "SaaS Platform") {
+        Container(portal, "Developer Portal", "React SPA", "Self-service UI for app management, billing, and logs")
+        Container(api_gw, "API Gateway", "Kong / Envoy", "Routes requests, enforces rate limits and auth")
+        Container(iam, "Identity Service", "Go + gRPC", "OAuth2/OIDC, tenant isolation, RBAC")
+        Container(build_svc, "Build Service", "Go", "Pulls source, runs Docker builds, pushes to registry")
+        Container(deploy_svc, "Deploy Service", "Go + Kubernetes client", "Manages Kubernetes workloads per tenant")
+        Container(log_svc, "Logging Service", "Vector + Loki", "Aggregates and queries structured logs")
+        Container(metric_svc, "Metrics Service", "Prometheus + Thanos", "Collects and stores long-term metrics")
+        ContainerDb(tenant_db, "Tenant Database", "PostgreSQL (RDS)", "Tenant metadata, billing records, configs")
+        ContainerDb(artifact_store, "Artifact Store", "S3", "Docker images, build caches, deployment manifests")
+        ContainerQueue(event_bus, "Event Bus", "Kafka", "Async events between platform services")
+    }
+
+    System_Ext(github, "GitHub / GitLab", "Source code hosting and webhooks")
+    System_Ext(stripe, "Stripe", "Subscription billing and invoicing")
+    System_Ext(pagerduty, "PagerDuty", "On-call alerting and incident management")
+    System_Ext(registry, "Container Registry", "GHCR / ECR — stores tenant images")
+
+    Rel(dev, portal, "Manages apps, views logs", "HTTPS")
+    Rel(enduser, api_gw, "Calls tenant APIs", "HTTPS")
+    Rel(ops, metric_svc, "Views dashboards", "HTTPS")
+    Rel(portal, api_gw, "API calls", "HTTPS/JSON")
+    Rel(api_gw, iam, "Validates tokens", "gRPC")
+    Rel(api_gw, deploy_svc, "Routes app traffic", "HTTP")
+    Rel(iam, tenant_db, "Reads/writes tenant data", "SQL")
+    Rel(build_svc, github, "Clones repo on push", "HTTPS")
+    Rel(build_svc, artifact_store, "Stores images", "S3 API")
+    Rel(build_svc, registry, "Pushes Docker images", "HTTPS")
+    Rel(deploy_svc, artifact_store, "Reads manifests", "S3 API")
+    Rel(deploy_svc, event_bus, "Publishes deploy events", "Kafka")
+    Rel(log_svc, event_bus, "Consumes log events", "Kafka")
+    Rel(metric_svc, pagerduty, "Fires alerts", "HTTPS")
+    Rel(portal, stripe, "Manages subscriptions", "HTTPS")

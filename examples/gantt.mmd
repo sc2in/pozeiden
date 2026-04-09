@@ -1,13 +1,42 @@
 gantt
-    title Project Timeline
+    title E-Commerce Platform Launch
     dateFormat YYYY-MM-DD
+    axisFormat %b %d
+    tickInterval 1week
+    excludes weekends
     todayMarker
+
+    section Discovery
+        Stakeholder interviews    : done, disc1, 2024-01-08, 5d
+        Competitive analysis      : done, disc2, after disc1, 3d
+        Requirements doc          : done, disc3, after disc2, 4d
+
     section Design
-        Research        : done, 3d
-        Wireframes      : done, 2d
-    section Development
-        Backend         : crit, 5d
-        Frontend        : 4d
-    section Testing
-        QA              : 3d
-        Bug fixes       : 2d
+        UX research               : done, des1, after disc3, 5d
+        Wireframes                : done, des2, after des1, 5d
+        Visual design             : active, des3, after des2, 7d
+        Design review             : crit, des4, after des3, 2d
+
+    section Backend
+        Database schema           : crit, done, be1, 2024-01-29, 3d
+        Auth service              : crit, done, be2, after be1, 5d
+        Product API               : crit, be3, after be2, 7d
+        Order service             : crit, be4, after be3, 6d
+        Payment integration       : crit, be5, after be4, 5d
+
+    section Frontend
+        Component library         : fe1, after des2, 5d
+        Product pages             : fe2, after fe1, 5d
+        Cart and checkout         : crit, fe3, after fe2, 6d
+        Admin dashboard           : fe4, after fe3, 5d
+
+    section QA
+        Integration tests         : qa1, after be5, 5d
+        E2E tests                 : qa2, after fe4, 5d
+        Performance testing       : crit, qa3, after qa1, 3d
+        Security audit            : crit, qa4, after qa3, 4d
+
+    section Launch
+        Staging deploy            : mile, m1, after qa4, 0d
+        Beta period               : m2, after m1, 7d
+        Production launch         : crit, mile, m3, after m2, 0d

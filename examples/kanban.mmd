@@ -1,13 +1,32 @@
 kanban
-todo
-    id1["Design API"]
-    id2["Write tests"]
-    id3["Update docs"]
-in-progress
-    id4["Implement auth"]
-    id5["Fix login bug"]
-review
-    id6["Code review PR #42"]
-done
-    id7["Deploy v1.0"]
-    id8["Setup CI pipeline"]
+    title Platform Engineering Sprint 14
+
+    backlog
+        be112["Implement distributed tracing with OpenTelemetry"]
+        be118["Upgrade Kubernetes cluster to 1.29"]
+        fe089["Add dark mode theme support"]
+        be120["Write runbook for incident P1 response"]
+
+    todo
+        be101["Refactor auth middleware to use OIDC"]@{ priority: 'Very High' }
+        be105["Add audit logging to all write endpoints"]@{ priority: 'High' }
+        fe078["Build admin user management UI"]@{ priority: 'High' }
+        be109["Migrate cron jobs to Kubernetes CronJob resources"]
+        qa044["Write E2E tests for checkout flow"]@{ priority: 'High' }
+
+    in-progress
+        be098["Integrate Stripe webhook handler"]@{ assigned: 'alice' }
+        fe071["Implement real-time notification badge"]@{ assigned: 'bob' }
+        be103["Performance tune PostgreSQL query planner"]@{ assigned: 'carol', priority: 'Very High' }
+
+    review
+        be095["Add Redis caching layer to product API"]@{ assigned: 'alice' }
+        fe068["Redesign dashboard layout for mobile"]@{ assigned: 'dave' }
+        ops031["Terraform module for VPC peering"]@{ assigned: 'carol' }
+
+    done
+        be091["Deploy Kafka event bus to staging"]
+        be093["Write OpenAPI spec for v2 endpoints"]
+        fe062["Add CSV export to analytics page"]
+        ops028["Set up Grafana alerting for SLO burn rate"]
+        qa040["Automate regression suite in CI"]

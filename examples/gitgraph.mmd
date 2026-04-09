@@ -1,9 +1,29 @@
-gitGraph
-    commit
+gitGraph LR:
+    commit id: "initial" tag: "v0.1.0"
     branch develop
     checkout develop
-    commit
-    commit
+    commit id: "add auth module"
+    commit id: "add user model"
+    branch feature/payments
+    checkout feature/payments
+    commit id: "stripe integration"
+    commit id: "webhook handler"
+    commit id: "payment tests" type: HIGHLIGHT
+    checkout develop
+    merge feature/payments id: "merge payments" tag: "payments-ready"
+    branch feature/search
+    checkout feature/search
+    commit id: "elasticsearch setup"
+    commit id: "search API"
+    checkout develop
+    commit id: "hotfix: null check"
+    merge feature/search
     checkout main
-    merge develop
-    commit
+    merge develop id: "release" tag: "v1.0.0" type: HIGHLIGHT
+    branch hotfix/login
+    checkout hotfix/login
+    commit id: "fix login race" type: REVERSE
+    checkout main
+    merge hotfix/login tag: "v1.0.1"
+    checkout develop
+    merge main

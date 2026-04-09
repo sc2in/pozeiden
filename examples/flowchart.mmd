@@ -1,8 +1,35 @@
 flowchart TD
-    A([Start]) --> B{Decision}
-    B -->|Yes| C[Process]
-    B -->|No| D[(Database)]
-    C -- update --> D
-    D --> E{{Config}}
-    E --> F[[Subroutine]]
-    F -.-> G((Done))
+    classDef critical fill:#ff6b6b,stroke:#c0392b,color:#fff,font-weight:bold
+    classDef success fill:#2ecc71,stroke:#27ae60,color:#fff
+    classDef warning fill:#f39c12,stroke:#e67e22,color:#fff
+    classDef info fill:#3498db,stroke:#2980b9,color:#fff
+
+    subgraph Input["Input Layer"]
+        direction LR
+        A([Start]) --> B{Valid Request?}
+        B -->|No| ERR[/Error Response/]
+        ERR -.->|retry| A
+    end
+
+    subgraph Process["Processing Layer"]
+        direction TB
+        C[(Load from DB)] --> D[[Enrich Data]]
+        D --> E{{Cache hit?}}
+        E -->|Yes| FAST[/Return cached/]
+        E -->|No| SLOW[Heavy Process]
+        SLOW --> F[(Write to DB)]
+    end
+
+    subgraph Output["Output Layer"]
+        G[Format Response] --> H>Publish to Queue]
+        H --> I((Done))
+    end
+
+    B -->|Yes| C
+    F --> G
+    FAST --> G
+
+    class A,I success
+    class ERR critical
+    class E,B warning
+    class C,F,D info

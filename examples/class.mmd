@@ -1,20 +1,64 @@
 classDiagram
-    class Animal <<abstract>> {
-        +String name
-        +makeSound() String
+    direction TB
+    namespace Core {
+        class Entity {
+            <<abstract>>
+            +UUID id
+            +DateTime createdAt
+            +DateTime updatedAt
+            +equals(other Entity) bool
+            +hashCode() int
+        }
+        class Repository~T~ {
+            <<interface>>
+            +findById(id UUID) T?
+            +findAll() List~T~
+            +save(entity T) T
+            +delete(id UUID) void
+        }
     }
-    class Duck {
-        +swim() void
-        +quack() String
+    namespace Domain {
+        class User {
+            +String email
+            +String passwordHash
+            -String salt
+            +Role role
+            +activate() void
+            +deactivate() void
+            +checkPassword(raw String) bool
+        }
+        class Order {
+            +OrderStatus status
+            +Money total
+            +List~LineItem~ items
+            +place() void
+            +cancel() void
+            +addItem(item LineItem) void
+        }
+        class LineItem {
+            +Product product
+            +int quantity
+            +Money price
+            +subtotal() Money
+        }
+        class Product {
+            +String name
+            +Money price
+            +int stock
+        }
     }
-    class Fish {
-        +depth int
+    class Role {
+        <<enumeration>>
+        ADMIN
+        USER
+        GUEST
     }
-    class Collection~T~ {
-        +items List~T~
-        +add(item T) void
-    }
-    Animal <|-- Duck
-    Animal <|-- Fish
-    Duck --> Fish : chases
-    Collection~Duck~ o-- Duck
+
+    Entity <|-- User
+    Entity <|-- Order
+    Entity <|-- Product
+    Repository~User~ <|.. UserRepository
+    Order "1" *-- "1..*" LineItem : contains
+    LineItem "many" --> "1" Product : references
+    User "1" --> "0..*" Order : places
+    User --> Role : has

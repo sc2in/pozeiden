@@ -1,18 +1,40 @@
 stateDiagram-v2
-    [*] --> Idle
-    Idle --> Running : start
-    Running --> Idle : stop
-    Running --> Error : fail
-    Error --> Idle : reset
-    state fork1 <<fork>>
-    state join1 <<join>>
-    state choice1 <<choice>>
-    Running --> fork1
-    fork1 --> Logging
-    fork1 --> Metrics
-    Logging --> join1
-    Metrics --> join1
-    join1 --> Done
-    Done --> choice1
-    choice1 --> Idle : retry
-    choice1 --> [*] : exit
+    direction TB
+    [*] --> Idle : power on
+
+    state Idle {
+        [*] --> Standby
+        Standby --> Ready : wake
+        Ready --> Standby : sleep
+    }
+
+    Idle --> Authenticating : login attempt
+
+    state Authenticating {
+        [*] --> CheckingCredentials
+        CheckingCredentials --> MFA : credentials ok
+        CheckingCredentials --> Failed : bad password
+        MFA --> Failed : bad code
+        MFA --> [*] : code ok
+        Failed --> [*]
+    }
+
+    Authenticating --> Active : success
+    Authenticating --> Locked : too many failures
+
+    state Active {
+        [*] --> Browsing
+        state fork_dl <<fork>>
+        state join_dl <<join>>
+        Browsing --> fork_dl : start download
+        fork_dl --> Downloading
+        fork_dl --> Logging
+        Downloading --> join_dl
+        Logging --> join_dl
+        join_dl --> Browsing : complete
+    }
+
+    Active --> Idle : logout
+    Locked --> Idle : admin unlock
+    Active --> [*] : power off
+    note right of Locked : Account locked\nafter 5 failures

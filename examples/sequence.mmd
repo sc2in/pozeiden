@@ -1,15 +1,36 @@
 sequenceDiagram
     autonumber
-    participant Alice
-    participant Bob
-    participant Server
-    Alice->>Bob: request
-    activate Bob
-    Note right of Bob: processing
-    Bob->>Server: forward
-    activate Server
-    Server-->>Bob: data
-    deactivate Server
-    Bob-->>Alice: response
-    deactivate Bob
-    Note over Alice,Bob: done
+    box rgb(200,220,255) Client Side
+        actor User
+        participant Browser
+    end
+    box rgb(220,255,220) Server Side
+        participant API
+        participant Auth
+        participant DB
+    end
+    participant EmailSvc as Email Service
+
+    User->>Browser: Submit login form
+    activate Browser
+    Browser->>+API: POST /auth/login
+    API->>+Auth: validate(credentials)
+    Auth->>+DB: SELECT user WHERE email=?
+    DB-->>-Auth: user record
+    alt Invalid credentials
+        Auth-->>API: 401 Unauthorized
+        API-->>Browser: 401 error
+        Browser-->>User: Show error message
+    else Valid credentials
+        Auth-->>-API: JWT token
+        API-)EmailSvc: Send login alert (async)
+        Note right of EmailSvc: fire-and-forget
+        API-->>-Browser: 200 + Set-Cookie
+        deactivate Browser
+        User->>Browser: Navigate to dashboard
+        loop Poll for notifications
+            Browser->>API: GET /notifications
+            API-->>Browser: []
+        end
+    end
+    Note over User,DB: Full auth flow complete

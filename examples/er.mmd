@@ -1,11 +1,67 @@
 erDiagram
-    CUSTOMER ||--o{ ORDER : "places"
-    ORDER ||--|{ LINE-ITEM : "contains"
     CUSTOMER {
-        string name PK
-        string email
+        uuid id PK
+        string email UK
+        string first_name
+        string last_name
+        string phone
+        timestamp created_at
+    }
+    ADDRESS {
+        uuid id PK
+        uuid customer_id FK
+        string street
+        string city
+        string country
+        string postal_code
+        boolean is_default
     }
     ORDER {
-        int orderNumber PK
+        uuid id PK
+        uuid customer_id FK
+        uuid address_id FK
         string status
+        decimal total_amount
+        timestamp placed_at
+        timestamp shipped_at
     }
+    ORDER_ITEM {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        int quantity
+        decimal unit_price
+    }
+    PRODUCT {
+        uuid id PK
+        uuid category_id FK
+        string sku UK
+        string name
+        text description
+        decimal price
+        int stock_quantity
+    }
+    CATEGORY {
+        uuid id PK
+        uuid parent_id FK
+        string name
+        string slug UK
+    }
+    REVIEW {
+        uuid id PK
+        uuid customer_id FK
+        uuid product_id FK
+        int rating
+        text body
+        timestamp posted_at
+    }
+
+    CUSTOMER ||--o{ ADDRESS : "has"
+    CUSTOMER ||--o{ ORDER : "places"
+    CUSTOMER ||--o{ REVIEW : "writes"
+    ORDER }o--|| ADDRESS : "ships to"
+    ORDER ||--|{ ORDER_ITEM : "contains"
+    ORDER_ITEM }|--|| PRODUCT : "references"
+    PRODUCT }o--|| CATEGORY : "belongs to"
+    CATEGORY ||--o{ CATEGORY : "has subcategory"
+    PRODUCT ||--o{ REVIEW : "receives"

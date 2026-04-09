@@ -395,6 +395,30 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
         }
     }.run;
 
+    // First pass: detect column-header indent level (minimum indent of content
+    // lines after the first line, ignoring blank/comment lines and the "title"
+    // directive).
+    var col_indent: usize = std.math.maxInt(usize);
+    {
+        var scan = std.mem.splitScalar(u8, text, '\n');
+        var skip_first = true;
+        while (scan.next()) |raw| {
+            if (skip_first) { skip_first = false; continue; }
+            const line = std.mem.trim(u8, raw, " \t\r");
+            if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+            if (std.mem.startsWith(u8, line, "title ")) continue;
+            // Count leading spaces/tabs
+            var ind: usize = 0;
+            for (raw) |c| {
+                if (c == ' ') { ind += 1; }
+                else if (c == '\t') { ind += 4; }
+                else break;
+            }
+            if (ind < col_indent) col_indent = ind;
+        }
+        if (col_indent == std.math.maxInt(usize)) col_indent = 0;
+    }
+
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
@@ -409,24 +433,42 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
             continue;
         }
 
-        const is_indented = raw.len > 0 and (raw[0] == ' ' or raw[0] == '\t');
+        // Skip standalone "title" directive
+        if (std.mem.startsWith(u8, line, "title ")) continue;
 
-        if (!is_indented and line.len > 0) {
-            // New column header
+        // Measure this line's indentation
+        var ind: usize = 0;
+        for (raw) |c| {
+            if (c == ' ') { ind += 1; }
+            else if (c == '\t') { ind += 4; }
+            else break;
+        }
+
+        if (ind <= col_indent) {
+            // Column header
             if (current_col_label) |lbl| {
                 try flushColumn(&columns, lbl, &current_items, a);
                 current_items = .empty;
             }
             current_col_label = line;
-        } else if (is_indented and current_col_label != null) {
-            // Item inside current column
-            // Syntax: "id" or "id[\"label\"]" or "@{...}"
-            var item_label = line;
-            var item_id = line;
-            if (std.mem.indexOf(u8, line, "[\"")) |lb| {
-                item_id = line[0..lb];
-                const rb = std.mem.indexOf(u8, line[lb..], "\"]") orelse (line.len - lb);
-                item_label = line[lb + 2 .. @min(lb + rb, line.len)];
+        } else if (current_col_label != null) {
+            // Item inside current column.
+            // Strip trailing @{...} metadata — not rendered yet.
+            var item_line = line;
+            if (std.mem.indexOf(u8, item_line, "@{")) |at| {
+                item_line = std.mem.trimRight(u8, item_line[0..at], " \t");
+            }
+            // Syntax: id["label"] or "label" (bare string) or plain id
+            var item_label = item_line;
+            var item_id = item_line;
+            if (std.mem.indexOf(u8, item_line, "[\"")) |lb| {
+                item_id = item_line[0..lb];
+                const rb = std.mem.indexOf(u8, item_line[lb..], "\"]") orelse (item_line.len - lb);
+                item_label = item_line[lb + 2 .. @min(lb + rb, item_line.len)];
+            } else if (item_line.len > 0 and item_line[0] == '"') {
+                // Bare quoted string — use as label, generate id from position
+                item_label = std.mem.trim(u8, item_line, "\"");
+                item_id = item_label;
             }
             var iv = Value.Node{ .type_name = "item", .fields = .{} };
             try iv.fields.put(a, "id", Value{ .string = item_id });
