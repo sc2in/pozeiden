@@ -626,6 +626,8 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
     var node_class_map = std.StringHashMap([]const u8).init(a);
     // node_id → direct style string (from "style nodeId fill:#xxx,stroke:#yyy")
     var node_styles = std.StringHashMap([]const u8).init(a);
+    // edge index → style string (from "linkStyle N stroke:#xxx,stroke-width:2px")
+    var link_styles = std.AutoHashMap(usize, []const u8).init(a);
 
     // Subgraph tracking
     const Subgraph = struct {
@@ -686,7 +688,22 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             }
             continue;
         }
-        if (std.mem.startsWith(u8, line, "linkStyle ")) continue;
+        // linkStyle N stroke:#xxx,stroke-width:2px  (per-edge style by insertion index)
+        if (std.mem.startsWith(u8, line, "linkStyle ")) {
+            const rest = line[10..];
+            var tok_end: usize = 0;
+            while (tok_end < rest.len and rest[tok_end] != ' ' and rest[tok_end] != '\t') tok_end += 1;
+            const indices_str = rest[0..tok_end];
+            const style_str = std.mem.trim(u8, rest[tok_end..], " \t");
+            if (style_str.len > 0) {
+                var idx_it = std.mem.splitScalar(u8, indices_str, ',');
+                while (idx_it.next()) |idx_s| {
+                    const idx = std.fmt.parseUnsigned(usize, std.mem.trim(u8, idx_s, " \t"), 10) catch continue;
+                    try link_styles.put(idx, style_str);
+                }
+            }
+            continue;
+        }
 
         if (first) {
             first = false;
@@ -835,6 +852,13 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             if (flowchartParseProp(style, "stroke"))  |v| try nn.fields.put(a, "stroke",     Value{ .string = v });
             if (flowchartParseProp(style, "color"))   |v| try nn.fields.put(a, "text_color", Value{ .string = v });
         }
+    }
+
+    // Apply linkStyle overrides to edges by insertion index.
+    for (edges_list.items, 0..) |*ev, ei| {
+        const style = link_styles.get(ei) orelse continue;
+        const en = switch (ev.*) { .node => |*n| n, else => continue };
+        if (flowchartParseProp(style, "stroke")) |v| try en.fields.put(a, "edge_color", Value{ .string = v });
     }
 
     // Build subgraphs list for the renderer
@@ -1018,7 +1042,26 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
         }
         if (std.mem.startsWith(u8, line, "else") or
             std.mem.startsWith(u8, line, "and ") or std.mem.eql(u8, line, "and")) {
-            continue; // alt/par branch separator, skip
+            // Emit a separator signal so the renderer can draw a divider line.
+            const sep_label = if (std.mem.startsWith(u8, line, "else ")) std.mem.trim(u8, line[5..], " \t")
+                else if (std.mem.startsWith(u8, line, "and ")) std.mem.trim(u8, line[4..], " \t")
+                else "";
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "blockSep" });
+            try sig.fields.put(a, "label", Value{ .string = sep_label });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            try signals_list.append(a, Value{ .node = sig });
+            continue;
+        }
+        // rect rgb(...) ... end: colored highlight span over a range of messages.
+        if (std.mem.startsWith(u8, line, "rect ")) {
+            const color_str = std.mem.trim(u8, line[5..], " \t");
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "rectStart" });
+            try sig.fields.put(a, "blockText", Value{ .string = color_str });
+            try signals_list.append(a, Value{ .node = sig });
+            try block_stack.append(a, .{ .kind = "rect", .label = color_str, .start = signals_list.items.len - 1 });
+            continue;
         }
         if (std.mem.eql(u8, line, "end")) {
             if (block_stack.items.len > 0) {
@@ -1036,6 +1079,7 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                         if (std.mem.eql(u8, top.kind, "loop")) "loopEnd"
                         else if (std.mem.eql(u8, top.kind, "opt")) "optEnd"
                         else if (std.mem.eql(u8, top.kind, "par")) "parEnd"
+                        else if (std.mem.eql(u8, top.kind, "rect")) "rectEnd"
                         else "altEnd";
                     var sig = Value.Node{ .type_name = "signal", .fields = .{} };
                     try sig.fields.put(a, "type", Value{ .string = end_type });

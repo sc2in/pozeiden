@@ -57,6 +57,7 @@ pub const GraphEdge = struct {
     to: []const u8,
     label: ?[]const u8,
     style: EdgeStyle,
+    color: ?[]const u8 = null,   // from linkStyle override
     /// Set by `breakCycles`: edge points against the DAG flow and is treated
     /// as logically reversed (to→from) during layer assignment.
     reversed: bool = false,

@@ -51,11 +51,13 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const label = en.getString("label");
         const style_str = en.getString("style") orelse "solid";
         const style = parseEdgeStyle(style_str);
+        const edge_color = en.getString("edge_color");
         try graph_edges.append(allocator, layout.GraphEdge{
             .from = from,
             .to = to,
             .label = label,
             .style = style,
+            .color = edge_color,
         });
     }
 
@@ -155,7 +157,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (graph.edges) |e| {
         const from_node = findNode(graph.nodes, e.from) orelse continue;
         const to_node = findNode(graph.nodes, e.to) orelse continue;
-        const stroke = theme.edge_color;
+        const stroke = e.color orelse theme.edge_color;
         const sw = theme.edge_stroke_width;
 
         // ── Self-loop: node connects to itself ────────────────────────────

@@ -43,6 +43,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     defer notes.deinit(allocator);
     var bands: std.ArrayList(ActorBand) = .empty;
     defer bands.deinit(allocator);
+    var separators: std.ArrayList(Separator) = .empty;
+    defer separators.deinit(allocator);
 
     const do_autonumber = (node.getNumber("autonumber") orelse 0.0) != 0.0;
 
@@ -156,6 +158,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             for (blocks.items) |*b| {
                 if (b.kind == .par and b.end_row == null) { b.end_row = messages.items.len; break; }
             }
+        } else if (std.mem.eql(u8, msg_type, "rectStart")) {
+            const color = sn.getString("blockText") orelse "";
+            try blocks.append(allocator, Block{ .kind = .rect, .label = color, .start_row = messages.items.len });
+        } else if (std.mem.eql(u8, msg_type, "rectEnd")) {
+            for (blocks.items) |*b| {
+                if (b.kind == .rect and b.end_row == null) { b.end_row = messages.items.len; break; }
+            }
+        } else if (std.mem.eql(u8, msg_type, "blockSep")) {
+            const lbl = sn.getString("label") orelse "";
+            const row: usize = @intFromFloat(sn.getNumber("row") orelse @as(f64, @floatFromInt(messages.items.len)));
+            try separators.append(allocator, Separator{ .label = lbl, .row = row });
         }
     }
 
@@ -214,23 +227,41 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const bh = @as(f32, @floatFromInt(end - b.start_row)) * ROW_H + 20;
         const bx: f32 = MARGIN_X - 10;
         const bw: f32 = @as(f32, @floatFromInt(total_w)) - (MARGIN_X - 10) * 2;
+        if (b.kind == .rect) {
+            // rect block: user-specified fill color, no border label
+            const color = if (b.label.len > 0) b.label else "rgba(200,200,200,0.2)";
+            try svg.rect(bx, by, bw, bh, 4.0, color, "none", 0);
+            continue;
+        }
         const blk_fill = switch (b.kind) {
             .loop => "#f0f4ff",
             .alt  => "#fff8f0",
             .opt  => "#f0fff4",
             .par  => "#fdf0ff",
+            .rect => unreachable,
         };
         const blk_stroke = switch (b.kind) {
             .loop => "#b0c0e8",
             .alt  => "#e8c8a0",
             .opt  => "#a0d8b0",
             .par  => "#c8a0d8",
+            .rect => unreachable,
         };
         try svg.rect(bx, by, bw, bh, 4.0, blk_fill, blk_stroke, 1.0);
         var kind_label_buf: [64]u8 = undefined;
-        const kind_str = switch (b.kind) { .loop => "loop", .alt => "alt", .opt => "opt", .par => "par" };
+        const kind_str: []const u8 = switch (b.kind) { .loop => "loop", .alt => "alt", .opt => "opt", .par => "par", .rect => unreachable };
         const kind_label = try std.fmt.bufPrint(&kind_label_buf, "{s} {s}", .{ kind_str, b.label });
         try svg.text(bx + 4, by + 14, kind_label, theme.text_color, theme.font_size_small, .start, "normal");
+    }
+
+    // 1b. else/and separators — dashed horizontal dividers within blocks
+    for (separators.items) |sep| {
+        const sy = FIRST_MSG_Y + @as(f32, @floatFromInt(sep.row)) * ROW_H - ROW_H / 4.0;
+        const sx: f32 = MARGIN_X - 10;
+        const sw: f32 = @as(f32, @floatFromInt(total_w)) - (MARGIN_X - 10) * 2;
+        try svg.dashedLine(sx, sy, sx + sw, sy, "#aaaaaa", 1.0, "4,3");
+        if (sep.label.len > 0)
+            try svg.text(sx + 4, sy - 3, sep.label, theme.text_color, theme.font_size_small, .start, "italic");
     }
 
     // 2. Lifelines
@@ -390,10 +421,15 @@ fn positionKind(s: []const u8) PosKind {
 }
 
 const Block = struct {
-    kind: enum { loop, alt, opt, par },
-    label: []const u8,
+    kind: enum { loop, alt, opt, par, rect },
+    label: []const u8,   // for rect: the color string
     start_row: usize,
     end_row: ?usize = null,
+};
+
+const Separator = struct {
+    label: []const u8,
+    row: usize,
 };
 
 const ActorBand = struct {
