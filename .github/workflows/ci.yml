@@ -2,35 +2,41 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
 
 jobs:
   test:
-    name: Test (Zig ${{ matrix.zig }})
+    name: Test (${{ matrix.zig }})
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        zig: ["0.15.2", "master"]
       fail-fast: false
+      matrix:
+        include:
+          - zig: "0.15.2"
+            stable: true
+          - zig: master
+            stable: false
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Zig ${{ matrix.zig }}
-        uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@v2
         with:
           version: ${{ matrix.zig }}
 
-      - name: Run unit tests
+      - name: Run tests
         run: zig build test
+        continue-on-error: ${{ !matrix.stable }}
 
-      - name: Render example diagrams
+      - name: Render examples
         run: zig build examples
+        continue-on-error: ${{ !matrix.stable }}
 
-      - name: Upload rendered examples
-        if: matrix.zig == '0.15.2'
+      - name: Upload rendered SVGs
+        if: matrix.stable
         uses: actions/upload-artifact@v4
         with:
-          name: example-svgs
+          name: rendered-svgs
           path: zig-out/examples/
           retention-days: 14
