@@ -372,24 +372,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             },
         };
 
-        // Cubic Bezier control points pull the curve away from the straight-line path.
-        // For TB/BT: control points extend vertically from the exit/entry points.
-        // For LR/RL: control points extend horizontally.
-        const ctrl: f32 = switch (direction) {
-            .tb, .bt => layout.V_GAP * 0.6,
-            .lr, .rl => layout.H_GAP,
-        };
-        const cx1: f32, const cy1: f32, const cx2: f32, const cy2: f32 = switch (direction) {
-            .tb  => .{ fx,        fy + ctrl, tx,        ty - ctrl },
-            .bt  => .{ fx,        fy - ctrl, tx,        ty + ctrl },
-            .lr  => .{ fx + ctrl, fy,        tx - ctrl, ty },
-            .rl  => .{ fx - ctrl, fy,        tx + ctrl, ty },
-        };
-
+        // Orthogonal (elbow/Manhattan) routing:
+        // TB/BT: exit vertically to midpoint row, cross horizontally, enter vertically.
+        // LR/RL: exit horizontally to midpoint column, cross vertically, enter horizontally.
+        const elbow_x: f32 = (fx + tx) / 2.0;
+        const elbow_y: f32 = (fy + ty) / 2.0;
         var path_buf: [256]u8 = undefined;
-        const path_d = try std.fmt.bufPrint(&path_buf,
-            "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
-            .{ fx, fy, cx1, cy1, cx2, cy2, tx, ty });
+        const path_d = switch (direction) {
+            .tb, .bt => try std.fmt.bufPrint(&path_buf,
+                "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}",
+                .{ fx, fy, fx, elbow_y, tx, elbow_y, tx, ty }),
+            .lr, .rl => try std.fmt.bufPrint(&path_buf,
+                "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}",
+                .{ fx, fy, elbow_x, fy, elbow_x, ty, tx, ty }),
+        };
 
         if (e.style == .dotted) {
             try svg.path(path_d, "none", stroke, sw, "stroke-dasharray=\"5,5\"");
@@ -399,9 +395,11 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try svg.path(path_d, "none", stroke, sw, "");
         }
 
-        // Direction-aware arrowhead: tangent at Bezier t=1 is (P3 - C2)
-        const tang_x = tx - cx2;
-        const tang_y = ty - cy2;
+        // Arrowhead direction is determined by the last elbow segment.
+        // TB: last segment goes from (tx, mid_y) → (tx, ty) — pointing in fy→ty direction.
+        // LR: last segment goes from (mid_x, ty) → (tx, ty) — pointing in fx→tx direction.
+        const tang_x: f32 = switch (direction) { .lr => tx - elbow_x, .rl => tx - elbow_x, .tb, .bt => 0 };
+        const tang_y: f32 = switch (direction) { .tb => ty - elbow_y, .bt => ty - elbow_y, .lr, .rl => 0 };
         const tang_len = @sqrt(tang_x * tang_x + tang_y * tang_y);
         if (tang_len > 0.5) {
             const ux = tang_x / tang_len;
@@ -421,11 +419,13 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try svg.polygon(pts, stroke, stroke, 0);
         }
 
-        // Edge label at Bezier midpoint (t=0.5)
+        // Edge label at the midpoint of the elbow's crossing segment.
+        // TB/BT: crossing segment is horizontal at elbow_y; label at (mid-x, elbow_y).
+        // LR/RL: crossing segment is vertical at elbow_x; label at (elbow_x, mid-y).
         if (e.label) |lbl| {
-            const mid_x = 0.125 * fx + 0.375 * cx1 + 0.375 * cx2 + 0.125 * tx;
-            const mid_y = 0.125 * fy + 0.375 * cy1 + 0.375 * cy2 + 0.125 * ty;
-            try svg.text(mid_x, mid_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+            const lbl_x: f32 = switch (direction) { .tb, .bt => (fx + tx) / 2.0, .lr, .rl => elbow_x };
+            const lbl_y: f32 = switch (direction) { .tb, .bt => elbow_y, .lr, .rl => (fy + ty) / 2.0 };
+            try svg.text(lbl_x, lbl_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
 

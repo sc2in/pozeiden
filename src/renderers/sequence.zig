@@ -41,6 +41,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     defer activations.deinit(allocator);
     var notes: std.ArrayList(Note) = .empty;
     defer notes.deinit(allocator);
+    var refs: std.ArrayList(RefBox) = .empty;
+    defer refs.deinit(allocator);
     var bands: std.ArrayList(ActorBand) = .empty;
     defer bands.deinit(allocator);
     var separators: std.ArrayList(Separator) = .empty;
@@ -134,6 +136,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 .actor1 = actor1,
                 .actor2 = actor2,
                 .position = position,
+                .text = text,
+                .row = row,
+            });
+        } else if (std.mem.eql(u8, msg_type, "ref")) {
+            const row: usize = @intFromFloat(sn.getNumber("row") orelse @as(f64, @floatFromInt(messages.items.len)));
+            const actor1 = sn.getString("actor1") orelse "";
+            const actor2 = sn.getString("actor2");
+            const text = sn.getString("blockText") orelse "";
+            try refs.append(allocator, RefBox{
+                .actor1 = actor1,
+                .actor2 = actor2,
                 .text = text,
                 .row = row,
             });
@@ -381,6 +394,36 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             nt.text, theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
+    // 5b. Ref boxes (UML "ref" interaction fragments — dashed rectangle spanning actors)
+    for (refs.items) |rb| {
+        const a1_idx = actorIndex(actors.items, rb.actor1) orelse 0;
+        const a2_idx = if (rb.actor2) |a2| actorIndex(actors.items, a2) orelse a1_idx else a1_idx;
+        const min_idx = @min(a1_idx, a2_idx);
+        const max_idx = @max(a1_idx, a2_idx);
+
+        // Span from left edge of min actor to right edge of max actor, with padding
+        const bx = MARGIN_X + @as(f32, @floatFromInt(min_idx)) * LANE_GAP - ACTOR_W * 0.1;
+        const bw = @as(f32, @floatFromInt(max_idx - min_idx)) * LANE_GAP + ACTOR_W * 1.2;
+        const ref_h: f32 = ROW_H - 8;
+        const by = FIRST_MSG_Y + @as(f32, @floatFromInt(rb.row)) * ROW_H - ref_h / 2 + 2;
+
+        // Dashed-border background box
+        var path_buf: [256]u8 = undefined;
+        const path_d = try std.fmt.bufPrint(&path_buf,
+            "M {d:.1},{d:.1} L {d:.1},{d:.1} L {d:.1},{d:.1} L {d:.1},{d:.1} Z",
+            .{ bx, by, bx + bw, by, bx + bw, by + ref_h, bx, by + ref_h });
+        try svg.path(path_d, "#f0f4ff", "#6688cc", 1.2, "stroke-dasharray=\"6,3\"");
+        // "ref" corner label box (solid fill, small)
+        const ref_lbl_w: f32 = 26;
+        const ref_lbl_h: f32 = 14;
+        try svg.rect(bx, by, ref_lbl_w, ref_lbl_h, 0, "#6688cc", "#6688cc", 0);
+        try svg.text(bx + ref_lbl_w / 2, by + ref_lbl_h / 2 + 4, "ref", "#ffffff", 9, .middle, "bold");
+        // Description text centered in the box
+        if (rb.text.len > 0) {
+            try svg.text(bx + bw / 2, by + ref_h / 2 + 4, rb.text, theme.text_color, theme.font_size_small, .middle, "normal");
+        }
+    }
+
     // 6. Messages
     var msg_counter: usize = 0;
     for (messages.items, 0..) |msg, mi| {
@@ -543,6 +586,15 @@ const Note = struct {
     actor1: []const u8,
     actor2: ?[]const u8,
     position: []const u8,
+    text: []const u8,
+    row: usize,
+};
+
+/// UML "ref" interaction fragment — a box spanning specified actors that
+/// references another interaction by name/label.
+const RefBox = struct {
+    actor1: []const u8,
+    actor2: ?[]const u8, // if null, only span actor1's lane
     text: []const u8,
     row: usize,
 };
