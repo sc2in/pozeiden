@@ -9,7 +9,11 @@
 
 pub var font_size: u32 = 14;
 pub var font_size_small: u32 = 12;
-pub const font_family = "trebuchet ms, verdana, arial, sans-serif";
+/// CSS font-family string used for all SVG text elements.
+/// Override via `ThemeOverride.font_family` to ensure a font that is available
+/// in your target environment (important for PDF/Typst rendering where system
+/// fonts may not be present).
+pub var font_family: []const u8 = "trebuchet ms, verdana, arial, sans-serif";
 
 pub var background: []const u8 = "#ffffff";
 pub var text_color: []const u8 = "#333333";
@@ -79,6 +83,10 @@ pub const ThemeOverride = struct {
     edge_color:       ?[]const u8 = null,
     font_size:        ?u32 = null,
     font_size_small:  ?u32 = null,
+    /// Override the CSS font-family for all SVG text. Useful when embedding SVG
+    /// in environments where the default fonts are unavailable (e.g. Typst PDF).
+    /// Example: `"Liberation Sans, Arial, sans-serif"`
+    font_family:      ?[]const u8 = null,
 };
 
 /// Apply `ov` to the module-level theme vars.  Call `resetToDefaults` when
@@ -91,6 +99,7 @@ pub fn applyOverride(ov: ThemeOverride) void {
     if (ov.edge_color)      |v| edge_color       = v;
     if (ov.font_size)       |v| font_size        = v;
     if (ov.font_size_small) |v| font_size_small  = v;
+    if (ov.font_family)     |v| font_family      = v;
     // Derived fields that mirror overridden values for visual consistency.
     if (ov.background)      |v| label_background = v;
     if (ov.text_color)      |v| { signal_color = v; line_color = v; }
@@ -102,6 +111,7 @@ pub fn applyOverride(ov: ThemeOverride) void {
 pub fn resetToDefaults() void {
     font_size        = 14;
     font_size_small  = 12;
+    font_family      = "trebuchet ms, verdana, arial, sans-serif";
     background       = "#ffffff";
     text_color       = "#333333";
     line_color       = "#333333";

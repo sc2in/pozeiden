@@ -206,8 +206,8 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                 const w = fbs.writer();
                 try w.print(
                     "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" " ++
-                    "text-anchor=\"middle\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
-                    .{ x, y, text_color, theme.font_size_small });
+                    "text-anchor=\"middle\" font-family=\"{s}\">",
+                    .{ x, y, text_color, theme.font_size_small, theme.font_family });
                 var lit = std.mem.splitScalar(u8, label, '\n');
                 var line_idx: usize = 0;
                 const total_lines = std.mem.count(u8, label, "\n") + 1;

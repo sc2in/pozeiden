@@ -17,6 +17,7 @@
 //! const output = try svg.toOwnedSlice(); // caller owns this
 //! ```
 const std = @import("std");
+const theme = @import("theme.zig");
 
 /// Streaming SVG builder.  Call methods in document order; `header` first,
 /// `footer` last, `toOwnedSlice` after `footer`.
@@ -170,8 +171,8 @@ pub const SvgWriter = struct {
             .end => "end",
         };
         try self.buf.writer(self.allocator).print(
-            "<text x=\"{d:.2}\" y=\"{d:.2}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
-            .{ x, y, fill, font_size, anchor_str, font_weight },
+            "<text x=\"{d:.2}\" y=\"{d:.2}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
+            .{ x, y, fill, font_size, anchor_str, font_weight, theme.font_family },
         );
         try xmlEscape(self.buf.writer(self.allocator), content);
         try self.buf.writer(self.allocator).writeAll("</text>\n");
@@ -265,8 +266,8 @@ pub const SvgWriter = struct {
         };
         const w = self.buf.writer(self.allocator);
         try w.print(
-            "<text fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"trebuchet ms,verdana,arial,sans-serif\">",
-            .{ fill, font_size, anchor_str, font_weight },
+            "<text fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
+            .{ fill, font_size, anchor_str, font_weight, theme.font_family },
         );
         try w.print("<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y1 });
         try xmlEscape(w, line1);

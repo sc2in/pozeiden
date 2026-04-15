@@ -8,6 +8,7 @@
 //! --format json wraps the SVG in a JSON envelope:
 //!   {"svg":"...","diagram_type":"flowchart"}
 const std = @import("std");
+
 const pozeiden = @import("pozeiden");
 
 const Format = enum { svg, json };
@@ -80,9 +81,9 @@ pub fn main() !void {
         .svg => svg,
         .json => blk: {
             const type_name = @tagName(diagram_type);
-            var buf = std.ArrayList(u8).init(allocator);
-            errdefer buf.deinit();
-            const w = buf.writer();
+            var buf = std.ArrayList(u8){};
+            errdefer buf.deinit(allocator);
+            const w = buf.writer(allocator);
             try w.writeAll("{\"svg\":\"");
             for (svg) |c| {
                 switch (c) {
@@ -94,7 +95,7 @@ pub fn main() !void {
                 }
             }
             try w.print("\",\"diagram_type\":\"{s}\"}}\n", .{type_name});
-            break :blk try buf.toOwnedSlice();
+            break :blk try buf.toOwnedSlice(allocator);
         },
     };
     defer if (format == .json) allocator.free(output_bytes);
