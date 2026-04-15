@@ -564,8 +564,27 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
         },
     }
 
-    // Node label (wrapped if too wide)
-    try svg.textWrapped(cx, cy + 4, n.label, w - 8, ntextc, theme.font_size, .middle, nweight);
+    // Node label — use shape-adjusted effective width so text does not overflow
+    // into the visual border of shapes with narrow interiors (diamond, circle, etc.).
+    const label_max_w: f32 = switch (n.shape) {
+        // Diamond: usable interior is roughly 55% of the bounding box width.
+        .diamond => w * 0.55,
+        // Circle / double_circle: the rendered radius is h/2, so the maximum
+        // chord at the text line positions (±line_h/2 from centre) is narrower
+        // than the bounding box width.  Use the diameter (h) minus padding.
+        .circle, .double_circle => h - 8,
+        // Hexagon: the flat sides start at w/4 from each edge.
+        .hexagon => w * 0.50,
+        // Cylinder: narrowing at top cap; just trim slightly more.
+        .cylinder => w - 16,
+        // Parallelogram / trapezoid shapes have slanted sides; reduce by slant.
+        .parallelogram, .parallelogram_alt,
+        .trapezoid, .trapezoid_alt => w * 0.70,
+        // All other shapes (rect, round, stadium, subroutine, ellipse, asymmetric):
+        // standard 8-pixel inset on each side.
+        else => w - 16,
+    };
+    try svg.textWrapped(cx, cy + 4, n.label, label_max_w, ntextc, theme.font_size, .middle, nweight);
 }
 
 fn renderFallback(allocator: std.mem.Allocator, msg: []const u8) ![]const u8 {

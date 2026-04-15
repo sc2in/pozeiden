@@ -44,6 +44,17 @@ const git_langium = @embedFile("grammars/gitGraph.langium");
 const flow_jison = @embedFile("grammars/flow.jison");
 const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
+/// The type of diagram identified in a mermaid source string.
+/// Re-exported from `detect.zig` for library consumers.
+pub const DiagramType = detect.DiagramType;
+
+/// Detect the diagram type from the first non-blank, non-comment line of
+/// `mermaid_text`.  Returns `.unknown` if no recognised keyword is found.
+/// Useful when the caller needs to filter or route before calling `render`.
+pub fn detectDiagramType(mermaid_text: []const u8) DiagramType {
+    return detect.detect(mermaid_text);
+}
+
 /// Errors that `render` can return in addition to `std.mem.Allocator.Error`.
 pub const RenderError = error{
     /// The diagram type could not be identified from the first non-blank line.
@@ -98,6 +109,20 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
 pub const RenderOptions = struct {
     /// Runtime theme overrides.  Unset fields use the mermaid default values.
     theme_override: theme.ThemeOverride = .{},
+
+    /// If non-zero, scale the output SVG so its width does not exceed this
+    /// value (in SVG user units / pixels).  Height scales proportionally.
+    /// Applied after `max_height`.
+    max_width: u32 = 0,
+
+    /// If non-zero, scale the output SVG so its height does not exceed this
+    /// value.  Width scales proportionally.  `max_width` takes precedence when
+    /// both constraints would apply simultaneously.
+    max_height: u32 = 0,
+
+    /// Uniform scale factor applied to the SVG `viewBox` (e.g. `0.5` = 50%).
+    /// Ignored when `max_width` or `max_height` are non-zero.
+    scale: f32 = 1.0,
 };
 
 /// Like `render`, but accepts a `RenderOptions` to customise the output.
@@ -110,7 +135,88 @@ pub fn renderWithOptions(
 ) ![]const u8 {
     theme.applyOverride(options.theme_override);
     defer theme.resetToDefaults();
-    return render(allocator, mermaid_text);
+    const svg = try render(allocator, mermaid_text);
+
+    const needs_scale = options.max_width != 0 or options.max_height != 0 or options.scale != 1.0;
+    if (!needs_scale) return svg;
+
+    // Post-process: patch width/height/viewBox on the root <svg> element.
+    const scaled = scaleSvg(allocator, svg, options) catch return svg;
+    allocator.free(svg);
+    return scaled;
+}
+
+/// Parse the `width` and `height` attributes from the root `<svg ...>` element
+/// and rewrite them (plus the `viewBox`) to apply dimension constraints.
+fn scaleSvg(
+    allocator: std.mem.Allocator,
+    svg: []const u8,
+    options: RenderOptions,
+) ![]const u8 {
+    // Locate the root <svg ...> opening tag.
+    const svg_tag_start = std.mem.indexOf(u8, svg, "<svg ") orelse return error.NotSvg;
+    const svg_tag_end = std.mem.indexOfScalarPos(u8, svg, svg_tag_start, '>') orelse return error.NotSvg;
+    const header = svg[svg_tag_start .. svg_tag_end + 1];
+
+    // Extract width and height attribute values (integers).
+    const orig_w = parseSvgDimAttr(header, "width") orelse return error.NoDimensions;
+    const orig_h = parseSvgDimAttr(header, "height") orelse return error.NoDimensions;
+    if (orig_w == 0 or orig_h == 0) return error.NoDimensions;
+
+    // Compute the effective scale factor.
+    var s: f32 = if (options.scale != 1.0) options.scale else 1.0;
+
+    if (options.max_width != 0 or options.max_height != 0) {
+        var sw: f32 = 1.0;
+        var sh: f32 = 1.0;
+        if (options.max_width != 0) {
+            sw = @as(f32, @floatFromInt(options.max_width)) / @as(f32, @floatFromInt(orig_w));
+        }
+        if (options.max_height != 0) {
+            sh = @as(f32, @floatFromInt(options.max_height)) / @as(f32, @floatFromInt(orig_h));
+        }
+        // Use the smaller of the two to satisfy both constraints simultaneously.
+        s = @min(sw, sh);
+        // Never upscale via max_* constraints; only shrink.
+        if (s > 1.0) s = 1.0;
+    }
+
+    if (s == 1.0) return allocator.dupe(u8, svg);
+
+    const new_w: u32 = @intFromFloat(@round(@as(f32, @floatFromInt(orig_w)) * s));
+    const new_h: u32 = @intFromFloat(@round(@as(f32, @floatFromInt(orig_h)) * s));
+
+    // Build a replacement <svg ...> tag keeping the original viewBox but
+    // replacing width and height so the SVG scales to the requested size.
+    // viewBox stays as "0 0 orig_w orig_h" to preserve all content.
+    var new_header_buf: [256]u8 = undefined;
+    const new_header = try std.fmt.bufPrint(&new_header_buf,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{d}\" height=\"{d}\" viewBox=\"0 0 {d} {d}\">",
+        .{ new_w, new_h, orig_w, orig_h });
+
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+    try out.appendSlice(allocator, svg[0..svg_tag_start]);
+    try out.appendSlice(allocator, new_header);
+    try out.appendSlice(allocator, svg[svg_tag_end + 1 ..]);
+    return out.toOwnedSlice(allocator);
+}
+
+/// Parse a numeric SVG attribute like `width="640"` from the tag string.
+fn parseSvgDimAttr(tag: []const u8, attr: []const u8) ?u32 {
+    const needle_len = attr.len + 2; // attr + '="'
+    var i: usize = 0;
+    while (i + needle_len < tag.len) : (i += 1) {
+        if (!std.mem.eql(u8, tag[i .. i + attr.len], attr)) continue;
+        const after = i + attr.len;
+        if (tag[after] != '=') continue;
+        if (tag[after + 1] != '"') continue;
+        const v_start = after + 2;
+        var v_end = v_start;
+        while (v_end < tag.len and tag[v_end] != '"') v_end += 1;
+        return std.fmt.parseInt(u32, tag[v_start..v_end], 10) catch null;
+    }
+    return null;
 }
 
 fn renderLangium(
@@ -553,6 +659,7 @@ fn applyInitDirective(text: []const u8) bool {
         if (jsonStringValue(vars, "lineColor"))         |v| { ov.edge_color  = v; }
         if (jsonStringValue(vars, "background"))        |v| { ov.background  = v; }
         if (jsonStringValue(vars, "mainBkg"))           |v| { ov.background  = v; }
+        if (jsonStringValue(vars, "fontFamily"))        |v| { ov.font_family = v; }
     }
 
     theme.applyOverride(ov);
@@ -3352,4 +3459,50 @@ test "kanban basic board" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "todo") != null);
     try std.testing.expect(std.mem.indexOf(u8, svg, "Task A") != null);
     try std.testing.expect(std.mem.indexOf(u8, svg, "done") != null);
+}
+
+test "detectDiagramType public API" {
+    try std.testing.expectEqual(DiagramType.pie, detectDiagramType("pie title Pets\n"));
+    try std.testing.expectEqual(DiagramType.flowchart, detectDiagramType("graph TD\nA-->B\n"));
+    try std.testing.expectEqual(DiagramType.sequence, detectDiagramType("sequenceDiagram\n"));
+    try std.testing.expectEqual(DiagramType.unknown, detectDiagramType("notADiagram\n"));
+}
+
+test "renderWithOptions font_family override" {
+    const input = "pie\n\"A\" : 60\n\"B\" : 40\n";
+    const svg = try renderWithOptions(std.testing.allocator, input, .{
+        .theme_override = .{ .font_family = "Liberation Sans, sans-serif" },
+    });
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "Liberation Sans") != null);
+    // Ensure default font is NOT present after override
+    try std.testing.expect(std.mem.indexOf(u8, svg, "trebuchet") == null);
+}
+
+test "renderWithOptions max_width shrinks SVG" {
+    const input = "pie\n\"A\" : 60\n\"B\" : 40\n";
+    const svg_full = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg_full);
+    const full_w = parseSvgDimAttr(svg_full[0 .. std.mem.indexOf(u8, svg_full, ">").? + 1], "width") orelse 0;
+    try std.testing.expect(full_w > 0);
+
+    const svg_small = try renderWithOptions(std.testing.allocator, input, .{ .max_width = full_w / 2 });
+    defer std.testing.allocator.free(svg_small);
+    const small_w = parseSvgDimAttr(svg_small[0 .. std.mem.indexOf(u8, svg_small, ">").? + 1], "width") orelse 0;
+    try std.testing.expect(small_w <= full_w / 2 + 1); // allow ±1 for rounding
+    // viewBox should still reference original dimensions
+    try std.testing.expect(std.mem.indexOf(u8, svg_small, "viewBox") != null);
+}
+
+test "renderWithOptions scale factor" {
+    const input = "pie\n\"A\" : 60\n\"B\" : 40\n";
+    const svg_full = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg_full);
+    const full_w = parseSvgDimAttr(svg_full[0 .. std.mem.indexOf(u8, svg_full, ">").? + 1], "width") orelse 0;
+
+    const svg_half = try renderWithOptions(std.testing.allocator, input, .{ .scale = 0.5 });
+    defer std.testing.allocator.free(svg_half);
+    const half_w = parseSvgDimAttr(svg_half[0 .. std.mem.indexOf(u8, svg_half, ">").? + 1], "width") orelse 0;
+    const expected: u32 = @intFromFloat(@round(@as(f32, @floatFromInt(full_w)) * 0.5));
+    try std.testing.expectEqual(expected, half_w);
 }
