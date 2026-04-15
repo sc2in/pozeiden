@@ -88,11 +88,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                                else iv.asString() orelse "";
             const card_y = cy + HEADER_H + CARD_PAD + @as(f32, @floatFromInt(ii)) * (CARD_H + CARD_PAD);
             try svg.rect(cx + 8, card_y, COL_W - 16, CARD_H, 4.0, theme.node_fill, color, 1.0);
-            // Truncate long card text
-            const max_len: usize = 20;
-            const display = if (item_label.len > max_len) item_label[0..max_len] else item_label;
-            try svg.text(cx + COL_W / 2, card_y + CARD_H / 2 + 4,
-                display, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(cx + COL_W / 2, card_y + CARD_H / 2 + 4, item_label,
+                COL_W - 32, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
 
