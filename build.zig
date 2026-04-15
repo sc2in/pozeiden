@@ -52,6 +52,36 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_mod_tests.step);
 
+    // ── lib step ──────────────────────────────────────────────────────────────
+    // Builds a C-ABI shared library (libpozeiden.so) and installs the public
+    // header.
+    //
+    //   zig build lib
+    //   # produces zig-out/lib/libpozeiden.so and zig-out/include/pozeiden.h
+
+    const capi_mod = b.createModule(.{
+        .root_source_file = b.path("src/capi.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "pozeiden", .module = mod },
+        },
+    });
+
+    const shared_lib = b.addLibrary(.{
+        .name = "pozeiden",
+        .root_module = capi_mod,
+        .linkage = .dynamic,
+        .version = .{ .major = 0, .minor = 1, .patch = 0 },
+    });
+
+    const lib_step = b.step("lib", "Build C shared library (libpozeiden.so)");
+    lib_step.dependOn(&b.addInstallArtifact(shared_lib, .{}).step);
+    lib_step.dependOn(&b.addInstallFile(
+        b.path("include/pozeiden.h"),
+        "include/pozeiden.h",
+    ).step);
+
     // ── playground step ───────────────────────────────────────────────────────
     // Compiles pozeiden to WebAssembly and bundles it with the HTML playground.
     //

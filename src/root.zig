@@ -94,10 +94,23 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
     }
 }
 
+/// Re-export the diagram type enum so callers don't need to import detect.zig.
+pub const DiagramType = detect.DiagramType;
+
+/// Detect the diagram type from the first non-blank, non-comment line of
+/// `mermaid_text`.  Returns `.unknown` for unrecognised input.
+pub fn detectDiagramType(mermaid_text: []const u8) DiagramType {
+    return detect.detect(mermaid_text);
+}
+
 /// Options for `renderWithOptions`.
 pub const RenderOptions = struct {
     /// Runtime theme overrides.  Unset fields use the mermaid default values.
     theme_override: theme.ThemeOverride = .{},
+    /// When `true`, return `error.UnknownDiagramType` for unrecognised input
+    /// instead of generating a fallback SVG.  Useful for pipeline callers that
+    /// need to distinguish a real render from a no-op.
+    strict: bool = false,
 };
 
 /// Like `render`, but accepts a `RenderOptions` to customise the output.
@@ -108,6 +121,8 @@ pub fn renderWithOptions(
     mermaid_text: []const u8,
     options: RenderOptions,
 ) ![]const u8 {
+    if (options.strict and detect.detect(mermaid_text) == .unknown)
+        return error.UnknownDiagramType;
     theme.applyOverride(options.theme_override);
     defer theme.resetToDefaults();
     return render(allocator, mermaid_text);
