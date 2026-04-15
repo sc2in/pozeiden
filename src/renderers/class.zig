@@ -127,8 +127,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         row_y[r + 1] = row_y[r] + h + ROW_GAP;
     }
 
+    const note_extra: f32 = if (node.getList("notes").len > 0) 184 else 0;
     const total_w: u32 = @intFromFloat(
-        MARGIN * 2 + @as(f32, @floatFromInt(GRID_COLS)) * (CLASS_W + COL_GAP) - COL_GAP
+        MARGIN * 2 + @as(f32, @floatFromInt(GRID_COLS)) * (CLASS_W + COL_GAP) - COL_GAP + note_extra
     );
     const total_h: u32 = @intFromFloat(row_y[n_rows] + MARGIN);
 
@@ -273,13 +274,15 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 std.fmt.bufPrint(buf[256..], "{s}{s} : {s}", .{ vis, name_display, type_display }) catch m.name
             else
                 std.fmt.bufPrint(buf[256..], "{s}{s}", .{ vis, name_display }) catch m.name;
-            try svg.text(bx + 8, my, label, theme.text_color, theme.font_size_small, .start, "normal");
+            const max_chars: usize = 22;
+            const display = if (label.len > max_chars) label[0..max_chars] else label;
+            try svg.text(bx + 8, my, display, theme.text_color, theme.font_size_small, .start, "normal");
         }
     }
 
     // Draw notes (yellow annotation boxes, right of target class or top-right corner)
-    const NOTE_W: f32 = 120;
-    const NOTE_H: f32 = 36;
+    const NOTE_W: f32 = 160;
+    const NOTE_H: f32 = 46;
     for (node.getList("notes")) |nv| {
         const nn = nv.asNode() orelse continue;
         const text = nn.getString("text") orelse continue;
@@ -299,8 +302,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             }
         }
         try svg.rect(nx, ny, NOTE_W, NOTE_H, 4.0, "#fffde7", "#f0c040", 1.2);
-        try svg.text(nx + NOTE_W / 2, ny + NOTE_H / 2 + 4, text,
-            theme.text_color, theme.font_size_small, .middle, "normal");
+        try svg.textWrapped(nx + NOTE_W / 2, ny + NOTE_H / 2, text,
+            NOTE_W - 8, theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
     try svg.footer();

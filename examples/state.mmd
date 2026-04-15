@@ -12,6 +12,9 @@ stateDiagram-v2
         MFA --> AuthFailed : bad code
         MFA --> [*] : code ok
         AuthFailed --> [*]
+        --
+        [*] --> AuditPending
+        AuditPending --> AuditLogged : record attempt
     }
 
     Authenticating --> Active : success

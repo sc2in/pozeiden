@@ -1958,11 +1958,12 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             try tn.fields.put(a, "to", Value{ .string = to_id });
             try tn.fields.put(a, "label", Value{ .string = lbl });
             try transitions.append(a, Value{ .node = tn });
-            // Track from/to as members of the active compound
+            // Track from/to as members of the active compound (skip pseudo-states)
             if (compound_stack.items.len > 0) {
                 const top = &compound_stack.items[compound_stack.items.len - 1];
                 const ids = [2][]const u8{ from_id, to_id };
                 for (ids) |sid| {
+                    if (std.mem.eql(u8, sid, "[*]") or std.mem.eql(u8, sid, "[*]-end")) continue;
                     var already = false;
                     for (top.members.items) |m| if (std.mem.eql(u8, m, sid)) { already = true; break; };
                     if (!already) try top.members.append(a, sid);

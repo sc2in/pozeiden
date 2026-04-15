@@ -251,17 +251,37 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             }
         };
 
-        try svg.dashedLine(from_x, from_y, to_x, to_y, "#666666", 1.5, "6,3");
+        // Cubic Bezier edge: same-row arcs below to avoid crossing intermediate boxes;
+        // different-row uses an S-curve for cleaner visual flow.
+        const cx1: f32, const cy1: f32, const cx2: f32, const cy2: f32 = blk: {
+            if (fc.row == tc.row) {
+                const arc: f32 = 50;
+                const dx_third = (to_x - from_x) / 3;
+                break :blk .{ from_x + dx_third, from_y + arc, to_x - dx_third, to_y + arc };
+            } else {
+                const ctrl: f32 = ROW_GAP * 0.5;
+                if (fc.row < tc.row) {
+                    break :blk .{ from_x, from_y + ctrl, to_x, to_y - ctrl };
+                } else {
+                    break :blk .{ from_x, from_y - ctrl, to_x, to_y + ctrl };
+                }
+            }
+        };
+        var path_buf: [256]u8 = undefined;
+        const path_d = try std.fmt.bufPrint(&path_buf,
+            "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
+            .{ from_x, from_y, cx1, cy1, cx2, cy2, to_x, to_y });
+        try svg.path(path_d, "none", "#666666", 1.5, "stroke-dasharray=\"6,3\"");
 
-        // Arrowhead at `to` end
-        try drawArrow(&svg, to_x, to_y, from_x, from_y);
+        // Arrowhead tangent follows Bezier endpoint direction
+        try drawArrow(&svg, to_x, to_y, cx2, cy2);
         if (rel.bidirectional) {
-            try drawArrow(&svg, from_x, from_y, to_x, to_y);
+            try drawArrow(&svg, from_x, from_y, cx1, cy1);
         }
 
-        // Label at midpoint
-        const mx = (from_x + to_x) / 2;
-        const my = (from_y + to_y) / 2;
+        // Label near midpoint (at the Bezier midpoint, t=0.5)
+        const mx = 0.125 * from_x + 0.375 * cx1 + 0.375 * cx2 + 0.125 * to_x;
+        const my = 0.125 * from_y + 0.375 * cy1 + 0.375 * cy2 + 0.125 * to_y;
         if (rel.label.len > 0) {
             try svg.text(mx, my - 6, rel.label, TEXT_DARK, theme.font_size_small, .middle, "normal");
         }

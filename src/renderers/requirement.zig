@@ -132,10 +132,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try svg.polygon(pts, theme.line_color, theme.line_color, 0);
         }
 
-        // Relationship kind label at midpoint
-        if (kind.len > 0) {
-            try svg.text((fx + tx) / 2, (fy + ty) / 2 - 6, kind,
-                theme.text_color, theme.font_size_small, .middle, "normal");
+        // Relationship kind label at midpoint, offset perpendicular to the edge
+        if (kind.len > 0 and len > 1.0) {
+            const perp: f32 = 12.0;
+            const lx = (fx + tx) / 2 + (-dy / len) * perp;
+            const ly = (fy + ty) / 2 + (dx / len) * perp;
+            try svg.text(lx, ly, kind, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
 
