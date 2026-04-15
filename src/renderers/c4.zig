@@ -283,9 +283,13 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const mx = 0.125 * from_x + 0.375 * cx1 + 0.375 * cx2 + 0.125 * to_x;
         const my = 0.125 * from_y + 0.375 * cy1 + 0.375 * cy2 + 0.125 * to_y;
         if (rel.label.len > 0) {
+            const lw = @as(f32, @floatFromInt(rel.label.len)) * 6.5 + 8;
+            try svg.rect(mx - lw / 2, my - 16, lw, 14, 2.0, theme.background, "none", 0);
             try svg.text(mx, my - 6, rel.label, TEXT_DARK, theme.font_size_small, .middle, "normal");
         }
         if (rel.tech.len > 0) {
+            const tw = @as(f32, @floatFromInt(rel.tech.len)) * 6.0 + 8;
+            try svg.rect(mx - tw / 2, my, tw, 14, 2.0, theme.background, "none", 0);
             try svg.text(mx, my + 8, rel.tech, "#666666", theme.font_size_small - 1, .middle, "normal");
         }
     }

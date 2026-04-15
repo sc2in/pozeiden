@@ -186,6 +186,16 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             if (s.depth < c_min_depth) c_min_depth = s.depth;
             if (s.depth > c_max_depth) c_max_depth = s.depth;
         }
+        // Also fold the compound state node itself into the bounding box so the
+        // container and its UML node form a single cohesive rectangle.
+        if (stateIndex(states.items, comp_id)) |comp_si| {
+            const cs = states.items[comp_si];
+            member_found = true;
+            if (cs.col < c_min_col) c_min_col = cs.col;
+            if (cs.col > c_max_col) c_max_col = cs.col;
+            if (cs.depth < c_min_depth) c_min_depth = cs.depth;
+            if (cs.depth > c_max_depth) c_max_depth = cs.depth;
+        }
         if (!member_found) continue;
 
         const COMP_PAD: f32 = 18;

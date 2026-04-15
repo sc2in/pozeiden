@@ -292,13 +292,21 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         if (target.len > 0) {
             if (classIndex(classes.items, target)) |ci| {
                 const cl = classes.items[ci];
-                nx = classX(cl.col) + CLASS_W + 12;
                 const ste_h: f32 = if (cl.stereotype.len > 0) MEMBER_H else 0;
                 const bh = CLASS_HEADER_H + ste_h + @as(f32, @floatFromInt(cl.members.len)) * MEMBER_H + 10;
-                ny = row_y[cl.row] + bh / 2 - NOTE_H / 2;
-                // Connector line from note to class right edge
-                try svg.dashedLine(classX(cl.col) + CLASS_W, row_y[cl.row] + bh / 2,
-                    nx, ny + NOTE_H / 2, "#aaaaaa", 1.0, "4,3");
+                const cx = classX(cl.col);
+                const cy = row_y[cl.row];
+                if (cl.col == GRID_COLS - 1 or cl.row == 0) {
+                    // Rightmost column or top row: place note to the RIGHT
+                    nx = cx + CLASS_W + 12;
+                    ny = cy + bh / 2 - NOTE_H / 2;
+                    try svg.dashedLine(cx + CLASS_W, cy + bh / 2, nx, ny + NOTE_H / 2, "#aaaaaa", 1.0, "4,3");
+                } else {
+                    // Inner class: place note ABOVE to avoid overlapping right neighbour
+                    nx = cx + (CLASS_W - NOTE_W) / 2;
+                    ny = cy - NOTE_H - 10;
+                    try svg.dashedLine(cx + CLASS_W / 2, cy, cx + CLASS_W / 2, ny + NOTE_H, "#aaaaaa", 1.0, "4,3");
+                }
             }
         }
         try svg.rect(nx, ny, NOTE_W, NOTE_H, 4.0, "#fffde7", "#f0c040", 1.2);
@@ -430,13 +438,20 @@ fn parseMember(s: []const u8) Member {
         }
     }
     const is_method = std.mem.indexOf(u8, rest, "(") != null;
-    // Mermaid syntax: `Type name` : first token is type, second is name.
-    // Display convention (UML): `+name : Type`.
     var name = rest;
     var type_str: []const u8 = "";
-    if (std.mem.indexOf(u8, rest, " ")) |sp| {
-        type_str = rest[0..sp];          // first token = type
-        name = std.mem.trim(u8, rest[sp + 1..], " \t"); // second token = name
+    if (is_method) {
+        // Method-first syntax: `methodName(params) ReturnType`
+        // Split at the closing ')' — everything before+including it is the name,
+        // everything after (trimmed) is the return type.
+        if (std.mem.lastIndexOfScalar(u8, rest, ')')) |rp| {
+            name = rest[0 .. rp + 1];
+            type_str = std.mem.trim(u8, rest[rp + 1 ..], " \t");
+        }
+    } else if (std.mem.indexOf(u8, rest, " ")) |sp| {
+        // Field syntax: `Type name`
+        type_str = rest[0..sp];
+        name = std.mem.trim(u8, rest[sp + 1..], " \t");
     }
     return Member{ .visibility = vis, .name = name, .type_str = type_str, .is_method = is_method };
 }
