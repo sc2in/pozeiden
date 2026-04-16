@@ -138,32 +138,128 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     try svg.header(svg_w, svg_h);
     try svg.defs(arrow_marker_defs);
 
-    // Draw subgraph background boxes (behind edges and nodes)
+    // Draw subgraph background boxes (behind edges and nodes).
+    // Nested subgraphs are supported: bboxes are computed bottom-up (leaf → root)
+    // so that child bboxes contribute to their parent's bbox.
+    // Rendering order is root-first so inner boxes paint on top of outer boxes.
     const subgraphs_val = node.getList("subgraphs");
-    for (subgraphs_val) |sgv| {
-        const sgn = sgv.asNode() orelse continue;
-        const label = sgn.getString("label") orelse "";
-        const members = sgn.getList("members");
-        if (members.len == 0) continue;
+    const n_sg = subgraphs_val.len;
 
-        // Compute bounding box of member nodes
-        var min_x: f32 = std.math.floatMax(f32);
-        var min_y: f32 = std.math.floatMax(f32);
-        var max_x: f32 = -std.math.floatMax(f32);
-        var max_y: f32 = -std.math.floatMax(f32);
-        for (members) |mv| {
+    // Build subgraph id → index map
+    var sg_id_to_idx = std.StringHashMap(usize).init(allocator);
+    defer sg_id_to_idx.deinit();
+    for (subgraphs_val, 0..) |sgv, si| {
+        const sgn = sgv.asNode() orelse continue;
+        const sgid = sgn.getString("id") orelse sgn.getString("label") orelse continue;
+        try sg_id_to_idx.put(sgid, si);
+    }
+
+    // For each subgraph track parent index (maxInt = no parent)
+    var sg_parent = try allocator.alloc(usize, n_sg);
+    defer allocator.free(sg_parent);
+    for (sg_parent) |*p| p.* = std.math.maxInt(usize);
+    // A subgraph A is the parent of B if B's id appears in A's members list
+    for (subgraphs_val, 0..) |sgv, si| {
+        const sgn = sgv.asNode() orelse continue;
+        for (sgn.getList("members")) |mv| {
             const mid = mv.asString() orelse continue;
-            const mn = findNode(graph.nodes, mid) orelse continue;
-            if (mn.x < min_x) min_x = mn.x;
-            if (mn.y < min_y) min_y = mn.y;
-            if (mn.x + mn.w > max_x) max_x = mn.x + mn.w;
-            if (mn.y + mn.h > max_y) max_y = mn.y + mn.h;
+            if (sg_id_to_idx.get(mid)) |child_idx| {
+                sg_parent[child_idx] = si;
+            }
         }
-        if (min_x >= max_x) continue;
-        const pad: f32 = 16;
-        try svg.rect(min_x - pad, min_y - pad, max_x - min_x + pad * 2, max_y - min_y + pad * 2,
+    }
+
+    // Compute per-subgraph bboxes bottom-up.
+    // sg_bbox[i] = {min_x, min_y, max_x, max_y} or null if no nodes
+    const BBox = struct { min_x: f32, min_y: f32, max_x: f32, max_y: f32 };
+    var sg_bbox = try allocator.alloc(?BBox, n_sg);
+    defer allocator.free(sg_bbox);
+    for (sg_bbox) |*b| b.* = null;
+
+    // Process in multiple passes until no changes (topological order from leaves)
+    var changed = true;
+    var pass: usize = 0;
+    while (changed and pass < n_sg + 1) : (pass += 1) {
+        changed = false;
+        for (subgraphs_val, 0..) |sgv, si| {
+            const sgn = sgv.asNode() orelse continue;
+            var min_x: f32 = std.math.floatMax(f32);
+            var min_y: f32 = std.math.floatMax(f32);
+            var max_x: f32 = -std.math.floatMax(f32);
+            var max_y: f32 = -std.math.floatMax(f32);
+            // Expand bbox to include member nodes
+            for (sgn.getList("members")) |mv| {
+                const mid = mv.asString() orelse continue;
+                // Is this member another subgraph? Use its bbox.
+                if (sg_id_to_idx.get(mid)) |child_si| {
+                    if (sg_bbox[child_si]) |cb| {
+                        if (cb.min_x < min_x) min_x = cb.min_x;
+                        if (cb.min_y < min_y) min_y = cb.min_y;
+                        if (cb.max_x > max_x) max_x = cb.max_x;
+                        if (cb.max_y > max_y) max_y = cb.max_y;
+                    }
+                    continue;
+                }
+                // Regular node
+                const mn = findNode(graph.nodes, mid) orelse continue;
+                if (mn.x < min_x) min_x = mn.x;
+                if (mn.y < min_y) min_y = mn.y;
+                if (mn.x + mn.w > max_x) max_x = mn.x + mn.w;
+                if (mn.y + mn.h > max_y) max_y = mn.y + mn.h;
+            }
+            if (min_x < max_x) {
+                const new_bb = BBox{ .min_x = min_x, .min_y = min_y, .max_x = max_x, .max_y = max_y };
+                if (sg_bbox[si] == null or
+                    sg_bbox[si].?.min_x != new_bb.min_x or sg_bbox[si].?.max_x != new_bb.max_x or
+                    sg_bbox[si].?.min_y != new_bb.min_y or sg_bbox[si].?.max_y != new_bb.max_y)
+                {
+                    sg_bbox[si] = new_bb;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    // Render: outermost (largest depth from root) subgraphs first so children paint on top.
+    // Compute render depth (root = 0, child = 1, grandchild = 2 …)
+    var sg_depth = try allocator.alloc(usize, n_sg);
+    defer allocator.free(sg_depth);
+    for (sg_depth) |*d| d.* = 0;
+    for (0..n_sg) |_| {
+        for (0..n_sg) |si| {
+            if (sg_parent[si] != std.math.maxInt(usize))
+                sg_depth[si] = sg_depth[sg_parent[si]] + 1;
+        }
+    }
+    // Sort: render highest depth first so outermost are drawn last (on top would
+    // block nodes).  Actually we want outermost (depth 0) drawn first (bottom layer)
+    // and inner drawn later — std order (depth 0 first, then 1, 2…) is correct.
+    // Use a simple selection-sort style: render in order of ascending depth.
+    var sg_render_order = try allocator.alloc(usize, n_sg);
+    defer allocator.free(sg_render_order);
+    for (sg_render_order, 0..) |*r, i| r.* = i;
+    // Bubble sort by sg_depth ascending
+    for (0..n_sg) |i| {
+        for (0..n_sg - i - 1) |j| {
+            if (sg_depth[sg_render_order[j]] > sg_depth[sg_render_order[j + 1]]) {
+                const tmp = sg_render_order[j];
+                sg_render_order[j] = sg_render_order[j + 1];
+                sg_render_order[j + 1] = tmp;
+            }
+        }
+    }
+
+    const pad: f32 = 16;
+    for (sg_render_order) |si| {
+        const bb = sg_bbox[si] orelse continue;
+        const sgn = subgraphs_val[si].asNode() orelse continue;
+        const label = sgn.getString("label") orelse "";
+        // Nested subgraphs get slightly more padding to visually separate levels
+        const extra: f32 = @as(f32, @floatFromInt(sg_depth[si])) * 8;
+        const p = pad + extra;
+        try svg.rect(bb.min_x - p, bb.min_y - p, bb.max_x - bb.min_x + p * 2, bb.max_y - bb.min_y + p * 2,
             6.0, "#f0f4ff", "#b0c0e8", 1.2);
-        try svg.text(min_x - pad + 6, min_y - pad + 13, label,
+        try svg.text(bb.min_x - p + 6, bb.min_y - p + 13, label,
             "#4466aa", theme.font_size_small, .start, "normal");
     }
 

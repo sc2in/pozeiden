@@ -1810,10 +1810,20 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var notes_list: std.ArrayList(Value) = .empty;
     var seen = std.StringHashMap(void).init(a);
 
+    // CompoundInfo tracks per-compound membership, split by concurrent region.
+    // `regions` is a list of member-id lists, one per region separated by `--`.
     const CompoundInfo = struct {
         id: []const u8,
-        members: std.ArrayList([]const u8) = .empty,
-        divider_count: usize = 0,
+        regions: std.ArrayList(std.ArrayList([]const u8)) = .empty,
+
+        fn currentRegion(self: *@This()) *std.ArrayList([]const u8) {
+            return &self.regions.items[self.regions.items.len - 1];
+        }
+        fn addMember(self: *@This(), alloc: std.mem.Allocator, id: []const u8) !void {
+            const region = self.currentRegion();
+            for (region.items) |m| if (std.mem.eql(u8, m, id)) return;
+            try region.append(alloc, id);
+        }
     };
     var compound_stack: std.ArrayList(CompoundInfo) = .empty;
     var compounds_list: std.ArrayList(Value) = .empty;
@@ -1867,16 +1877,20 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             } else {
                 // "state id" or "state id {": register with id as label
                 const id = std.mem.trim(u8, rest, " \t{\"");
-                if (id.len > 0) try addState(&states, &seen, a, id, id, "");
+                const is_compound_opener = id.len > 0 and std.mem.indexOf(u8, rest, "{") != null;
+                // Compound headers get shape "compound" so the renderer knows not to draw them as rects
+                if (id.len > 0) try addState(&states, &seen, a, id, id, if (is_compound_opener) "compound" else "");
                 // Compound opener: push a new compound entry
-                if (id.len > 0 and std.mem.indexOf(u8, rest, "{") != null) {
+                if (is_compound_opener) {
                     if (compound_stack.items.len > 0) {
-                        const parent = &compound_stack.items[compound_stack.items.len - 1];
-                        var already = false;
-                        for (parent.members.items) |m| if (std.mem.eql(u8, m, id)) { already = true; break; };
-                        if (!already) try parent.members.append(a, id);
+                        // Register this compound as a member of its parent compound
+                        try compound_stack.items[compound_stack.items.len - 1].addMember(a, id);
                     }
-                    try compound_stack.append(a, CompoundInfo{ .id = try a.dupe(u8, id) });
+                    var ci = CompoundInfo{ .id = try a.dupe(u8, id) };
+                    // Start with one empty region
+                    const first_region: std.ArrayList([]const u8) = .empty;
+                    try ci.regions.append(a, first_region);
+                    try compound_stack.append(a, ci);
                 }
             }
             continue;
@@ -1888,20 +1902,25 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 const ci = compound_stack.pop().?;
                 var cn = Value.Node{ .type_name = "compound", .fields = .{} };
                 try cn.fields.put(a, "id", Value{ .string = ci.id });
-                var mv: std.ArrayList(Value) = .empty;
-                for (ci.members.items) |m| try mv.append(a, Value{ .string = m });
-                try cn.fields.put(a, "members", Value{ .list = try mv.toOwnedSlice(a) });
-                try cn.fields.put(a, "dividers", Value{ .number = @floatFromInt(ci.divider_count) });
+                // Emit `regions`: list of lists, one per concurrent region
+                var regions_val: std.ArrayList(Value) = .empty;
+                for (ci.regions.items) |region| {
+                    var region_val: std.ArrayList(Value) = .empty;
+                    for (region.items) |m| try region_val.append(a, Value{ .string = m });
+                    try regions_val.append(a, Value{ .list = try region_val.toOwnedSlice(a) });
+                }
+                try cn.fields.put(a, "regions", Value{ .list = try regions_val.toOwnedSlice(a) });
                 try compounds_list.append(a, Value{ .node = cn });
             }
             continue;
         }
         // Skip orphan `{` lines
         if (std.mem.indexOf(u8, line, "{") != null) continue;
-        // Concurrent region separator (-- or ---): record divider
+        // Concurrent region separator (-- or ---): start a new region
         if (std.mem.eql(u8, line, "---") or std.mem.eql(u8, line, "--")) {
             if (compound_stack.items.len > 0) {
-                compound_stack.items[compound_stack.items.len - 1].divider_count += 1;
+                const new_region: std.ArrayList([]const u8) = .empty;
+                try compound_stack.items[compound_stack.items.len - 1].regions.append(a, new_region);
             }
             continue;
         }
@@ -1942,31 +1961,53 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
 
             if (from.len == 0 or to.len == 0) continue;
             // Map pseudo-state identifiers to canonical IDs.
-            // [*] as source = initial; [*] as target = final (distinct id for BFS).
+            // When inside a compound, scope [*] to avoid aliasing the global initial state.
             // [H] = shallow history; [H*] = deep history.
-            const from_id = if (std.mem.eql(u8, from, "[*]")) "[*]" else from;
-            const to_id = if (std.mem.eql(u8, to, "[*]")) "[*]-end" else to;
-            const from_shp = if (std.mem.eql(u8, from_id, "[H]")) "history"
-                             else if (std.mem.eql(u8, from_id, "[H*]")) "deepHistory" else "";
-            const to_shp   = if (std.mem.eql(u8, to_id, "[H]")) "history"
-                             else if (std.mem.eql(u8, to_id, "[H*]")) "deepHistory" else "";
-            try addState(&states, &seen, a, from_id, from_id, from_shp);
-            try addState(&states, &seen, a, to_id, to_id, to_shp);
+            const in_compound = compound_stack.items.len > 0;
+            const comp_id_cur: []const u8 = if (in_compound)
+                compound_stack.items[compound_stack.items.len - 1].id
+            else "";
+
+            const from_id: []const u8 = if (std.mem.eql(u8, from, "[*]")) blk: {
+                if (in_compound)
+                    break :blk try std.fmt.allocPrint(a, "{s}.[*]", .{comp_id_cur})
+                else
+                    break :blk "[*]";
+            } else from;
+
+            const to_id: []const u8 = if (std.mem.eql(u8, to, "[*]")) blk: {
+                if (in_compound)
+                    break :blk try std.fmt.allocPrint(a, "{s}.[*]-end", .{comp_id_cur})
+                else
+                    break :blk "[*]-end";
+            } else to;
+
+            const from_shp = if (std.mem.eql(u8, from, "[H]")) "history"
+                             else if (std.mem.eql(u8, from, "[H*]")) "deepHistory" else "";
+            const to_shp   = if (std.mem.eql(u8, to, "[H]")) "history"
+                             else if (std.mem.eql(u8, to, "[H*]")) "deepHistory" else "";
+            // Scoped initial/final states get shape "initial"/"final" so renderer can draw them
+            const from_shp2 = if (std.mem.endsWith(u8, from_id, ".[*]")) "initial"
+                              else if (std.mem.endsWith(u8, from_id, ".[*]-end")) "final"
+                              else from_shp;
+            const to_shp2   = if (std.mem.endsWith(u8, to_id, ".[*]")) "initial"
+                              else if (std.mem.endsWith(u8, to_id, ".[*]-end")) "final"
+                              else to_shp;
+            try addState(&states, &seen, a, from_id, from_id, from_shp2);
+            try addState(&states, &seen, a, to_id, to_id, to_shp2);
 
             var tn = Value.Node{ .type_name = "transition", .fields = .{} };
             try tn.fields.put(a, "from", Value{ .string = from_id });
             try tn.fields.put(a, "to", Value{ .string = to_id });
             try tn.fields.put(a, "label", Value{ .string = lbl });
             try transitions.append(a, Value{ .node = tn });
-            // Track from/to as members of the active compound (skip pseudo-states)
-            if (compound_stack.items.len > 0) {
+            // Track both endpoints as members of the active compound's current region
+            if (in_compound) {
                 const top = &compound_stack.items[compound_stack.items.len - 1];
-                const ids = [2][]const u8{ from_id, to_id };
-                for (ids) |sid| {
-                    if (std.mem.eql(u8, sid, "[*]") or std.mem.eql(u8, sid, "[*]-end")) continue;
-                    var already = false;
-                    for (top.members.items) |m| if (std.mem.eql(u8, m, sid)) { already = true; break; };
-                    if (!already) try top.members.append(a, sid);
+                for ([2][]const u8{ from_id, to_id }) |sid| {
+                    // Don't add the compound header itself as its own member
+                    if (std.mem.eql(u8, sid, top.id)) continue;
+                    try top.addMember(a, sid);
                 }
             }
         }
