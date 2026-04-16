@@ -35,7 +35,6 @@
       overflow: hidden;
     }
 
-    /* ── Header ───────────────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
@@ -54,7 +53,6 @@
       letter-spacing: 0.05em;
       white-space: nowrap;
     }
-
     .logo span { color: var(--text-dim); font-weight: 400; font-size: 0.8rem; margin-left: 6px; }
 
     #example-select {
@@ -71,7 +69,24 @@
 
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-    #copy-btn {
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 26px;
+      padding: 0 8px;
+      border-radius: 13px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .chip-label { color: var(--text-dim); font-weight: 600; }
+    .chip-val   { color: var(--green); font-variant-numeric: tabular-nums; }
+    .chip-val.loading { color: var(--yellow); }
+    .chip-val.error   { color: var(--red); }
+
+    .hdr-btn {
       background: var(--surface2);
       color: var(--text);
       border: 1px solid var(--border);
@@ -83,25 +98,14 @@
       white-space: nowrap;
       transition: background 0.15s;
     }
-    #copy-btn:hover { background: var(--border); }
+    .hdr-btn:hover { background: var(--border); }
 
-    #status {
-      font-size: 0.78rem;
-      color: var(--text-dim);
-      white-space: nowrap;
-      min-width: 80px;
-      text-align: right;
-    }
-    #status.ok    { color: var(--green); }
-    #status.error { color: var(--red); }
-    #status.loading { color: var(--yellow); }
-
-    /* ── Panel labels ─────────────────────────────────────────── */
     .panel-label {
       height: 28px;
       display: flex;
       align-items: center;
-      padding: 0 12px;
+      padding: 0 10px;
+      gap: 8px;
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 0.1em;
@@ -112,7 +116,33 @@
       flex-shrink: 0;
     }
 
-    /* ── Two-panel layout ─────────────────────────────────────── */
+    .zoom-controls { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+
+    .zoom-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: 4px;
+      width: 22px;
+      height: 20px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s, color 0.1s;
+    }
+    .zoom-btn:hover { background: var(--surface2); color: var(--text); }
+    .zoom-btn.wide  { width: auto; padding: 0 5px; }
+
+    .zoom-level {
+      font-size: 0.66rem;
+      color: var(--text-dim);
+      min-width: 32px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
     .panels {
       flex: 1;
       display: grid;
@@ -148,26 +178,31 @@
       overflow: hidden;
     }
 
-    #preview {
+    #viewport {
       flex: 1;
+      overflow: hidden;
+      background: var(--preview-bg);
+      position: relative;
+      cursor: grab;
+    }
+    #viewport:active { cursor: grabbing; }
+
+    #canvas {
+      position: absolute;
+      top: 0; left: 0;
+      transform-origin: 0 0;
+    }
+    #canvas svg { display: block; border-radius: 4px; }
+
+    #placeholder {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: auto;
-      padding: 20px;
-      background: var(--preview-bg);
-      position: relative;
-    }
-
-    #preview svg {
-      max-width: 100%;
-      height: auto;
-      border-radius: 4px;
-    }
-
-    .placeholder {
       color: #adb5bd;
       font-size: 0.875rem;
+      pointer-events: none;
     }
 
     #wasm-error {
@@ -182,14 +217,11 @@
       justify-content: center;
       text-align: center;
       padding: 24px;
+      z-index: 10;
     }
 
-    /* ── Mobile ───────────────────────────────────────────────── */
     @media (max-width: 680px) {
-      .panels {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr 1fr;
-      }
+      .panels { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
       .editor-pane { border-right: none; border-bottom: 1px solid var(--border); }
     }
   </style>
@@ -202,204 +234,276 @@
     <option value="">— examples —</option>
   </select>
   <div class="header-right">
-    <button id="copy-btn" title="Copy SVG to clipboard">Copy SVG</button>
-    <div id="status" class="loading">Loading…</div>
+    <div class="chip">
+      <span class="chip-label">⚡</span>
+      <span class="chip-val loading" id="render-time">–</span>
+    </div>
+    <button id="copy-btn" class="hdr-btn">Copy SVG</button>
   </div>
 </header>
 
 <div class="panels">
   <div class="editor-pane">
-    <div class="panel-label">Mermaid</div>
+    <div class="panel-label">Mermaid Source</div>
     <textarea id="editor" spellcheck="false" autocorrect="off" autocomplete="off" autocapitalize="off"></textarea>
   </div>
+
   <div class="preview-pane">
-    <div class="panel-label">SVG Preview</div>
-    <div id="preview">
-      <span class="placeholder">Waiting…</span>
+    <div class="panel-label">
+      SVG Preview
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="btn-out">−</button>
+        <span class="zoom-level" id="zoom-label">100%</span>
+        <button class="zoom-btn" id="btn-in">+</button>
+        <button class="zoom-btn wide" id="btn-fit">⊡</button>
+      </div>
+    </div>
+    <div id="viewport">
+      <div id="canvas"></div>
+      <div id="placeholder">Waiting…</div>
       <div id="wasm-error"></div>
     </div>
   </div>
 </div>
 
 <script>
-// ── Example list — content fetched from examples/{name}.mmd at runtime ───────
-const exampleNames = [
-  'flowchart', 'sequence', 'class', 'state', 'er', 'gantt',
-  'gitgraph', 'pie', 'mindmap', 'timeline', 'xychart', 'quadrant',
-  'sankey', 'c4', 'block', 'requirement', 'kanban',
+// ── Examples ──────────────────────────────────────────────────────────────────
+const EXAMPLES = [
+  'flowchart','sequence','class','state','er','gantt','gitgraph','pie',
+  'mindmap','timeline','xychart','quadrant','sankey','c4','block','requirement','kanban',
 ];
-
-const exampleCache = {}; // name → fetched text
-
-async function loadExample(name) {
-  if (exampleCache[name]) return exampleCache[name];
-  const res = await fetch(`examples/${name}.mmd`);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  const text = await res.text();
-  exampleCache[name] = text;
-  return text;
+const cache = {};
+async function fetchExample(name) {
+  if (cache[name]) return cache[name];
+  const r = await fetch(`examples/${name}.mmd`);
+  if (!r.ok) throw new Error(r.status);
+  return (cache[name] = await r.text());
 }
 
-// ── WASM bridge ───────────────────────────────────────────────────────────────
-let wasm = null;
-let lastSvgText = '';
+// ── WASM ──────────────────────────────────────────────────────────────────────
+let wasm = null, lastSvg = '';
+const buf = () => wasm ? wasm.memory.buffer : new ArrayBuffer(0);
 
-// Always fetch a fresh reference — memory.buffer can be detached after grow.
-function wasmMemBuf() { return wasm ? wasm.memory.buffer : new ArrayBuffer(0); }
-
-// Minimal WASI shim — only the 5 fd_* calls the module imports.
-// These are used by Zig's panic/stdio path and won't be called during
-// normal rendering; stubs returning EBADF (8) are sufficient.
-function makeWasiShim(getMemory) {
-  const EBADF = 8, SUCCESS = 0;
-  return {
-    wasi_snapshot_preview1: {
-      fd_write(fd, iovs_ptr, iovs_len, nwritten_ptr) {
-        // Allow stderr (2) writes so panic messages appear in the console.
-        const mem = new DataView(getMemory());
-        let written = 0;
-        for (let i = 0; i < iovs_len; i++) {
-          const base = mem.getUint32(iovs_ptr + i * 8, true);
-          const len  = mem.getUint32(iovs_ptr + i * 8 + 4, true);
-          if (fd === 2 /* stderr */) {
-            const bytes = new Uint8Array(getMemory(), base, len);
-            console.warn('[wasm stderr]', new TextDecoder().decode(bytes));
-          }
-          written += len;
-        }
-        mem.setUint32(nwritten_ptr, written, true);
-        return SUCCESS;
-      },
-      fd_read()        { return EBADF; },
-      fd_filestat_get(){ return EBADF; },
-      fd_seek()        { return EBADF; },
-      fd_pwrite()      { return EBADF; },
-    },
-  };
-}
-
-async function loadWasm() {
-  try {
-    const shim = makeWasiShim(() => wasmMemBuf());
-    const result = await WebAssembly.instantiateStreaming(fetch('pozeiden.wasm'), shim);
-    wasm = result.instance.exports;
-    setStatus('Ready', 'ok');
-    // Load and render the default example
-    const editor = document.getElementById('editor');
-    const sel = document.getElementById('example-select');
-    sel.value = 'flowchart';
-    try {
-      const text = await loadExample('flowchart');
-      editor.value = text;
-      doRender(text);
-    } catch {
-      doRender(editor.value);
+const wasiShim = { wasi_snapshot_preview1: {
+  fd_write(fd, iov, n, nw) {
+    const v = new DataView(buf()); let w = 0;
+    for (let i = 0; i < n; i++) {
+      const b = v.getUint32(iov + i*8, true), l = v.getUint32(iov + i*8+4, true);
+      if (fd === 2) console.warn('[wasm]', new TextDecoder().decode(new Uint8Array(buf(), b, l)));
+      w += l;
     }
-  } catch (err) {
-    const errEl = document.getElementById('wasm-error');
-    errEl.style.display = 'flex';
-    errEl.textContent = 'Failed to load pozeiden.wasm\n\n' + String(err) +
-      '\n\nServe this directory over HTTP (e.g. python3 -m http.server)';
-    setStatus('Load failed', 'error');
-  }
+    v.setUint32(nw, w, true); return 0;
+  },
+  fd_read(){ return 8; }, fd_filestat_get(){ return 8; },
+  fd_seek(){ return 8; }, fd_pwrite(){ return 8; },
+}};
+
+// ── Timing ────────────────────────────────────────────────────────────────────
+function fmt(ms) {
+  if (ms < 1)  return Math.round(ms * 1000) + ' µs';
+  return parseFloat(ms.toFixed(2)) + ' ms';
 }
 
-function doRender(text) {
+// ── Zoom / pan ────────────────────────────────────────────────────────────────
+const viewport = document.getElementById('viewport');
+const canvas   = document.getElementById('canvas');
+const zoomLbl  = document.getElementById('zoom-label');
+let sc = 1, tx = 0, ty = 0, svgW = 0, svgH = 0;
+
+function applyXform() {
+  canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
+  zoomLbl.textContent = Math.round(sc * 100) + '%';
+}
+
+function fit() {
+  if (!svgW || !svgH) return;
+  const vr = viewport.getBoundingClientRect();
+  // Guard: if the viewport isn't laid out yet, defer to next frame
+  if (vr.width < 10 || vr.height < 10) { requestAnimationFrame(fit); return; }
+  const pad = 24;
+  sc = Math.min((vr.width - pad * 2) / svgW, (vr.height - pad * 2) / svgH, 1);
+  tx = (vr.width  - svgW * sc) / 2;
+  ty = (vr.height - svgH * sc) / 2;
+  applyXform();
+}
+
+function zoomTo(factor, cx, cy) {
+  const ns = Math.min(Math.max(sc * factor, 0.05), 16);
+  const r  = ns / sc;
+  tx = cx - (cx - tx) * r;
+  ty = cy - (cy - ty) * r;
+  sc = ns;
+  applyXform();
+}
+
+document.getElementById('btn-in').addEventListener('click', () => {
+  const r = viewport.getBoundingClientRect();
+  zoomTo(1.25, r.width / 2, r.height / 2);
+});
+document.getElementById('btn-out').addEventListener('click', () => {
+  const r = viewport.getBoundingClientRect();
+  zoomTo(1 / 1.25, r.width / 2, r.height / 2);
+});
+document.getElementById('btn-fit').addEventListener('click', fit);
+
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  zoomTo(e.deltaY < 0 ? 1.12 : 1/1.12, e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+
+{ // drag-to-pan
+  let dn = false, sx = 0, sy = 0, stx = 0, sty = 0;
+  viewport.addEventListener('mousedown', e => {
+    if (e.button) return; dn = true;
+    sx = e.clientX; sy = e.clientY; stx = tx; sty = ty; e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dn) return;
+    tx = stx + e.clientX - sx; ty = sty + e.clientY - sy; applyXform();
+  });
+  window.addEventListener('mouseup', () => { dn = false; });
+}
+
+window.addEventListener('resize', fit);
+
+// ── SVG dimensions (regex — no DOM parse, no ID-table side effects) ───────────
+function svgSize(text) {
+  const tag = text.match(/<svg[^>]+>/)?.[0] ?? '';
+  const w = parseFloat(tag.match(/\bwidth="([^"]+)"/)?.[1] ?? '0');
+  const h = parseFloat(tag.match(/\bheight="([^"]+)"/)?.[1] ?? '0');
+  if (w > 0 && h > 0) return [w, h];
+  // fall back to last two numbers in viewBox
+  const vb = tag.match(/\bviewBox="[^"]*\s+([\d.]+)\s+([\d.]+)"/);
+  if (vb) return [parseFloat(vb[1]), parseFloat(vb[2])];
+  return [400, 300];
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+// Inline SVG with per-render ID mangling.
+// Pozeiden emits fixed marker IDs (e.g. id="arrow") that go into the browser's
+// global ID table when SVGs are injected inline.  Replacing innerHTML while a
+// previous paint job still holds a url(#arrow) reference can cause a
+// use-after-free inside Blink's SVG paint server, crashing the tab.
+// Fix: prefix every id/url-ref with a short random tag so each render's IDs
+// are unique and no stale reference can survive across renders.
+const timeEl      = document.getElementById('render-time');
+const placeholder  = document.getElementById('placeholder');
+
+let renderId = 0; // monotonically increasing render nonce
+
+function render(text) {
   if (!wasm) return;
+  timeEl.className = 'chip-val loading';
+  timeEl.textContent = '…';
+
   const t0 = performance.now();
   try {
-    const bytes = new TextEncoder().encode(text);
-    const inputPtr = wasm.get_input_ptr();
-    new Uint8Array(wasmMemBuf()).set(bytes, inputPtr);
-    const svgLen = wasm.render(bytes.length);
-    if (svgLen === 0) {
-      setStatus('Error', 'error');
-      document.getElementById('preview').innerHTML =
-        '<span class="placeholder" style="color:#ed8796">Render returned empty output.</span>';
-      lastSvgText = '';
+    const enc = new TextEncoder().encode(text);
+    new Uint8Array(buf()).set(enc, wasm.get_input_ptr());
+    const len = wasm.render(enc.length);
+    const elapsed = performance.now() - t0;
+
+    if (!len) {
+      timeEl.className = 'chip-val error';
+      timeEl.textContent = 'empty';
+      canvas.innerHTML = '';
+      placeholder.style.display = 'flex';
+      placeholder.textContent = 'Render returned empty output.';
+      lastSvg = '';
       return;
     }
-    const outPtr = wasm.get_output_ptr();
-    // Fresh buffer reference after potential memory growth during render()
-    lastSvgText = new TextDecoder().decode(new Uint8Array(wasmMemBuf(), outPtr, svgLen));
-    const ms = (performance.now() - t0).toFixed(1);
-    document.getElementById('preview').innerHTML = lastSvgText;
-    setStatus(`${ms} ms`, 'ok');
-  } catch (err) {
-    setStatus('JS error', 'error');
-    console.error(err);
+
+    lastSvg = new TextDecoder().decode(new Uint8Array(buf(), wasm.get_output_ptr(), len));
+    timeEl.className = 'chip-val';
+    timeEl.textContent = fmt(elapsed);
+    placeholder.style.display = 'none';
+
+    // Mangle all IDs so this render's markers never collide with a previous
+    // render's IDs that may still be live in the browser's paint pipeline.
+    const rid = 'r' + (++renderId);
+    const safeSvg = lastSvg
+      .replace(/\bid="([^"]+)"/g,   `id="$1-${rid}"`)
+      .replace(/url\(#([^)]+)\)/g,  `url(#$1-${rid})`);
+
+    canvas.innerHTML = safeSvg;
+
+    const [w, h] = svgSize(lastSvg);
+    svgW = w; svgH = h;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    fit();
+  } catch (e) {
+    timeEl.className = 'chip-val error';
+    timeEl.textContent = 'error';
+    console.error(e);
   }
 }
 
-function setStatus(msg, cls) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = cls || '';
-}
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const { instance } = await WebAssembly.instantiateStreaming(fetch('pozeiden.wasm'), wasiShim);
+    wasm = instance.exports;
+    timeEl.className = 'chip-val';
+    timeEl.textContent = 'ready';
 
-// ── UI wiring ─────────────────────────────────────────────────────────────────
-let debounceTimer = null;
+    const editor = document.getElementById('editor');
+    document.getElementById('example-select').value = 'flowchart';
+    try {
+      const text = await fetchExample('flowchart');
+      editor.value = text;
+      render(text);
+    } catch { render(editor.value); }
+  } catch (e) {
+    const el = document.getElementById('wasm-error');
+    el.style.display = 'flex';
+    el.textContent = 'Failed to load pozeiden.wasm\n\n' + e +
+      '\n\nServe over HTTP (e.g. python3 -m http.server)';
+    timeEl.className = 'chip-val error';
+    timeEl.textContent = 'load failed';
+  }
+})();
 
+// ── UI ────────────────────────────────────────────────────────────────────────
 const editor = document.getElementById('editor');
-
+let debounce = null;
 editor.addEventListener('input', () => {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => doRender(editor.value), 180);
+  clearTimeout(debounce);
+  debounce = setTimeout(() => render(editor.value), 180);
 });
-
-// Tab key → insert 4 spaces
-editor.addEventListener('keydown', (e) => {
+editor.addEventListener('keydown', e => {
   if (e.key !== 'Tab') return;
   e.preventDefault();
-  const s = editor.selectionStart;
-  const end = editor.selectionEnd;
+  const s = editor.selectionStart, end = editor.selectionEnd;
   editor.value = editor.value.slice(0, s) + '    ' + editor.value.slice(end);
   editor.selectionStart = editor.selectionEnd = s + 4;
 });
 
-// Example dropdown
-const select = document.getElementById('example-select');
-for (const name of exampleNames) {
-  const opt = document.createElement('option');
-  opt.value = name;
-  opt.textContent = name;
-  select.appendChild(opt);
+const sel = document.getElementById('example-select');
+for (const n of EXAMPLES) {
+  const o = document.createElement('option');
+  o.value = n; o.textContent = n; sel.appendChild(o);
 }
-select.addEventListener('change', async () => {
-  const name = select.value;
-  if (!name) return;
-  setStatus('Loading…', 'loading');
-  try {
-    const text = await loadExample(name);
-    editor.value = text;
-    doRender(text);
-  } catch (err) {
-    setStatus('Fetch error', 'error');
-    console.error('Failed to load example:', name, err);
-  }
+sel.addEventListener('change', async () => {
+  const n = sel.value; if (!n) return;
+  try { const t = await fetchExample(n); editor.value = t; render(t); }
+  catch (e) { console.error(e); }
 });
 
-// Copy SVG button
 document.getElementById('copy-btn').addEventListener('click', async () => {
-  if (!lastSvgText) return;
+  if (!lastSvg) return;
   try {
-    await navigator.clipboard.writeText(lastSvgText);
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = 'Copy SVG'; }, 1500);
+    await navigator.clipboard.writeText(lastSvg);
+    const b = document.getElementById('copy-btn');
+    b.textContent = 'Copied!';
+    setTimeout(() => { b.textContent = 'Copy SVG'; }, 1500);
   } catch {
-    // Fallback for non-secure contexts
-    const ta = document.createElement('textarea');
-    ta.value = lastSvgText;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    const t = document.createElement('textarea');
+    t.value = lastSvg; document.body.appendChild(t); t.select();
+    document.execCommand('copy'); document.body.removeChild(t);
   }
 });
-
-// Boot
-loadWasm();
 </script>
 </body>
 </html>
