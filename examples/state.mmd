@@ -1,5 +1,4 @@
 stateDiagram-v2
-    direction LR
     [*] --> Idle : power on
 
     Idle --> Authenticating : login attempt
@@ -32,6 +31,16 @@ stateDiagram-v2
 
     Active --> Idle : logout
     Locked --> Idle : admin unlock
+
+    state Resumable {
+        [*] --> [H]
+        [H] --> Working
+        Working --> Paused : pause
+        Paused --> [H*] : resume
+    }
+
+    Active --> Resumable
+    Resumable --> Active : done
 
     note right of Locked
         Locked after 5\nfailed attempts
