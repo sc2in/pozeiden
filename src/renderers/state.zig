@@ -163,6 +163,62 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }.get;
 
+    // Draw compound state containers (concurrent regions) — drawn first so states sit on top
+    for (node.getList("compounds")) |cv| {
+        const cn = cv.asNode() orelse continue;
+        const comp_id = cn.getString("id") orelse continue;
+        const members_list = cn.getList("members");
+        const dividers = cn.getNumber("dividers") orelse 0;
+        const num_dividers: usize = @intFromFloat(dividers);
+
+        var c_min_col: usize = std.math.maxInt(usize);
+        var c_max_col: usize = 0;
+        var c_min_depth: usize = std.math.maxInt(usize);
+        var c_max_depth: usize = 0;
+        var member_found = false;
+        for (members_list) |mv| {
+            const mid = mv.asString() orelse continue;
+            const si = stateIndex(states.items, mid) orelse continue;
+            const s = states.items[si];
+            member_found = true;
+            if (s.col < c_min_col) c_min_col = s.col;
+            if (s.col > c_max_col) c_max_col = s.col;
+            if (s.depth < c_min_depth) c_min_depth = s.depth;
+            if (s.depth > c_max_depth) c_max_depth = s.depth;
+        }
+        // Also fold the compound state node itself into the bounding box so the
+        // container and its UML node form a single cohesive rectangle.
+        if (stateIndex(states.items, comp_id)) |comp_si| {
+            const cs = states.items[comp_si];
+            member_found = true;
+            if (cs.col < c_min_col) c_min_col = cs.col;
+            if (cs.col > c_max_col) c_max_col = cs.col;
+            if (cs.depth < c_min_depth) c_min_depth = cs.depth;
+            if (cs.depth > c_max_depth) c_max_depth = cs.depth;
+        }
+        if (!member_found) continue;
+
+        const COMP_PAD: f32 = 18;
+        const bx = stateX(c_min_col) - STATE_W / 2 - COMP_PAD;
+        const by = stateY(c_min_depth) - STATE_H / 2 - COMP_PAD;
+        const bw = stateX(c_max_col) + STATE_W / 2 + COMP_PAD - bx;
+        const bh = stateY(c_max_depth) + STATE_H / 2 + COMP_PAD - by;
+
+        try svg.rect(bx, by, bw, bh, 6.0, "none", theme.node_stroke, 1.5);
+        try svg.text(bx + 8, by + 14, comp_id, theme.text_color, theme.font_size_small, .start, "bold");
+
+        if (num_dividers > 0) {
+            const num_regions: f32 = @floatFromInt(num_dividers + 1);
+            for (0..num_dividers) |di| {
+                const div_y = by + (@as(f32, @floatFromInt(di + 1)) / num_regions) * bh;
+                var div_buf: [128]u8 = undefined;
+                const div_d = try std.fmt.bufPrint(&div_buf,
+                    "M {d:.1} {d:.1} L {d:.1} {d:.1}", .{ bx, div_y, bx + bw, div_y });
+                try svg.path(div_d, "none", theme.node_stroke, 1.0, "stroke-dasharray=\"5,3\"");
+            }
+        }
+    }
+
     // Draw transitions first
     for (transitions.items) |t| {
         const fi = stateIndex(states.items, t.from) orelse continue;
@@ -302,6 +358,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
                 .{ cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy });
             try svg.polygon(pts, theme.node_fill, theme.node_stroke, 1.5);
+        } else if (std.mem.eql(u8, s.shape, "history") or std.mem.eql(u8, s.shape, "deepHistory")) {
+            // Shallow history [H] or deep history [H*]: circle with label inside
+            const r: f32 = START_R + 4;
+            try svg.circle(cx, cy, r, theme.node_fill, theme.node_stroke, 1.5);
+            const hist_lbl = if (std.mem.eql(u8, s.shape, "deepHistory")) "H*" else "H";
+            try svg.text(cx, cy + 4, hist_lbl, theme.text_color, 10, .middle, "bold");
         } else {
             try svg.rect(cx - STATE_W / 2, cy - STATE_H / 2, STATE_W, STATE_H, 18.0, theme.node_fill, theme.node_stroke, 1.5);
             try svg.textWrapped(cx, cy + 5, s.label, STATE_W - 8, theme.text_color, theme.font_size, .middle, "normal");

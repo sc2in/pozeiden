@@ -26,6 +26,7 @@ const Commit = struct {
     label: []const u8,
     commit_type: []const u8, // "NORMAL", "REVERSE", "HIGHLIGHT"
     merge_from: ?[]const u8, // branch name being merged if this is a merge commit
+    cherry_pick_from: ?[]const u8 = null, // source commit id if this is a cherry-pick
     tag: ?[]const u8 = null,
     x: f32 = 0,
     y: f32 = 0,
@@ -150,6 +151,33 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 .x = new_x,
                 .y = y,
             });
+        } else if (std.mem.eql(u8, type_name, "CherryPicking")) {
+            const src_id = sn.getString("id") orelse continue;
+
+            commit_counter += 1;
+            var id_buf: [32]u8 = undefined;
+            const cp_id = try std.fmt.bufPrint(&id_buf, "cp{d}", .{commit_counter});
+
+            const cur_x = branch_x.get(current_branch) orelse MARGIN_X;
+            const new_x = cur_x + COMMIT_STEP;
+            try branch_x.put(current_branch, new_x);
+
+            const lane = branchLane(branches.items, current_branch) orelse 0;
+            const y = MARGIN_Y + @as(f32, @floatFromInt(lane)) * LANE_H + LANE_H / 2;
+
+            const id_owned = try a.dupe(u8, cp_id);
+            const src_owned = try a.dupe(u8, src_id);
+            const branch_owned2 = try a.dupe(u8, current_branch);
+            try commits.append(a, Commit{
+                .id = id_owned,
+                .branch = branch_owned2,
+                .label = "",
+                .commit_type = "NORMAL",
+                .merge_from = null,
+                .cherry_pick_from = src_owned,
+                .x = new_x,
+                .y = y,
+            });
         }
     }
 
@@ -198,6 +226,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 const br = getBranch(branches.items, c.branch);
                 const color = if (br) |b| b.color else theme.signal_color;
                 try svg.line(pc.x, pc.y, c.x, c.y, color, 2.0);
+            }
+        }
+    }
+
+    // Draw cherry-pick edges (dashed line from source commit to cherry-pick commit)
+    for (commits.items) |c| {
+        const src_id = c.cherry_pick_from orelse continue;
+        for (commits.items) |src| {
+            if (std.mem.eql(u8, src.id, src_id)) {
+                try svg.dashedLine(src.x, src.y, c.x, c.y, "#888888", 1.5, "5,3");
+                break;
             }
         }
     }

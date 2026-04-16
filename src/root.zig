@@ -889,12 +889,17 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         members: std.ArrayList(Value),
     };
     var subgraphs: std.ArrayList(Subgraph) = .empty;
-    var cur_subgraph: ?usize = null; // index into subgraphs
+    // Stack of subgraph indices — supports arbitrary nesting depth.
+    // The top of the stack is the innermost (currently active) subgraph.
+    var subgraph_stack: std.ArrayList(usize) = .empty;
 
     const addNodeToSubgraph = struct {
-        fn run(sgs: *std.ArrayList(Subgraph), idx: ?usize, alloc: std.mem.Allocator, id: []const u8) !void {
-            const i = idx orelse return;
-            try sgs.items[i].members.append(alloc, Value{ .string = id });
+        fn run(sgs: *std.ArrayList(Subgraph), stack: *const std.ArrayList(usize), alloc: std.mem.Allocator, id: []const u8) !void {
+            // Add the node to all active subgraphs (innermost + ancestors) so that
+            // outer bounding boxes correctly enclose their nested children.
+            for (stack.items) |sg_idx| {
+                try sgs.items[sg_idx].members.append(alloc, Value{ .string = id });
+            }
         }
     }.run;
 
@@ -993,11 +998,11 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             };
             const sg_idx = subgraphs.items.len;
             try subgraphs.append(a, .{ .id = sg_id, .label = label, .members = .empty });
-            cur_subgraph = sg_idx;
+            try subgraph_stack.append(a, sg_idx);
             continue;
         }
-        if (std.mem.eql(u8, line, "end") and cur_subgraph != null) {
-            cur_subgraph = null;
+        if (std.mem.eql(u8, line, "end") and subgraph_stack.items.len > 0) {
+            _ = subgraph_stack.pop();
             continue;
         }
 
@@ -1060,7 +1065,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = from_label });
                 try n.fields.put(a, "shape", Value{ .string = from_shape });
                 try nodes_list.append(a, Value{ .node = n });
-                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, from_id);
+                try addNodeToSubgraph(&subgraphs, &subgraph_stack, a, from_id);
             }
             if (seen_nodes.get(to_id) == null) {
                 try seen_nodes.put(to_id, {});
@@ -1069,7 +1074,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = to_label });
                 try n.fields.put(a, "shape", Value{ .string = to_shape });
                 try nodes_list.append(a, Value{ .node = n });
-                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, to_id);
+                try addNodeToSubgraph(&subgraphs, &subgraph_stack, a, to_id);
             }
 
             // Add edge
@@ -1097,7 +1102,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
                 try n.fields.put(a, "label", Value{ .string = node_label });
                 try n.fields.put(a, "shape", Value{ .string = node_shape });
                 try nodes_list.append(a, Value{ .node = n });
-                try addNodeToSubgraph(&subgraphs, cur_subgraph, a, node_id);
+                try addNodeToSubgraph(&subgraphs, &subgraph_stack, a, node_id);
                 if (standalone_class) |cn| try node_class_map.put(node_id, cn);
             }
         }
@@ -1415,6 +1420,41 @@ fn renderSequenceDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
                 try sig.fields.put(a, "position", Value{ .string = "over" });
             }
             try signals_list.append(a, Value{ .node = sig });
+            continue;
+        }
+        // ref over Actor1[, Actor2]: text   — UML "ref" interaction fragment
+        // Also supports multi-line: ref over Actor1\n  text\nend
+        if (std.mem.startsWith(u8, line, "ref over ") or std.mem.startsWith(u8, line, "ref ")) {
+            const after_kw: []const u8 = if (std.mem.startsWith(u8, line, "ref over ")) line[9..] else line[4..];
+            const colon_pos = std.mem.indexOfScalar(u8, after_kw, ':');
+            const actors_raw = std.mem.trim(u8, if (colon_pos) |cp| after_kw[0..cp] else after_kw, " \t");
+            var ref_text: []const u8 = if (colon_pos) |cp| std.mem.trim(u8, after_kw[cp + 1 ..], " \t") else "";
+            var actor1: []const u8 = actors_raw;
+            var actor2: ?[]const u8 = null;
+            if (std.mem.indexOfScalar(u8, actors_raw, ',')) |ci| {
+                actor1 = std.mem.trim(u8, actors_raw[0..ci], " \t");
+                actor2 = std.mem.trim(u8, actors_raw[ci + 1 ..], " \t");
+            }
+            // Multi-line: collect lines until "end" when no inline text
+            if (ref_text.len == 0) {
+                var text_buf: std.ArrayList(u8) = .empty;
+                while (lines.next()) |raw2| {
+                    const l2 = std.mem.trim(u8, raw2, " \t\r");
+                    if (std.mem.eql(u8, l2, "end")) break;
+                    if (l2.len == 0) continue;
+                    if (text_buf.items.len > 0) try text_buf.append(a, ' ');
+                    try text_buf.appendSlice(a, l2);
+                }
+                ref_text = try text_buf.toOwnedSlice(a);
+            }
+            var sig = Value.Node{ .type_name = "signal", .fields = .{} };
+            try sig.fields.put(a, "type", Value{ .string = "ref" });
+            try sig.fields.put(a, "actor1", Value{ .string = actor1 });
+            if (actor2) |a2| try sig.fields.put(a, "actor2", Value{ .string = a2 });
+            try sig.fields.put(a, "blockText", Value{ .string = ref_text });
+            try sig.fields.put(a, "row", Value{ .number = @floatFromInt(msg_count) });
+            try signals_list.append(a, Value{ .node = sig });
+            msg_count += 1;
             continue;
         }
         if (std.mem.startsWith(u8, line, "else") or
@@ -1770,13 +1810,22 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var notes_list: std.ArrayList(Value) = .empty;
     var seen = std.StringHashMap(void).init(a);
 
+    const CompoundInfo = struct {
+        id: []const u8,
+        members: std.ArrayList([]const u8) = .empty,
+        divider_count: usize = 0,
+    };
+    var compound_stack: std.ArrayList(CompoundInfo) = .empty;
+    var compounds_list: std.ArrayList(Value) = .empty;
+
     const addState = struct {
-        fn run(sl: *std.ArrayList(Value), s: *std.StringHashMap(void), alloc: std.mem.Allocator, id: []const u8, lbl: []const u8) !void {
+        fn run(sl: *std.ArrayList(Value), s: *std.StringHashMap(void), alloc: std.mem.Allocator, id: []const u8, lbl: []const u8, shp: []const u8) !void {
             if (s.get(id) != null) return;
             try s.put(id, {});
             var sn = Value.Node{ .type_name = "state", .fields = .{} };
             try sn.fields.put(alloc, "id", Value{ .string = id });
             try sn.fields.put(alloc, "label", Value{ .string = lbl });
+            if (shp.len > 0) try sn.fields.put(alloc, "shape", Value{ .string = shp });
             try sl.append(alloc, Value{ .node = sn });
         }
     }.run;
@@ -1814,19 +1863,48 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             } else if (std.mem.indexOf(u8, rest, " as ")) |ai| {
                 const lbl_raw = std.mem.trim(u8, rest[0..ai], " \t\"");
                 const id = std.mem.trim(u8, rest[ai + 4 ..], " \t{");
-                if (id.len > 0) try addState(&states, &seen, a, id, lbl_raw);
+                if (id.len > 0) try addState(&states, &seen, a, id, lbl_raw, "");
             } else {
                 // "state id" or "state id {": register with id as label
                 const id = std.mem.trim(u8, rest, " \t{\"");
-                if (id.len > 0) try addState(&states, &seen, a, id, id);
+                if (id.len > 0) try addState(&states, &seen, a, id, id, "");
+                // Compound opener: push a new compound entry
+                if (id.len > 0 and std.mem.indexOf(u8, rest, "{") != null) {
+                    if (compound_stack.items.len > 0) {
+                        const parent = &compound_stack.items[compound_stack.items.len - 1];
+                        var already = false;
+                        for (parent.members.items) |m| if (std.mem.eql(u8, m, id)) { already = true; break; };
+                        if (!already) try parent.members.append(a, id);
+                    }
+                    try compound_stack.append(a, CompoundInfo{ .id = try a.dupe(u8, id) });
+                }
             }
             continue;
         }
 
-        // Skip compound state opens/closes
-        if (std.mem.eql(u8, line, "}") or std.mem.indexOf(u8, line, "{") != null) continue;
-        // Concurrent state separator (---): rendered as visual divider; treated as no-op in flat parser
-        if (std.mem.eql(u8, line, "---")) continue;
+        // Compound state close: pop compound stack and record it
+        if (std.mem.eql(u8, line, "}")) {
+            if (compound_stack.items.len > 0) {
+                const ci = compound_stack.pop().?;
+                var cn = Value.Node{ .type_name = "compound", .fields = .{} };
+                try cn.fields.put(a, "id", Value{ .string = ci.id });
+                var mv: std.ArrayList(Value) = .empty;
+                for (ci.members.items) |m| try mv.append(a, Value{ .string = m });
+                try cn.fields.put(a, "members", Value{ .list = try mv.toOwnedSlice(a) });
+                try cn.fields.put(a, "dividers", Value{ .number = @floatFromInt(ci.divider_count) });
+                try compounds_list.append(a, Value{ .node = cn });
+            }
+            continue;
+        }
+        // Skip orphan `{` lines
+        if (std.mem.indexOf(u8, line, "{") != null) continue;
+        // Concurrent region separator (-- or ---): record divider
+        if (std.mem.eql(u8, line, "---") or std.mem.eql(u8, line, "--")) {
+            if (compound_stack.items.len > 0) {
+                compound_stack.items[compound_stack.items.len - 1].divider_count += 1;
+            }
+            continue;
+        }
         // note right of StateId: text  /  note left of StateId: text
         if (std.mem.startsWith(u8, line, "note ")) {
             const rest = line[5..];
@@ -1863,18 +1941,34 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 "";
 
             if (from.len == 0 or to.len == 0) continue;
-            // [*] as source = initial pseudo-state; [*] as target = final pseudo-state.
-            // Use distinct ids so the BFS places the end state below the diagram.
+            // Map pseudo-state identifiers to canonical IDs.
+            // [*] as source = initial; [*] as target = final (distinct id for BFS).
+            // [H] = shallow history; [H*] = deep history.
             const from_id = if (std.mem.eql(u8, from, "[*]")) "[*]" else from;
             const to_id = if (std.mem.eql(u8, to, "[*]")) "[*]-end" else to;
-            try addState(&states, &seen, a, from_id, from_id);
-            try addState(&states, &seen, a, to_id, to_id);
+            const from_shp = if (std.mem.eql(u8, from_id, "[H]")) "history"
+                             else if (std.mem.eql(u8, from_id, "[H*]")) "deepHistory" else "";
+            const to_shp   = if (std.mem.eql(u8, to_id, "[H]")) "history"
+                             else if (std.mem.eql(u8, to_id, "[H*]")) "deepHistory" else "";
+            try addState(&states, &seen, a, from_id, from_id, from_shp);
+            try addState(&states, &seen, a, to_id, to_id, to_shp);
 
             var tn = Value.Node{ .type_name = "transition", .fields = .{} };
             try tn.fields.put(a, "from", Value{ .string = from_id });
             try tn.fields.put(a, "to", Value{ .string = to_id });
             try tn.fields.put(a, "label", Value{ .string = lbl });
             try transitions.append(a, Value{ .node = tn });
+            // Track from/to as members of the active compound (skip pseudo-states)
+            if (compound_stack.items.len > 0) {
+                const top = &compound_stack.items[compound_stack.items.len - 1];
+                const ids = [2][]const u8{ from_id, to_id };
+                for (ids) |sid| {
+                    if (std.mem.eql(u8, sid, "[*]") or std.mem.eql(u8, sid, "[*]-end")) continue;
+                    var already = false;
+                    for (top.members.items) |m| if (std.mem.eql(u8, m, sid)) { already = true; break; };
+                    if (!already) try top.members.append(a, sid);
+                }
+            }
         }
     }
 
@@ -1882,6 +1976,7 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     try root.fields.put(a, "states", Value{ .list = try states.toOwnedSlice(a) });
     try root.fields.put(a, "transitions", Value{ .list = try transitions.toOwnedSlice(a) });
     try root.fields.put(a, "notes", Value{ .list = try notes_list.toOwnedSlice(a) });
+    try root.fields.put(a, "compounds", Value{ .list = try compounds_list.toOwnedSlice(a) });
     return state_renderer.render(allocator, Value{ .node = root });
 }
 
@@ -2982,14 +3077,15 @@ test "flowchart BT direction" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
 }
 
-test "flowchart bezier path connector" {
-    // Bezier routing: edges use <path> with cubic curve data
+test "flowchart orthogonal path connector" {
+    // Orthogonal routing: edges use <path> with lineto (L) segments
     const input = "graph TD\nA --> B\nB --> C\n";
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "<path") != null);
-    // Cubic bezier uses 'C' command
-    try std.testing.expect(std.mem.indexOf(u8, svg, " C ") != null);
+    // Orthogonal routing uses 'L' (lineto) commands, not Bezier 'C'
+    try std.testing.expect(std.mem.indexOf(u8, svg, " L ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, " C ") == null);
 }
 
 test "flowchart cylinder hexagon subroutine shapes" {

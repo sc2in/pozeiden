@@ -7,7 +7,7 @@ const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 const theme = @import("../svg/theme.zig");
 
-const LEVEL_RADIUS: f32 = 130;
+const LEVEL_RADIUS: f32 = 165;
 const ROOT_R: f32 = 42;
 const NODE_W: f32 = 88;
 const NODE_H: f32 = 28;
