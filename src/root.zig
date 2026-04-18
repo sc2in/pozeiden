@@ -3729,3 +3729,78 @@ test "renderWithOptions scale factor" {
     const expected: u32 = @intFromFloat(@round(@as(f32, @floatFromInt(full_w)) * 0.5));
     try std.testing.expectEqual(expected, half_w);
 }
+
+test "render unknown diagram type emits fallback SVG" {
+    const svg = try render(std.testing.allocator, "not a diagram at all\n");
+    defer std.testing.allocator.free(svg);
+    // Unknown input produces a fallback SVG, not an error
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "renderWithOptions strict=true returns UnknownDiagramType error" {
+    try std.testing.expectError(
+        error.UnknownDiagramType,
+        renderWithOptions(std.testing.allocator, "not a diagram\n", .{ .strict = true }),
+    );
+}
+
+test "renderWithOptions max_height shrinks SVG proportionally" {
+    const input = "graph TD\nA-->B\nB-->C\n";
+    const svg_full = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg_full);
+    const orig_h = parseSvgDimAttr(svg_full[0 .. std.mem.indexOf(u8, svg_full, ">").? + 1], "height") orelse 0;
+    try std.testing.expect(orig_h > 0);
+
+    const max_h = orig_h / 2;
+    const svg_small = try renderWithOptions(std.testing.allocator, input, .{ .max_height = max_h });
+    defer std.testing.allocator.free(svg_small);
+    const small_h = parseSvgDimAttr(svg_small[0 .. std.mem.indexOf(u8, svg_small, ">").? + 1], "height") orelse 0;
+    try std.testing.expect(small_h <= max_h + 1);
+}
+
+test "renderWithOptions scale=1.0 is identity" {
+    const input = "pie\n\"A\" : 50\n\"B\" : 50\n";
+    const svg_base = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg_base);
+    const svg_scaled = try renderWithOptions(std.testing.allocator, input, .{ .scale = 1.0 });
+    defer std.testing.allocator.free(svg_scaled);
+    const w_base = parseSvgDimAttr(svg_base[0 .. std.mem.indexOf(u8, svg_base, ">").? + 1], "width") orelse 0;
+    const w_scaled = parseSvgDimAttr(svg_scaled[0 .. std.mem.indexOf(u8, svg_scaled, ">").? + 1], "width") orelse 0;
+    try std.testing.expectEqual(w_base, w_scaled);
+}
+
+test "renderWithOptions max_width larger than SVG does not upscale" {
+    const input = "pie\n\"A\" : 50\n\"B\" : 50\n";
+    const svg_full = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg_full);
+    const orig_w = parseSvgDimAttr(svg_full[0 .. std.mem.indexOf(u8, svg_full, ">").? + 1], "width") orelse 0;
+
+    const svg_big = try renderWithOptions(std.testing.allocator, input, .{ .max_width = orig_w * 10 });
+    defer std.testing.allocator.free(svg_big);
+    const big_w = parseSvgDimAttr(svg_big[0 .. std.mem.indexOf(u8, svg_big, ">").? + 1], "width") orelse 0;
+    // Should not be upscaled beyond original
+    try std.testing.expectEqual(orig_w, big_w);
+}
+
+test "render init directive dark theme applies dark background" {
+    // Use pie chart — it draws an explicit background rect using theme.background
+    const input = "%%{init: {'theme': 'dark'}}%%\npie\n\"A\" : 100\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#1a1a2e") != null);
+}
+
+test "render init directive themeVariables primaryColor overrides node fill" {
+    const input = "%%{init: {'themeVariables': {'primaryColor': '#ff1234'}}}%%\ngraph TD\nA-->B\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#ff1234") != null);
+}
+
+test "render init directive unknown theme is silently ignored" {
+    const input = "%%{init: {'theme': 'nonexistent'}}%%\npie\n\"A\" : 100\n";
+    // Should not error — unknown theme is a no-op
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}

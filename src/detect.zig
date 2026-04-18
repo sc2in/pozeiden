@@ -124,3 +124,78 @@ test "detect sequence" {
 test "detect gitgraph" {
     try std.testing.expectEqual(DiagramType.gitgraph, detect("gitGraph\ncommit\n"));
 }
+
+test "detect stateDiagram" {
+    try std.testing.expectEqual(DiagramType.state, detect("stateDiagram-v2\n[*] --> A\n"));
+    try std.testing.expectEqual(DiagramType.state, detect("stateDiagram\n[*] --> A\n"));
+}
+
+test "detect erDiagram" {
+    try std.testing.expectEqual(DiagramType.er, detect("erDiagram\nCUSTOMER ||--o{ ORDER : places\n"));
+}
+
+test "detect gantt" {
+    try std.testing.expectEqual(DiagramType.gantt, detect("gantt\ntitle Schedule\n"));
+}
+
+test "detect timeline" {
+    try std.testing.expectEqual(DiagramType.timeline, detect("timeline\ntitle History\n"));
+}
+
+test "detect xychart" {
+    try std.testing.expectEqual(DiagramType.xychart, detect("xychart-beta\nbar [1,2,3]\n"));
+}
+
+test "detect quadrantChart" {
+    try std.testing.expectEqual(DiagramType.quadrant, detect("quadrantChart\nx-axis A --> B\n"));
+}
+
+test "detect mindmap" {
+    try std.testing.expectEqual(DiagramType.mindmap, detect("mindmap\nroot((Root))\n"));
+}
+
+test "detect sankey" {
+    try std.testing.expectEqual(DiagramType.sankey, detect("sankey-beta\nA,B,10\n"));
+}
+
+test "detect C4Context" {
+    try std.testing.expectEqual(DiagramType.c4, detect("C4Context\nPerson(u, \"User\")\n"));
+}
+
+test "detect C4Container" {
+    try std.testing.expectEqual(DiagramType.c4, detect("C4Container\nContainer(api, \"API\")\n"));
+}
+
+test "detect block-beta" {
+    try std.testing.expectEqual(DiagramType.block, detect("block-beta\nA B\n"));
+}
+
+test "detect requirementDiagram" {
+    try std.testing.expectEqual(DiagramType.requirement, detect("requirementDiagram\nrequirement req1 {}\n"));
+}
+
+test "detect kanban" {
+    try std.testing.expectEqual(DiagramType.kanban, detect("kanban\ntodo\n  id1[\"Task\"]\n"));
+}
+
+test "detect unknown returns .unknown" {
+    try std.testing.expectEqual(DiagramType.unknown, detect("hello world\n"));
+    try std.testing.expectEqual(DiagramType.unknown, detect(""));
+}
+
+test "detect skips blank lines before keyword" {
+    try std.testing.expectEqual(DiagramType.pie, detect("\n\n  \npie\n\"A\" : 1\n"));
+}
+
+test "detect skips YAML front-matter delimiter" {
+    // detect skips lines starting with "---" but not other YAML content
+    try std.testing.expectEqual(DiagramType.flowchart, detect("---\ngraph TD\nA-->B\n"));
+}
+
+test "detect skips %% comment lines" {
+    try std.testing.expectEqual(DiagramType.pie, detect("%% a comment\npie\n\"A\" : 1\n"));
+}
+
+test "detect bare graph keyword (no direction)" {
+    try std.testing.expectEqual(DiagramType.flowchart, detect("graph\nA-->B\n"));
+}

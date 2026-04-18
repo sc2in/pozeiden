@@ -170,3 +170,80 @@ fn cleanTitle(s: []const u8) []const u8 {
     if (std.mem.startsWith(u8, t, "title")) t = std.mem.trimLeft(u8, t[5..], " \t");
     return std.mem.trimRight(u8, t, " \t\r\n");
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+fn makePieSection(arena: std.mem.Allocator, label: []const u8, value: f64) !Value {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    try fields.put(arena, "label", .{ .string = label });
+    try fields.put(arena, "value", .{ .number = value });
+    return .{ .node = .{ .type_name = "section", .fields = fields } };
+}
+
+test "pie renderer: two-section happy path" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var sections: std.ArrayList(Value) = .empty;
+    try sections.append(a, try makePieSection(a, "Dogs", 60));
+    try sections.append(a, try makePieSection(a, "Cats", 40));
+
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "sections", .{ .list = try sections.toOwnedSlice(a) });
+    const v: Value = .{ .node = .{ .type_name = "pie", .fields = root_fields } };
+
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<path") != null);
+    try testing.expect(std.mem.indexOf(u8, svg, "Dogs") != null);
+    try testing.expect(std.mem.indexOf(u8, svg, "Cats") != null);
+}
+
+test "pie renderer: empty sections renders fallback" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "sections", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "pie", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "pie renderer: all-zero values renders fallback" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var sections: std.ArrayList(Value) = .empty;
+    try sections.append(a, try makePieSection(a, "Nothing", 0));
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "sections", .{ .list = try sections.toOwnedSlice(a) });
+    const v: Value = .{ .node = .{ .type_name = "pie", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "pie renderer: title is included in SVG output" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var sections: std.ArrayList(Value) = .empty;
+    try sections.append(a, try makePieSection(a, "A", 100));
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "title", .{ .string = "My Chart" });
+    try root_fields.put(a, "sections", .{ .list = try sections.toOwnedSlice(a) });
+    const v: Value = .{ .node = .{ .type_name = "pie", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "My Chart") != null);
+}
+
+test "pie renderer: invalid value (not a node) returns error" {
+    const result = render(testing.allocator, .{ .null = {} });
+    try testing.expectError(error.InvalidInput, result);
+}

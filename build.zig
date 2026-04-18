@@ -52,6 +52,20 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_mod_tests.step);
 
+    // C API tests — capi.zig is not part of the pozeiden module, so it needs
+    // its own test artifact that imports pozeiden as a dependency.
+    const capi_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/capi.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(capi_tests).step);
+
     // ── lib step ──────────────────────────────────────────────────────────────
     // Builds a C-ABI shared library (libpozeiden.so) and installs the public
     // header.

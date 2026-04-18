@@ -477,3 +477,236 @@ pub fn svgHeight(nodes: []const GraphNode) u32 {
     }
     return @intFromFloat(max_y + MARGIN);
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+fn makeNode(id: []const u8) GraphNode {
+    return .{ .id = id, .label = id, .shape = .rect };
+}
+
+fn makeEdge(from: []const u8, to: []const u8) GraphEdge {
+    return .{ .from = from, .to = to, .label = null, .style = .solid };
+}
+
+test "layout empty graph is no-op" {
+    var nodes = [_]GraphNode{};
+    var edges = [_]GraphEdge{};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+}
+
+test "layout single node placed at margin" {
+    var nodes = [_]GraphNode{makeNode("A")};
+    var edges = [_]GraphEdge{};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    try testing.expect(nodes[0].x >= MARGIN - 1.0);
+    try testing.expect(nodes[0].y >= MARGIN - 1.0);
+}
+
+test "layout two nodes TB: A above B" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{makeEdge("A", "B")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    // Find A and B by id since orderNodes may reorder the slice
+    var a_y: f32 = 0;
+    var b_y: f32 = 0;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "A")) a_y = n.y;
+        if (std.mem.eql(u8, n.id, "B")) b_y = n.y;
+    }
+    try testing.expect(a_y < b_y);
+}
+
+test "layout two nodes LR: A left of B" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{makeEdge("A", "B")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .lr };
+    try layout(testing.allocator, &g);
+    var a_x: f32 = 0;
+    var b_x: f32 = 0;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "A")) a_x = n.x;
+        if (std.mem.eql(u8, n.id, "B")) b_x = n.x;
+    }
+    try testing.expect(a_x < b_x);
+}
+
+test "layout two nodes RL: A right of B" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{makeEdge("A", "B")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .rl };
+    try layout(testing.allocator, &g);
+    var a_x: f32 = 0;
+    var b_x: f32 = 0;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "A")) a_x = n.x;
+        if (std.mem.eql(u8, n.id, "B")) b_x = n.x;
+    }
+    try testing.expect(a_x > b_x);
+}
+
+test "layout two nodes BT: A below B" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{makeEdge("A", "B")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .bt };
+    try layout(testing.allocator, &g);
+    var a_y: f32 = 0;
+    var b_y: f32 = 0;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "A")) a_y = n.y;
+        if (std.mem.eql(u8, n.id, "B")) b_y = n.y;
+    }
+    try testing.expect(a_y > b_y);
+}
+
+test "layout three-node chain: sequential layers" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B"), makeNode("C") };
+    var edges = [_]GraphEdge{ makeEdge("A", "B"), makeEdge("B", "C") };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    var layers: [3]usize = undefined;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "A")) layers[0] = n.layer;
+        if (std.mem.eql(u8, n.id, "B")) layers[1] = n.layer;
+        if (std.mem.eql(u8, n.id, "C")) layers[2] = n.layer;
+    }
+    try testing.expect(layers[0] < layers[1]);
+    try testing.expect(layers[1] < layers[2]);
+}
+
+test "layout parallel nodes: same layer" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B"), makeNode("C") };
+    // A -> B and A -> C: B and C should be in same layer
+    var edges = [_]GraphEdge{ makeEdge("A", "B"), makeEdge("A", "C") };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    var b_layer: usize = 99;
+    var c_layer: usize = 99;
+    for (nodes) |n| {
+        if (std.mem.eql(u8, n.id, "B")) b_layer = n.layer;
+        if (std.mem.eql(u8, n.id, "C")) c_layer = n.layer;
+    }
+    try testing.expectEqual(b_layer, c_layer);
+}
+
+test "layout cycle is broken: both nodes get valid coordinates" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{ makeEdge("A", "B"), makeEdge("B", "A") };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    // At least one edge should be reversed after cycle breaking
+    var any_reversed = false;
+    for (edges) |e| {
+        if (e.reversed) any_reversed = true;
+    }
+    try testing.expect(any_reversed);
+    // Both nodes should have valid (non-negative) coordinates
+    for (nodes) |n| {
+        try testing.expect(n.x >= 0);
+        try testing.expect(n.y >= 0);
+    }
+}
+
+test "layout diamond graph: fork then join, all nodes placed" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B"), makeNode("C"), makeNode("D") };
+    var edges = [_]GraphEdge{
+        makeEdge("A", "B"), makeEdge("A", "C"),
+        makeEdge("B", "D"), makeEdge("C", "D"),
+    };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    for (nodes) |n| {
+        try testing.expect(n.x >= 0);
+        try testing.expect(n.y >= 0);
+    }
+}
+
+test "layout self-loop edge does not panic" {
+    var nodes = [_]GraphNode{makeNode("A")};
+    var edges = [_]GraphEdge{makeEdge("A", "A")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+}
+
+test "layout edge referencing unknown node id is skipped" {
+    var nodes = [_]GraphNode{makeNode("A")};
+    var edges = [_]GraphEdge{makeEdge("A", "MISSING")};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    try testing.expect(nodes[0].x >= 0);
+}
+
+test "boundingBox empty slice returns default" {
+    const bb = boundingBox(&.{});
+    try testing.expectApproxEqAbs(@as(f32, 400), bb.w, 1.0);
+    try testing.expectApproxEqAbs(@as(f32, 300), bb.h, 1.0);
+}
+
+test "boundingBox single node includes margin" {
+    const n: GraphNode = .{ .id = "A", .label = "A", .shape = .rect, .x = 40, .y = 40, .w = 120, .h = 40 };
+    const bb = boundingBox(&[_]GraphNode{n});
+    try testing.expect(bb.w > 0);
+    try testing.expect(bb.h > 0);
+}
+
+test "boundingBox multiple nodes spans all" {
+    const n1: GraphNode = .{ .id = "A", .label = "A", .shape = .rect, .x = 40, .y = 40, .w = 120, .h = 40 };
+    const n2: GraphNode = .{ .id = "B", .label = "B", .shape = .rect, .x = 300, .y = 200, .w = 120, .h = 40 };
+    const bb = boundingBox(&[_]GraphNode{ n1, n2 });
+    // bounding box must be wider than just n1
+    try testing.expect(bb.w > n1.w + 2 * MARGIN);
+}
+
+test "svgWidth empty nodes returns minimum" {
+    try testing.expectEqual(@as(u32, 300), svgWidth(&.{}));
+}
+
+test "svgWidth single laid-out node" {
+    const n: GraphNode = .{ .id = "A", .label = "A", .shape = .rect, .x = 40, .y = 40, .w = 120, .h = 40 };
+    const w = svgWidth(&[_]GraphNode{n});
+    try testing.expect(w > @as(u32, @intFromFloat(40 + 120)));
+}
+
+test "svgHeight empty nodes returns minimum" {
+    try testing.expectEqual(@as(u32, 200), svgHeight(&.{}));
+}
+
+test "svgHeight single laid-out node" {
+    const n: GraphNode = .{ .id = "A", .label = "A", .shape = .rect, .x = 40, .y = 40, .w = 120, .h = 40 };
+    const h = svgHeight(&[_]GraphNode{n});
+    try testing.expect(h > @as(u32, @intFromFloat(40 + 40)));
+}
+
+test "breakCycles: back edge marked reversed" {
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{ makeEdge("A", "B"), makeEdge("B", "A") };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try breakCycles(testing.allocator, &g);
+    var any_reversed = false;
+    for (edges) |e| if (e.reversed) { any_reversed = true; };
+    try testing.expect(any_reversed);
+}
+
+test "assignLayers: disconnected component gets layer 0" {
+    // Two isolated nodes with no edges - both should be at layer 0
+    var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
+    var edges = [_]GraphEdge{};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    try testing.expectEqual(@as(usize, 0), nodes[0].layer);
+    try testing.expectEqual(@as(usize, 0), nodes[1].layer);
+}
+
+test "translateNodes: minimum coordinate shifted to MARGIN" {
+    var nodes = [_]GraphNode{ makeNode("A") };
+    var edges = [_]GraphEdge{};
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    // After translate, minimum x and y should be >= MARGIN
+    try testing.expect(nodes[0].x >= MARGIN - 0.1);
+    try testing.expect(nodes[0].y >= MARGIN - 0.1);
+}

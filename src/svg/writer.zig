@@ -300,6 +300,286 @@ pub fn xmlEscape(writer: anytype, s: []const u8) !void {
     }
 }
 
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "SvgWriter header emits svg element with correct dimensions" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.header(800, 600);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "width=\"800\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "height=\"600\"") != null);
+}
+
+test "SvgWriter header viewBox matches width and height" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.header(400, 300);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "viewBox=\"0 0 400 300\"") != null);
+}
+
+test "SvgWriter footer emits closing svg tag" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.footer();
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "</svg>") != null);
+}
+
+test "SvgWriter header+footer produces valid envelope" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.header(100, 100);
+    try w.footer();
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<svg") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "</svg>") != null);
+}
+
+test "SvgWriter rect emits rect element with all attributes" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.rect(10, 20, 100, 50, 4.0, "#fff", "#000", 1.5);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<rect") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "fill=\"#fff\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "stroke=\"#000\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "rx=\"4.00\"") != null);
+}
+
+test "SvgWriter rect with rx=0 for sharp corners" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.rect(0, 0, 50, 30, 0.0, "#fff", "#000", 1.0);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "rx=\"0.00\"") != null);
+}
+
+test "SvgWriter circle emits circle element" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.circle(50, 60, 20, "#blue", "#red", 2.0);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<circle") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "cx=\"50.00\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "r=\"20.00\"") != null);
+}
+
+test "SvgWriter line emits line element" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.line(0, 0, 100, 100, "#333", 1.0);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<line") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "x1=\"0.00\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "x2=\"100.00\"") != null);
+}
+
+test "SvgWriter dashedLine emits stroke-dasharray attribute" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.dashedLine(0, 0, 50, 50, "#333", 1.0, "5,3");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "stroke-dasharray=\"5,3\"") != null);
+}
+
+test "SvgWriter path without extra_attrs" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.path("M 0 0 L 100 100", "none", "#333", 1.5, "");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<path") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "M 0 0 L 100 100") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "stroke=\"#333\"") != null);
+}
+
+test "SvgWriter path with extra_attrs appended" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.path("M 0 0", "none", "#000", 1.0, "stroke-dasharray=\"4,4\"");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "stroke-dasharray=\"4,4\"") != null);
+}
+
+test "SvgWriter polygon emits polygon element" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.polygon("0,0 10,5 0,10", "#fff", "#000", 1.0);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<polygon") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "points=\"0,0 10,5 0,10\"") != null);
+}
+
+test "SvgWriter text anchor=start" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(10, 20, "Hi", "#000", 14, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "text-anchor=\"start\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, ">Hi<") != null);
+}
+
+test "SvgWriter text anchor=middle" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(50, 50, "Mid", "#000", 14, .middle, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "text-anchor=\"middle\"") != null);
+}
+
+test "SvgWriter text anchor=end" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(90, 20, "End", "#000", 14, .end, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "text-anchor=\"end\"") != null);
+}
+
+test "SvgWriter text XML-escapes ampersand" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "A & B", "#000", 12, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "&amp;") != null);
+}
+
+test "SvgWriter text XML-escapes less-than" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "a<b", "#000", 12, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "&lt;") != null);
+}
+
+test "SvgWriter text XML-escapes greater-than" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "a>b", "#000", 12, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "&gt;") != null);
+}
+
+test "SvgWriter text XML-escapes double-quote" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "say \"hi\"", "#000", 12, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "&quot;") != null);
+}
+
+test "SvgWriter text XML-escapes apostrophe" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "it's", "#000", 12, .start, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "&#39;") != null);
+}
+
+test "SvgWriter openGroup with empty attrs emits bare g tag" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.openGroup("");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<g>") != null);
+}
+
+test "SvgWriter openGroup with attrs includes attribute string" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.openGroup("opacity=\"0.5\"");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "opacity=\"0.5\"") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "<g ") != null);
+}
+
+test "SvgWriter closeGroup emits closing g tag" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.closeGroup();
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "</g>") != null);
+}
+
+test "SvgWriter defs wraps content" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.defs("<marker id=\"m\"/>\n");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<defs>") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "</defs>") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "<marker id=\"m\"/>") != null);
+}
+
+test "SvgWriter raw appends fragment verbatim" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.raw("<custom-element/>");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<custom-element/>") != null);
+}
+
+test "SvgWriter textWrapped short content single-line" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    // 14px font, max_w=500 => chars_per_line ~= 64. "Hi" is well under.
+    try w.textWrapped(100, 50, "Hi", 500, "#000", 14, .middle, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    // Short content delegates to text(), which emits a plain <text> without <tspan>
+    try testing.expect(std.mem.indexOf(u8, out, "<text") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "<tspan") == null);
+}
+
+test "SvgWriter textWrapped long content emits tspan elements" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    // 14px font, max_w=50 => chars_per_line ~= 6. Use a longer string to force wrap.
+    try w.textWrapped(100, 50, "Hello World Overflow", 50, "#000", 14, .middle, "normal");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "<tspan") != null);
+}
+
+test "xmlEscape all five special characters" {
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(testing.allocator);
+    try xmlEscape(buf.writer(testing.allocator), "&<>\"'");
+    const out = buf.items;
+    try testing.expect(std.mem.indexOf(u8, out, "&amp;") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "&lt;") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "&gt;") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "&quot;") != null);
+    try testing.expect(std.mem.indexOf(u8, out, "&#39;") != null);
+}
+
 pub const arrow_marker_defs =
     "  <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"7\" refX=\"10\" refY=\"3.5\" orient=\"auto\">\n" ++
     "    <polygon points=\"0 0, 10 3.5, 0 7\" fill=\"#333333\"/>\n" ++

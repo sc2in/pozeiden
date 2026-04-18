@@ -729,3 +729,48 @@ fn parseDirection(s: []const u8) layout.Direction {
     if (std.mem.eql(u8, s, "BT")) return .bt;
     return .tb;
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "flowchart renderer: null value returns fallback SVG" {
+    const svg = try render(testing.allocator, .{ .null = {} });
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "flowchart renderer: no nodes returns fallback SVG" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "nodes", .{ .list = &.{} });
+    try root_fields.put(a, "edges", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "flowchart", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "flowchart renderer: single node no edges" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var node_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try node_fields.put(a, "id", .{ .string = "A" });
+    try node_fields.put(a, "label", .{ .string = "Alpha" });
+    try node_fields.put(a, "shape", .{ .string = "rect" });
+    const node_val: Value = .{ .node = .{ .type_name = "node", .fields = node_fields } };
+
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    var nodes_list = [_]Value{node_val};
+    try root_fields.put(a, "nodes", .{ .list = &nodes_list });
+    try root_fields.put(a, "edges", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "flowchart", .fields = root_fields } };
+
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "Alpha") != null);
+}

@@ -217,3 +217,54 @@ fn renderFallback(allocator: std.mem.Allocator) ![]const u8 {
     try svg.footer();
     return svg.toOwnedSlice();
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "gantt renderer: null value returns fallback SVG" {
+    const svg = try render(testing.allocator, .{ .null = {} });
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "gantt renderer: empty sections returns fallback SVG" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "sections", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "gantt", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "gantt renderer: title is rendered" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var task_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try task_fields.put(a, "name", .{ .string = "Task One" });
+    try task_fields.put(a, "duration", .{ .string = "2d" });
+    try task_fields.put(a, "flags", .{ .string = "" });
+    const task_val: Value = .{ .node = .{ .type_name = "task", .fields = task_fields } };
+
+    var section_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try section_fields.put(a, "label", .{ .string = "Phase 1" });
+    var tasks_arr = [_]Value{task_val};
+    try section_fields.put(a, "tasks", .{ .list = &tasks_arr });
+    const section_val: Value = .{ .node = .{ .type_name = "section", .fields = section_fields } };
+
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "title", .{ .string = "My Timeline" });
+    var sections_arr = [_]Value{section_val};
+    try root_fields.put(a, "sections", .{ .list = &sections_arr });
+    const v: Value = .{ .node = .{ .type_name = "gantt", .fields = root_fields } };
+
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "My Timeline") != null);
+    try testing.expect(std.mem.indexOf(u8, svg, "Task One") != null);
+}

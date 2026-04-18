@@ -11,6 +11,8 @@ const std = @import("std");
 /// named fields.  `.list` holds an ordered sequence of child values.
 /// `.string`, `.number`, and `.boolean` are leaf values.  `.null` represents
 /// an absent optional.
+const testing = std.testing;
+
 pub const Value = union(enum) {
     string: []const u8,
     number: f64,
@@ -114,3 +116,142 @@ pub const Value = union(enum) {
         };
     }
 };
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "Value.asString returns string payload" {
+    const v: Value = .{ .string = "hello" };
+    try testing.expectEqualStrings("hello", v.asString().?);
+}
+
+test "Value.asString returns null for non-string" {
+    try testing.expect((Value{ .number = 1.0 }).asString() == null);
+    try testing.expect((Value{ .boolean = true }).asString() == null);
+    try testing.expect((Value{ .null = {} }).asString() == null);
+}
+
+test "Value.asNumber returns number payload" {
+    const v: Value = .{ .number = 3.14 };
+    try testing.expectApproxEqAbs(@as(f64, 3.14), v.asNumber().?, 1e-9);
+}
+
+test "Value.asNumber coerces parseable string" {
+    const v: Value = .{ .string = "42" };
+    try testing.expectApproxEqAbs(@as(f64, 42.0), v.asNumber().?, 1e-9);
+}
+
+test "Value.asNumber coerces whitespace-padded string" {
+    const v: Value = .{ .string = "  7.5  " };
+    try testing.expectApproxEqAbs(@as(f64, 7.5), v.asNumber().?, 1e-9);
+}
+
+test "Value.asNumber returns null for boolean" {
+    try testing.expect((Value{ .boolean = true }).asNumber() == null);
+}
+
+test "Value.asNumber returns null for unparseable string" {
+    try testing.expect((Value{ .string = "abc" }).asNumber() == null);
+}
+
+test "Value.asBool returns bool payload" {
+    try testing.expect((Value{ .boolean = true }).asBool() == true);
+    try testing.expect((Value{ .boolean = false }).asBool() == false);
+}
+
+test "Value.asBool returns false for non-bool" {
+    try testing.expect((Value{ .number = 1.0 }).asBool() == false);
+    try testing.expect((Value{ .string = "true" }).asBool() == false);
+    try testing.expect((Value{ .null = {} }).asBool() == false);
+}
+
+test "Value.asNode returns node payload" {
+    const node: Value.Node = .{ .type_name = "test", .fields = .{} };
+    const v: Value = .{ .node = node };
+    try testing.expectEqualStrings("test", v.asNode().?.type_name);
+}
+
+test "Value.asNode returns null for non-node" {
+    try testing.expect((Value{ .string = "x" }).asNode() == null);
+    try testing.expect((Value{ .null = {} }).asNode() == null);
+}
+
+test "Value.asList returns list payload" {
+    const items = [_]Value{.{ .number = 1 }, .{ .number = 2 }};
+    const v: Value = .{ .list = @constCast(&items) };
+    try testing.expectEqual(@as(usize, 2), v.asList().len);
+}
+
+test "Value.asList returns empty slice for non-list" {
+    try testing.expectEqual(@as(usize, 0), (Value{ .string = "x" }).asList().len);
+    try testing.expectEqual(@as(usize, 0), (Value{ .number = 1 }).asList().len);
+}
+
+test "Value.null.asList returns empty slice" {
+    const v: Value = .{ .null = {} };
+    try testing.expectEqual(@as(usize, 0), v.asList().len);
+}
+
+test "Node.get returns present value" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "x", .{ .number = 5.0 });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expect(node.get("x") != null);
+    try testing.expectApproxEqAbs(@as(f64, 5.0), node.get("x").?.number, 1e-9);
+}
+
+test "Node.get returns null for absent key" {
+    const node: Value.Node = .{ .type_name = "n", .fields = .{} };
+    try testing.expect(node.get("missing") == null);
+}
+
+test "Node.getString happy path" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "label", .{ .string = "Alice" });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expectEqualStrings("Alice", node.getString("label").?);
+}
+
+test "Node.getString returns null when field is number" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "val", .{ .number = 1.0 });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expect(node.getString("val") == null);
+}
+
+test "Node.getNumber happy path" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "n", .{ .number = 99.0 });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expectApproxEqAbs(@as(f64, 99.0), node.getNumber("n").?, 1e-9);
+}
+
+test "Node.getNumber coerces string field" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "n", .{ .string = "3.14" });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expectApproxEqAbs(@as(f64, 3.14), node.getNumber("n").?, 1e-9);
+}
+
+test "Node.getBool happy path and default false" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    try fields.put(testing.allocator, "flag", .{ .boolean = true });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expect(node.getBool("flag") == true);
+    try testing.expect(node.getBool("missing") == false);
+}
+
+test "Node.getList happy path and empty fallback" {
+    var fields: std.StringHashMapUnmanaged(Value) = .{};
+    defer fields.deinit(testing.allocator);
+    const items = [_]Value{.{ .string = "a" }};
+    try fields.put(testing.allocator, "items", .{ .list = @constCast(&items) });
+    const node: Value.Node = .{ .type_name = "n", .fields = fields };
+    try testing.expectEqual(@as(usize, 1), node.getList("items").len);
+    try testing.expectEqual(@as(usize, 0), node.getList("missing").len);
+}
