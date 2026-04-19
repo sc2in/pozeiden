@@ -1,5 +1,11 @@
 const std = @import("std");
 
+const zon = @import("build.zig.zon");
+
+fn trimLeadingV(s: []const u8) []const u8 {
+    return if (s.len > 0 and s[0] == 'v') s[1..] else s;
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -14,11 +20,27 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Version priority: -Dversion flag > git describe > build.zig.zon
+    // The flag lets Nix (and other sandboxed builds) inject the version
+    // without requiring git in the build environment.
+    const options = b.addOptions();
+    const version = b.option([]const u8, "version", "Override version string") orelse blk: {
+        var exit_code: u8 = undefined;
+        const git_describe = b.runAllowFail(
+            &.{ "git", "describe", "--tags", "--always" },
+            &exit_code,
+            .Ignore,
+        ) catch "";
+        break :blk if (git_describe.len > 0) trimLeadingV(git_describe) else zon.version;
+    };
+    options.addOption([]const u8, "version", version);
+
     const mod = b.addModule("pozeiden", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
+    mod.addOptions("config", options);
     mod.addImport("mvzr", mvzr.module("mvzr"));
     mod.addImport("mecha", mecha.module("mecha"));
     mod.addImport("zigmark", zigmark.module("zigmark"));
@@ -34,6 +56,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    exe.root_module.addOptions("config", options);
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
@@ -66,6 +89,28 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(capi_tests).step);
 
+    // ── check step ────────────────────────────────────────────────────────────
+    // Semantic analysis without running — used by ZLS and CI.
+    //
+    //   zig build check
+
+    const check_step = b.step("check", "Check for semantic errors (ZLS)");
+    check_step.dependOn(&mod_tests.step);
+
+    // ── docs step ─────────────────────────────────────────────────────────────
+    // Generate API documentation.
+    //
+    //   zig build docs
+    //   open zig-out/docs/index.html
+
+    const docs_step = b.step("docs", "Generate API documentation to zig-out/docs/");
+    const docs = b.addInstallDirectory(.{
+        .source_dir = mod_tests.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+    docs_step.dependOn(&docs.step);
+
     // ── lib step ──────────────────────────────────────────────────────────────
     // Builds a C-ABI shared library (libpozeiden.so) and installs the public
     // header.
@@ -82,11 +127,12 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const ver = std.SemanticVersion.parse(zon.version) catch std.SemanticVersion{ .major = 0, .minor = 1, .patch = 0 };
     const shared_lib = b.addLibrary(.{
         .name = "pozeiden",
         .root_module = capi_mod,
         .linkage = .dynamic,
-        .version = .{ .major = 0, .minor = 1, .patch = 0 },
+        .version = .{ .major = ver.major, .minor = ver.minor, .patch = ver.patch },
     });
 
     const lib_step = b.step("lib", "Build C shared library (libpozeiden.so)");
@@ -124,6 +170,7 @@ pub fn build(b: *std.Build) void {
         .optimize = .ReleaseSmall,
         .single_threaded = true,
     });
+    mod_wasm.addOptions("config", options);
     mod_wasm.addImport("mvzr", mvzr_wasm.module("mvzr"));
     mod_wasm.addImport("mecha", mecha_wasm.module("mecha"));
     mod_wasm.addImport("zigmark", zigmark_wasm.module("zigmark"));

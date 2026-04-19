@@ -33,6 +33,7 @@
             ./src
             ./grammars
             ./playground
+            ./examples
           ];
         };
 

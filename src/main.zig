@@ -1,7 +1,7 @@
 //! pozeiden CLI: renders mermaid diagrams to SVG.
 //!
 //! Usage:
-//!   pozeiden [-i input.mmd] [-o output.svg] [--format svg|json]
+//!   pozeiden [-i input.mmd] [-o output.svg] [--format svg|json] [--version]
 //!
 //! With no arguments, reads from stdin and writes to stdout.
 //!
@@ -10,6 +10,7 @@
 const std = @import("std");
 
 const pozeiden = @import("pozeiden");
+const config = @import("config");
 
 const Format = enum { svg, json };
 
@@ -41,6 +42,9 @@ pub fn main() !void {
                 try std.fs.File.stderr().writeAll("error: --format must be svg or json\n");
                 std.process.exit(1);
             }
+        } else if (std.mem.eql(u8, args[i], "--version") or std.mem.eql(u8, args[i], "-V")) {
+            try std.fs.File.stdout().writeAll(config.version ++ "\n");
+            return;
         } else if (std.mem.eql(u8, args[i], "--help") or std.mem.eql(u8, args[i], "-h")) {
             try std.fs.File.stderr().writeAll(
                 \\Usage: pozeiden [-i input.mmd] [-o output.svg] [--format svg|json]
@@ -53,6 +57,8 @@ pub fn main() !void {
                 \\  -o <file>        Output file (default: stdout)
                 \\  --format svg     Output raw SVG (default)
                 \\  --format json    Output JSON: {"svg":"...","diagram_type":"..."}
+                \\  --version, -V    Print version and exit
+                \\  --help, -h       Print this help and exit
                 \\
             );
             return;

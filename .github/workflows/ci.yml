@@ -2,41 +2,58 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
   pull_request:
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test (${{ matrix.zig }})
-    runs-on: ubuntu-latest
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - zig: "0.15.2"
-            stable: true
-          - zig: master
-            stable: false
-
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: "write"
+      contents: "read"
     steps:
       - uses: actions/checkout@v4
 
-      - uses: mlugg/setup-zig@v2
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@main
         with:
-          version: ${{ matrix.zig }}
+          extra-conf: |
+            sandbox = false
 
-      - name: Run tests
-        run: zig build test
-        continue-on-error: ${{ !matrix.stable }}
+      - name: Setup Nix cache
+        uses: DeterminateSystems/flakehub-cache-action@main
+        with:
+          use-gha-cache: "enabled"
+          flakehub-flake-name: "sc2in/Pozeiden"
 
-      - name: Render examples
-        run: zig build examples
-        continue-on-error: ${{ !matrix.stable }}
+      - name: Install omnix
+        run: nix --accept-flake-config profile add nixpkgs#omnix
 
-      - name: Upload rendered SVGs
-        if: matrix.stable
+      - name: Configure permissions
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Run CI
+        run: om ci run --systems ${{ matrix.system }}
+
+      - name: Build release artifact
+        if: success()
+        run: nix build .#pozeiden-safe -o pozeiden-release
+
+      - name: Upload artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: rendered-svgs
-          path: zig-out/examples/
-          retention-days: 14
+          name: pozeiden-${{ matrix.system }}
+          path: pozeiden-release/
+          retention-days: 7
