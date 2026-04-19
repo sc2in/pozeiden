@@ -135,12 +135,11 @@ pub fn build(b: *std.Build) void {
         .version = .{ .major = ver.major, .minor = ver.minor, .patch = ver.patch },
     });
 
+    b.installArtifact(shared_lib);
+    b.installFile("include/pozeiden.h", "include/pozeiden.h");
+
     const lib_step = b.step("lib", "Build C shared library (libpozeiden.so)");
-    lib_step.dependOn(&b.addInstallArtifact(shared_lib, .{}).step);
-    lib_step.dependOn(&b.addInstallFile(
-        b.path("include/pozeiden.h"),
-        "include/pozeiden.h",
-    ).step);
+    lib_step.dependOn(b.getInstallStep());
 
     // ── playground step ───────────────────────────────────────────────────────
     // Compiles pozeiden to WebAssembly and bundles it with the HTML playground.
