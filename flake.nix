@@ -34,6 +34,7 @@
             ./grammars
             ./playground
             ./examples
+            ./include
           ];
         };
 
