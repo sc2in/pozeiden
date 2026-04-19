@@ -52,6 +52,20 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_mod_tests.step);
 
+    // C API tests — capi.zig is not part of the pozeiden module, so it needs
+    // its own test artifact that imports pozeiden as a dependency.
+    const capi_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/capi.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(capi_tests).step);
+
     // ── lib step ──────────────────────────────────────────────────────────────
     // Builds a C-ABI shared library (libpozeiden.so) and installs the public
     // header.
@@ -178,4 +192,39 @@ pub fn build(b: *std.Build) void {
         const install = b.addInstallFile(svg, b.fmt("examples/{s}.svg", .{name}));
         examples_step.dependOn(&install.step);
     }
+
+    // ── fuzz step ─────────────────────────────────────────────────────────────
+    // Smoke test:               zig build fuzz
+    // Coverage-guided fuzzing:  zig build fuzz --fuzz
+
+    const fuzz_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/fuzz.zig"),
+            .target = target,
+            .optimize = .Debug,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+        .use_llvm = true,
+    });
+    const fuzz_step = b.step("fuzz", "Run fuzz tests (append --fuzz for coverage-guided fuzzing)");
+    fuzz_step.dependOn(&b.addRunArtifact(fuzz_tests).step);
+
+    // ── bench step ────────────────────────────────────────────────────────────
+    // zig build bench
+
+    const bench_exe = b.addExecutable(.{
+        .name = "pozeiden-bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+    });
+    const bench_step = b.step("bench", "Benchmark render() over all 17 example diagrams");
+    bench_step.dependOn(&b.addRunArtifact(bench_exe).step);
 }

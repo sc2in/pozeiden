@@ -95,3 +95,58 @@ export fn pozeiden_detect(
     const dt = pozeiden.detectDiagramType(src);
     return @tagName(dt);
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = @import("std").testing;
+
+test "pozeiden_detect returns flowchart for graph TD input" {
+    const src = "graph TD\nA-->B\n";
+    const result = pozeiden_detect(src.ptr, src.len);
+    try testing.expectEqualStrings("flowchart", @import("std").mem.span(result));
+}
+
+test "pozeiden_detect returns pie for pie keyword" {
+    const src = "pie\n\"A\" : 60\n\"B\" : 40\n";
+    const result = pozeiden_detect(src.ptr, src.len);
+    try testing.expectEqualStrings("pie", @import("std").mem.span(result));
+}
+
+test "pozeiden_detect returns unknown for unrecognised input" {
+    const src = "not a diagram\n";
+    const result = pozeiden_detect(src.ptr, src.len);
+    try testing.expectEqualStrings("unknown", @import("std").mem.span(result));
+}
+
+test "pozeiden_render succeeds on valid pie input" {
+    const src = "pie\n\"Dogs\" : 60\n\"Cats\" : 40\n";
+    var out_svg: [*:0]u8 = undefined;
+    var out_len: usize = 0;
+    const rc = pozeiden_render(src.ptr, src.len, &out_svg, &out_len);
+    defer if (rc == 0) pozeiden_free(out_svg);
+    try testing.expectEqual(@as(c_int, 0), rc);
+    try testing.expect(out_len > 0);
+    try testing.expect(@import("std").mem.indexOf(u8, out_svg[0..out_len], "<svg") != null);
+}
+
+test "pozeiden_render out_svg is NUL-terminated" {
+    const src = "pie\n\"A\" : 100\n";
+    var out_svg: [*:0]u8 = undefined;
+    var out_len: usize = 0;
+    const rc = pozeiden_render(src.ptr, src.len, &out_svg, &out_len);
+    defer if (rc == 0) pozeiden_free(out_svg);
+    try testing.expectEqual(@as(c_int, 0), rc);
+    try testing.expectEqual(@as(u8, 0), out_svg[out_len]);
+}
+
+test "pozeiden_last_error returns a valid NUL-terminated pointer" {
+    const err = pozeiden_last_error();
+    // The returned pointer must be NUL-terminated and readable.
+    // We simply verify mem.span doesn't crash.
+    const span = @import("std").mem.span(err);
+    _ = span;
+}
+
+test "pozeiden_free null pointer is safe no-op" {
+    pozeiden_free(null);
+}

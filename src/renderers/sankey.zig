@@ -223,3 +223,49 @@ fn renderFallback(allocator: std.mem.Allocator) ![]const u8 {
     try svg.footer();
     return svg.toOwnedSlice();
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "sankey renderer: null value returns fallback SVG" {
+    const svg = try render(testing.allocator, .{ .null = {} });
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "sankey renderer: empty flows returns fallback SVG" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "flows", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "sankey", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "sankey renderer: single flow produces SVG with node labels" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    // Sankey expects flows with "from", "to", "value" fields
+    var flow_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try flow_fields.put(a, "from", .{ .string = "Source" });
+    try flow_fields.put(a, "to", .{ .string = "Sink" });
+    try flow_fields.put(a, "value", .{ .number = 100 });
+    const flow_val: Value = .{ .node = .{ .type_name = "flow", .fields = flow_fields } };
+
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    var flows = [_]Value{flow_val};
+    try root_fields.put(a, "flows", .{ .list = &flows });
+    const v: Value = .{ .node = .{ .type_name = "sankey", .fields = root_fields } };
+
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+    try testing.expect(std.mem.indexOf(u8, svg, "Source") != null);
+    try testing.expect(std.mem.indexOf(u8, svg, "Sink") != null);
+}

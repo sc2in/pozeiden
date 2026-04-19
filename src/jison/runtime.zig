@@ -487,3 +487,50 @@ test "jison seq lex: loop block" {
     try std.testing.expect(hasToken(tokens, "DOTTED_ARROW"));
     try std.testing.expect(hasToken(tokens, "end"));
 }
+
+test "jison flow lex: flowchart keyword" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), flow_src, "flowchart TD\nA-->B\n");
+    try std.testing.expect(tokens.len > 0);
+}
+
+test "jison flow lex: thick edge style" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), flow_src,
+        \\graph TD
+        \\A===B
+        \\
+    );
+    try std.testing.expect(tokens.len > 0);
+}
+
+test "jison seq lex: dotted arrow" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), seq_src,
+        \\sequenceDiagram
+        \\Alice-->>Bob: Response
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "SD"));
+    try std.testing.expect(hasToken(tokens, "DOTTED_ARROW"));
+}
+
+test "jison seq lex: note over declaration" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const tokens = try testLexDiagram(arena.allocator(), seq_src,
+        \\sequenceDiagram
+        \\Alice->>Bob: hi
+        \\note over Alice: thinking
+        \\
+    );
+    try std.testing.expect(hasToken(tokens, "SD"));
+    try std.testing.expect(hasToken(tokens, "note"));
+}

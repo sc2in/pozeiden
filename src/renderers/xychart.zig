@@ -162,3 +162,26 @@ fn renderFallback(allocator: std.mem.Allocator) ![]const u8 {
     try svg.footer();
     return svg.toOwnedSlice();
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "xychart renderer: null value returns fallback SVG" {
+    const svg = try render(testing.allocator, .{ .null = {} });
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "xychart renderer: empty data returns fallback SVG" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var root_fields: std.StringHashMapUnmanaged(Value) = .{};
+    try root_fields.put(a, "x_labels", .{ .list = &.{} });
+    try root_fields.put(a, "series", .{ .list = &.{} });
+    const v: Value = .{ .node = .{ .type_name = "xychart", .fields = root_fields } };
+    const svg = try render(testing.allocator, v);
+    defer testing.allocator.free(svg);
+    try testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
