@@ -192,4 +192,39 @@ pub fn build(b: *std.Build) void {
         const install = b.addInstallFile(svg, b.fmt("examples/{s}.svg", .{name}));
         examples_step.dependOn(&install.step);
     }
+
+    // ── fuzz step ─────────────────────────────────────────────────────────────
+    // Smoke test:               zig build fuzz
+    // Coverage-guided fuzzing:  zig build fuzz --fuzz
+
+    const fuzz_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/fuzz.zig"),
+            .target = target,
+            .optimize = .Debug,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+        .use_llvm = true,
+    });
+    const fuzz_step = b.step("fuzz", "Run fuzz tests (append --fuzz for coverage-guided fuzzing)");
+    fuzz_step.dependOn(&b.addRunArtifact(fuzz_tests).step);
+
+    // ── bench step ────────────────────────────────────────────────────────────
+    // zig build bench
+
+    const bench_exe = b.addExecutable(.{
+        .name = "pozeiden-bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+    });
+    const bench_step = b.step("bench", "Benchmark render() over all 17 example diagrams");
+    bench_step.dependOn(&b.addRunArtifact(bench_exe).step);
 }
