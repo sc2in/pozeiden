@@ -23,5 +23,8 @@
         "src",
         "grammars",
         "examples",
+        "include",
+        "LICENSE",
+        "README.md",
     },
 }
