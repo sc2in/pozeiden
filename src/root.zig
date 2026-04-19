@@ -887,6 +887,7 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         id: []const u8,
         label: []const u8,
         members: std.ArrayList(Value),
+        direction: []const u8 = "",
     };
     var subgraphs: std.ArrayList(Subgraph) = .empty;
     // Stack of subgraph indices — supports arbitrary nesting depth.
@@ -1006,7 +1007,13 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             continue;
         }
 
-        // Skip subgraph-local direction directives (direction LR / direction TB etc.)
+        // Capture subgraph-local direction directives (direction LR / direction TB etc.)
+        if (std.mem.startsWith(u8, line, "direction ") and subgraph_stack.items.len > 0) {
+            const dir_val = std.mem.trim(u8, line[10..], " \t");
+            const top = subgraph_stack.items[subgraph_stack.items.len - 1];
+            subgraphs.items[top].direction = dir_val;
+            continue;
+        }
         if (std.mem.startsWith(u8, line, "direction ")) continue;
 
         // Try to find an edge arrow
@@ -1202,6 +1209,8 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
         try sgn.fields.put(a, "id", Value{ .string = sg.id });
         try sgn.fields.put(a, "label", Value{ .string = sg.label });
         try sgn.fields.put(a, "members", Value{ .list = try sg.members.toOwnedSlice(a) });
+        if (sg.direction.len > 0)
+            try sgn.fields.put(a, "direction", Value{ .string = sg.direction });
         try subgraphs_val.append(a, Value{ .node = sgn });
     }
 

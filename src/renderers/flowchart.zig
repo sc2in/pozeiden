@@ -91,6 +91,84 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     try layout.layout(allocator, &graph);
 
+    // Re-layout subgraph members that declare their own direction.
+    // For each such subgraph: collect its member nodes, run a sub-layout
+    // with the subgraph's direction, then translate the results to
+    // preserve the overall position established by the global layout.
+    {
+        const sg_list = node.getList("subgraphs");
+        for (sg_list) |sgv| {
+            const sgn = sgv.asNode() orelse continue;
+            const sg_dir_str = sgn.getString("direction") orelse continue;
+            if (sg_dir_str.len == 0) continue;
+            const sg_dir = parseDirection(sg_dir_str);
+            if (sg_dir == direction) continue;
+
+            // Collect actual graph nodes that are members of this subgraph.
+            const members = sgn.getList("members");
+            var sub_nodes: std.ArrayList(layout.GraphNode) = .empty;
+            defer sub_nodes.deinit(allocator);
+            var sub_node_ptrs: std.ArrayList(*layout.GraphNode) = .empty;
+            defer sub_node_ptrs.deinit(allocator);
+            for (members) |mv| {
+                const mid = mv.asString() orelse continue;
+                for (graph.nodes) |*gn| {
+                    if (std.mem.eql(u8, gn.id, mid)) {
+                        try sub_nodes.append(allocator, gn.*);
+                        try sub_node_ptrs.append(allocator, gn);
+                        break;
+                    }
+                }
+            }
+            if (sub_nodes.items.len == 0) continue;
+
+            // Collect edges between sub-members.
+            var sub_edges: std.ArrayList(layout.GraphEdge) = .empty;
+            defer sub_edges.deinit(allocator);
+            for (graph.edges) |e| {
+                var from_in = false;
+                var to_in = false;
+                for (sub_nodes.items) |sn| {
+                    if (std.mem.eql(u8, sn.id, e.from)) from_in = true;
+                    if (std.mem.eql(u8, sn.id, e.to)) to_in = true;
+                }
+                if (from_in and to_in) try sub_edges.append(allocator, e);
+            }
+
+            // Record the top-left of the original global bbox.
+            var orig_min_x: f32 = std.math.floatMax(f32);
+            var orig_min_y: f32 = std.math.floatMax(f32);
+            for (sub_nodes.items) |sn| {
+                if (sn.x < orig_min_x) orig_min_x = sn.x;
+                if (sn.y < orig_min_y) orig_min_y = sn.y;
+            }
+
+            // Run sub-layout with the subgraph's direction.
+            var sub_graph = layout.Graph{
+                .nodes = sub_nodes.items,
+                .edges = sub_edges.items,
+                .direction = sg_dir,
+            };
+            try layout.layout(allocator, &sub_graph);
+
+            // Find top-left of sub-layout result.
+            var new_min_x: f32 = std.math.floatMax(f32);
+            var new_min_y: f32 = std.math.floatMax(f32);
+            for (sub_nodes.items) |sn| {
+                if (sn.x < new_min_x) new_min_x = sn.x;
+                if (sn.y < new_min_y) new_min_y = sn.y;
+            }
+
+            // Translate to align sub-layout top-left with the original top-left.
+            const dx = orig_min_x - new_min_x;
+            const dy = orig_min_y - new_min_y;
+            for (sub_nodes.items, 0..) |sn, i| {
+                sub_node_ptrs.items[i].x = sn.x + dx;
+                sub_node_ptrs.items[i].y = sn.y + dy;
+            }
+        }
+    }
+
     // Compute extra right/bottom padding needed for back-edge routing.
     // Back edges in TB/BT direction route laterally to the right of all nodes.
     var extra_w: u32 = 0;
