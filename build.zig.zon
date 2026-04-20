@@ -1,6 +1,6 @@
 .{
     .name = .pozeiden,
-    .version = "0.1.0",
+    .version = "0.1.1",
     .minimum_zig_version = "0.15.2",
     .fingerprint = 0xf497aca75da20a34,
     .dependencies = .{
