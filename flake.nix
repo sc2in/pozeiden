@@ -52,11 +52,22 @@
           drv.overrideAttrs (old: {
             meta = (old.meta or {}) // {description = desc;};
           });
+      in let
+        defaultPkg = withDesc (mkPozeiden null) "pozeiden — mermaid → SVG renderer";
       in {
-        default = withDesc (mkPozeiden null) "pozeiden — mermaid → SVG renderer";
+        default = defaultPkg;
         pozeiden-safe = withDesc (mkPozeiden "ReleaseSafe") "pozeiden (ReleaseSafe)";
         pozeiden-small = withDesc (mkPozeiden "ReleaseSmall") "pozeiden (ReleaseSmall)";
         pozeiden-fast = withDesc (mkPozeiden "ReleaseFast") "pozeiden (ReleaseFast)";
+        site = defaultPkg.overrideAttrs (_old: {
+          pname = "pozeiden-site";
+          buildPhase = "zig build site";
+          installPhase = ''
+            mkdir -p $out
+            cp -r zig-out/site/. $out/
+          '';
+          meta.description = "Pozeiden static site (playground + docs)";
+        });
       }
     );
 
