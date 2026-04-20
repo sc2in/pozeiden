@@ -97,6 +97,9 @@
       height: 30px;
       white-space: nowrap;
       transition: background 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
     }
     .hdr-btn:hover { background: var(--border); }
 
@@ -234,6 +237,8 @@
     <option value="">— examples —</option>
   </select>
   <div class="header-right">
+    <a href="/docs" class="hdr-btn">Docs</a>
+    <a href="https://github.com/sc2in/Pozeiden" class="hdr-btn" target="_blank" rel="noopener">GitHub</a>
     <div class="chip">
       <span class="chip-label">⚡</span>
       <span class="chip-val loading" id="render-time">–</span>

@@ -216,6 +216,38 @@ pub fn build(b: *std.Build) void {
         playground_step.dependOn(&install_mmd.step);
     }
 
+    // ── site step ─────────────────────────────────────────────────────────────
+    // Combines playground + API docs into a single static site at zig-out/site/.
+    // Playground files at the root; docs at /docs.
+    //
+    //   zig build site
+    //   cd zig-out/site && python3 -m http.server
+
+    const site_step = b.step("site", "Build combined site (playground + docs) to zig-out/site/");
+
+    const site_wasm = b.addInstallArtifact(wasm_exe, .{
+        .dest_dir = .{ .override = .{ .custom = "site" } },
+    });
+    site_step.dependOn(&site_wasm.step);
+
+    const site_html = b.addInstallFile(b.path("playground/index.html"), "site/index.html");
+    site_step.dependOn(&site_html.step);
+
+    for (example_names_pg) |name| {
+        const install_mmd = b.addInstallFile(
+            b.path(b.fmt("examples/{s}.mmd", .{name})),
+            b.fmt("site/examples/{s}.mmd", .{name}),
+        );
+        site_step.dependOn(&install_mmd.step);
+    }
+
+    const site_docs = b.addInstallDirectory(.{
+        .source_dir = mod_tests.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "site/docs",
+    });
+    site_step.dependOn(&site_docs.step);
+
     // ── examples step ─────────────────────────────────────────────────────────
     // Renders the .mmd files in examples/ to SVGs in zig-out/examples/.
     //
