@@ -76,7 +76,7 @@ fn skipParenGroup(pattern: []const u8, start: usize) usize {
 
 // ── Compiled terminal ─────────────────────────────────────────────────────────
 
-const CompiledTerminal = struct {
+pub const CompiledTerminal = struct {
     name: []const u8,
     hidden: bool,
     /// From the `returns <type>` annotation, e.g. "string", "number", "boolean".
@@ -87,20 +87,37 @@ const CompiledTerminal = struct {
     composed: []const []const u8,
 };
 
+/// Build compiled terminals from a merged grammar using `arena` for all allocations.
+/// The result can be cached and reused across many `Runtime.initPrecompiled` calls.
+pub fn compileTerminals(arena: std.mem.Allocator, merged: *const ast.MergedGrammar) ![]CompiledTerminal {
+    const all_terminals = try merged.allTerminals(arena);
+    var compiled = try arena.alloc(CompiledTerminal, all_terminals.len);
+    for (all_terminals, 0..) |term, i| {
+        compiled[i] = try compileTerminal(arena, term);
+    }
+    return compiled;
+}
+
 // ── Runtime ───────────────────────────────────────────────────────────────────
 
 pub const Runtime = struct {
     arena: std.mem.Allocator,
     merged: *const ast.MergedGrammar,
     /// Compiled terminals in priority order (primary first, imports after).
-    compiled: []CompiledTerminal,
+    compiled: []const CompiledTerminal,
 
     pub fn init(arena: std.mem.Allocator, merged: *const ast.MergedGrammar) !Runtime {
-        const all_terminals = try merged.allTerminals(arena);
-        var compiled = try arena.alloc(CompiledTerminal, all_terminals.len);
-        for (all_terminals, 0..) |term, i| {
-            compiled[i] = try compileTerminal(arena, term);
-        }
+        const compiled = try compileTerminals(arena, merged);
+        return Runtime{ .arena = arena, .merged = merged, .compiled = compiled };
+    }
+
+    /// Create a Runtime from pre-compiled terminals (e.g. a grammar cache).
+    /// `arena` is used only for per-call parsing allocations.
+    pub fn initPrecompiled(
+        arena: std.mem.Allocator,
+        merged: *const ast.MergedGrammar,
+        compiled: []const CompiledTerminal,
+    ) Runtime {
         return Runtime{ .arena = arena, .merged = merged, .compiled = compiled };
     }
 

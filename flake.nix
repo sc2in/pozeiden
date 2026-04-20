@@ -4,12 +4,15 @@
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1.964459.tar.gz";
     zig2nix.url = "https://flakehub.com/f/Cloudef/zig2nix/0.1.885.tar.gz";
+    zigmark.url = "github:sc2in/zigmark";
+    zigmark.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
     self,
     nixpkgs,
     zig2nix,
+    zigmark,
     ...
   }: let
     supportedSystems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
@@ -111,6 +114,9 @@
               zig fetch --save .
               echo "build.zig.zon updated."
             '')
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.mermaid-cli
+            # bench compares against mmdc; gracefully skipped when not in PATH
           ];
 
           shellHook = ''
@@ -131,7 +137,43 @@
     apps = forAllSystems (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
+        lib = pkgs.lib;
       in {
+        # `nix run .#bench` — run benchmarks and splice results into README.md
+        bench = let
+          benchApp = pkgs.writeShellApplication {
+            name = "pozeiden-bench";
+            runtimeInputs = [
+              pkgs.zig
+              pkgs.git
+              zigmark.packages.${system}.default
+            ] ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.mermaid-cli ];
+            text = ''
+              REPO="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+              cd "$REPO"
+              NEW=$(mktemp /tmp/bench-section-XXXXXX.md)
+              trap 'rm -f "$NEW"' EXIT
+              echo "▸ Building and running benchmarks…"
+              {
+                printf '_Last updated: %s - run: nix run .#bench\n\n' \
+                  "$(date -u '+%Y-%m-%d')"
+                zig build bench
+              } > "$NEW"
+              echo "▸ Updating README.md…"
+              zigmark -f normalize \
+                --section-start bench-start \
+                --section-end   bench-end   \
+                "$REPO/README.md"           \
+                -o "$REPO/README.md"        \
+                < "$NEW"
+              echo "✓ README.md updated."
+            '';
+          };
+        in {
+          type = "app";
+          program = "${benchApp}/bin/pozeiden-bench";
+        };
+
         # `nix run .` — render a diagram from stdin
         default = {
           type = "app";
