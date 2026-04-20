@@ -45,6 +45,54 @@ const git_langium = @embedFile("grammars/gitGraph.langium");
 const flow_jison = @embedFile("grammars/flow.jison");
 const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
+// ── Grammar cache ─────────────────────────────────────────────────────────────
+// Grammars are parsed from embedded source on first use and kept for the
+// process lifetime.  Not safe for concurrent first-call initialization.
+
+const LangiumCache = struct {
+    merged: *const langium_ast.MergedGrammar,
+    compiled: []const langium_runtime.CompiledTerminal,
+};
+
+var grammar_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+var cached_common_grammar: ?*const langium_ast.Grammar = null;
+var cached_pie: ?LangiumCache = null;
+var cached_git: ?LangiumCache = null;
+
+fn getCommonGrammar() !*const langium_ast.Grammar {
+    if (cached_common_grammar) |g| return g;
+    const ga = grammar_arena.allocator();
+    const g = try ga.create(langium_ast.Grammar);
+    g.* = langium_parser.parse(ga, common_langium) catch return error.ParseError;
+    cached_common_grammar = g;
+    return g;
+}
+
+fn buildLangiumCache(primary_src: []const u8) !LangiumCache {
+    const ga = grammar_arena.allocator();
+    const common = try getCommonGrammar();
+    const primary = try ga.create(langium_ast.Grammar);
+    primary.* = langium_parser.parse(ga, primary_src) catch return error.ParseError;
+    const imports = try ga.alloc(*const langium_ast.Grammar, 1);
+    imports[0] = common;
+    const merged = try ga.create(langium_ast.MergedGrammar);
+    merged.* = .{ .primary = primary, .imports = imports, .allocator = ga };
+    const compiled = try langium_runtime.compileTerminals(ga, merged);
+    return .{ .merged = merged, .compiled = compiled };
+}
+
+fn getPieCache() !LangiumCache {
+    if (cached_pie) |c| return c;
+    cached_pie = try buildLangiumCache(pie_langium);
+    return cached_pie.?;
+}
+
+fn getGitCache() !LangiumCache {
+    if (cached_git) |c| return c;
+    cached_git = try buildLangiumCache(git_langium);
+    return cached_git.?;
+}
+
 /// Detect the diagram type from the first non-blank, non-comment line of
 /// `mermaid_text`.  Returns `.unknown` if no recognised keyword is found.
 /// Useful when the caller needs to filter or route before calling `render`.
@@ -78,8 +126,8 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
     const diagram_type = detect.detect(mermaid_text);
 
     switch (diagram_type) {
-        .pie => return renderLangium(allocator, mermaid_text, pie_langium, pie_renderer.render),
-        .gitgraph => return renderLangium(allocator, mermaid_text, git_langium, gitgraph_renderer.render),
+        .pie => return renderLangium(allocator, mermaid_text, try getPieCache(), pie_renderer.render),
+        .gitgraph => return renderLangium(allocator, mermaid_text, try getGitCache(), gitgraph_renderer.render),
         .flowchart => return renderFlowchartDirect(allocator, mermaid_text),
         .sequence => return renderSequenceDirect(allocator, mermaid_text),
         .class => return renderClassDirect(allocator, mermaid_text),
@@ -224,36 +272,15 @@ fn parseSvgDimAttr(tag: []const u8, attr: []const u8) ?u32 {
 fn renderLangium(
     allocator: std.mem.Allocator,
     input: []const u8,
-    grammar_src: []const u8,
+    cache: LangiumCache,
     renderer: fn (std.mem.Allocator, Value) anyerror![]const u8,
 ) ![]const u8 {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Parse common.langium (provides shared terminals)
-    const common_grammar = langium_parser.parse(a, common_langium) catch return error.ParseError;
-    const common_grammar_heap = try a.create(langium_ast.Grammar);
-    common_grammar_heap.* = common_grammar;
-
-    // Parse the specific grammar file
-    const primary_grammar = langium_parser.parse(a, grammar_src) catch return error.ParseError;
-    const primary_grammar_heap = try a.create(langium_ast.Grammar);
-    primary_grammar_heap.* = primary_grammar;
-
-    // Build merged grammar (primary + common as import)
-    const imports = try a.alloc(*const langium_ast.Grammar, 1);
-    imports[0] = common_grammar_heap;
-    const merged = langium_ast.MergedGrammar{
-        .primary = primary_grammar_heap,
-        .imports = imports,
-        .allocator = a,
-    };
-    const merged_heap = try a.create(langium_ast.MergedGrammar);
-    merged_heap.* = merged;
-
-    // Run the Langium runtime to produce a Value AST
-    var runtime = langium_runtime.Runtime.init(a, merged_heap) catch return error.ParseError;
+    // Run the Langium runtime to produce a Value AST (grammar already compiled)
+    var runtime = langium_runtime.Runtime.initPrecompiled(a, cache.merged, cache.compiled);
     const value = runtime.run(input) catch {
         return renderer(allocator, Value{ .null = {} });
     };

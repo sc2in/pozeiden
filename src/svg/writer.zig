@@ -27,7 +27,9 @@ pub const SvgWriter = struct {
 
     /// Initialise an empty writer backed by `allocator`.
     pub fn init(allocator: std.mem.Allocator) SvgWriter {
-        return .{ .buf = .empty, .allocator = allocator };
+        var buf: std.ArrayList(u8) = .empty;
+        buf.ensureTotalCapacity(allocator, 8192) catch {};
+        return .{ .buf = buf, .allocator = allocator };
     }
 
     /// Release the internal buffer.  Do not call after `toOwnedSlice`.
