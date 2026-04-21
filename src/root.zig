@@ -804,15 +804,23 @@ fn parseNodeSpec(spec: []const u8) struct { []const u8, []const u8, []const u8 }
                     return .{ id, s[i + 2 .. @min(i + end, s.len)], "parallelogram" };
                 }
                 // Inverted parallelogram [\label\] or trapezoid-alt [\label/]
+                // Also handles the [\/label\/] double-delimiter variant.
                 if (i + 1 < s.len and s[i + 1] == '\\') {
+                    // When the opening is [\/ (backslash+slash), the label starts one
+                    // character later and the closing \/ before ] must also be trimmed.
+                    const double_open = i + 2 < s.len and s[i + 2] == '/';
+                    const label_offset: usize = if (double_open) 3 else 2;
                     const close_trap = std.mem.indexOf(u8, s[i..], "/]");
                     const close_para = std.mem.indexOf(u8, s[i..], "\\]");
                     if (close_trap != null and (close_para == null or close_trap.? < close_para.?)) {
                         const end = close_trap.?;
-                        return .{ id, s[i + 2 .. @min(i + end, s.len)], "trapezoid_alt" };
+                        // If closing is \/], trim the trailing \ too.
+                        const trim_close: usize = if (double_open and end > 0 and s[i + end - 1] == '\\') 1 else 0;
+                        return .{ id, s[i + label_offset .. @min(i + end - trim_close, s.len)], "trapezoid_alt" };
                     }
                     const end = close_para orelse (s.len - i - 1);
-                    return .{ id, s[i + 2 .. @min(i + end, s.len)], "parallelogram_alt" };
+                    const trim_close: usize = if (double_open and end > 0 and s[i + end - 1] == '/') 1 else 0;
+                    return .{ id, s[i + label_offset .. @min(i + end - trim_close, s.len)], "parallelogram_alt" };
                 }
                 // Rect: [label]
                 const end = std.mem.lastIndexOfScalar(u8, s, ']') orelse s.len - 1;
@@ -1019,7 +1027,15 @@ fn renderFlowchartDirect(allocator: std.mem.Allocator, text: []const u8) ![]cons
             const sg_id: []const u8, const label: []const u8 = if (std.mem.indexOf(u8, rest, "[")) |lb| blk: {
                 const id = std.mem.trim(u8, rest[0..lb], " \t");
                 const rb = std.mem.indexOf(u8, rest, "]") orelse (rest.len - 1);
-                break :blk .{ id, rest[lb + 1 .. rb] };
+                const raw_label = rest[lb + 1 .. rb];
+                // Strip surrounding quotes from e.g. ["Input Layer"] → Input Layer
+                const label_unquoted = if (raw_label.len >= 2 and
+                    (raw_label[0] == '"' or raw_label[0] == '\'') and
+                    raw_label[raw_label.len - 1] == raw_label[0])
+                    raw_label[1 .. raw_label.len - 1]
+                else
+                    raw_label;
+                break :blk .{ id, label_unquoted };
             } else blk: {
                 const lbl = if (rest.len > 0) rest else "group";
                 break :blk .{ lbl, lbl };

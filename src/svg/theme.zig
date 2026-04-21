@@ -62,13 +62,13 @@ pub const pie_stroke_width: f32 = 2.0;
 pub const pie_text_color = "#333333";
 pub const pie_outer_radius: f32 = 150.0;
 pub const pie_inner_radius: f32 = 0.0; // solid pie (not donut)
-pub const pie_label_radius: f32 = 190.0; // radius for label placement
-pub const pie_legend_x: f32 = 370.0;
+pub const pie_label_radius: f32 = 170.0; // radius for label placement (kept inside legend zone)
+pub const pie_legend_x: f32 = 420.0;
 pub const pie_legend_y_start: f32 = 80.0;
 pub const pie_legend_line_height: f32 = 24.0;
-pub const pie_width: u32 = 600;
+pub const pie_width: u32 = 700;
 pub const pie_height: u32 = 400;
-pub const pie_cx: f32 = 220.0;
+pub const pie_cx: f32 = 195.0;
 pub const pie_cy: f32 = 200.0;
 
 // ── Runtime theme override ─────────────────────────────────────────────────
