@@ -169,6 +169,23 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
+    // Build subgraph-index → direction map for subgraphs that override the parent direction.
+    // This lets edge rendering use each subgraph's own direction for edges that are
+    // wholly contained within that subgraph.
+    var sg_idx_to_dir = std.AutoHashMap(usize, layout.Direction).init(allocator);
+    defer sg_idx_to_dir.deinit();
+    {
+        const sg_list2 = node.getList("subgraphs");
+        for (sg_list2, 0..) |sgv2, sg_idx2| {
+            const sgn2 = sgv2.asNode() orelse continue;
+            const sg_dir_str2 = sgn2.getString("direction") orelse continue;
+            if (sg_dir_str2.len == 0) continue;
+            const sg_dir2 = parseDirection(sg_dir_str2);
+            if (sg_dir2 == direction) continue;
+            try sg_idx_to_dir.put(sg_idx2, sg_dir2);
+        }
+    }
+
     // Compute extra right/bottom padding needed for back-edge routing.
     // Back edges in TB/BT direction route laterally to the right of all nodes.
     var extra_w: u32 = 0;
@@ -176,7 +193,15 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (graph.edges) |e| {
         const fn2 = findNode(graph.nodes, e.from) orelse continue;
         const tn2 = findNode(graph.nodes, e.to) orelse continue;
-        const is_back: bool = switch (direction) {
+        const pad_from_sg = node_subgraph.get(e.from) orelse std.math.maxInt(usize);
+        const pad_to_sg = node_subgraph.get(e.to) orelse std.math.maxInt(usize);
+        const pad_dir: layout.Direction = blk: {
+            if (pad_from_sg == pad_to_sg and pad_from_sg != std.math.maxInt(usize)) {
+                if (sg_idx_to_dir.get(pad_from_sg)) |d| break :blk d;
+            }
+            break :blk direction;
+        };
+        const is_back: bool = switch (pad_dir) {
             .tb => tn2.y <= fn2.y,
             .bt => tn2.y >= fn2.y,
             .lr => tn2.x <= fn2.x,
@@ -187,7 +212,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             @floatFromInt(fn2.layer - tn2.layer) else @floatFromInt(tn2.layer - fn2.layer);
         const lateral: f32 = @max(layout.H_GAP * 2.5,
             layer_diff * fn2.w * 0.4 + layout.H_GAP);
-        switch (direction) {
+        switch (pad_dir) {
             .tb, .bt => {
                 const right = fn2.x + fn2.w + lateral + layout.H_GAP;
                 const cur_w = layout.svgWidth(graph.nodes);
@@ -215,6 +240,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     try svg.header(svg_w, svg_h);
     try svg.defs(arrow_marker_defs);
+    try svg.rect(0, 0, @floatFromInt(svg_w), @floatFromInt(svg_h), 0, theme.background, theme.background, 0);
 
     // Draw subgraph background boxes (behind edges and nodes).
     // Nested subgraphs are supported: bboxes are computed bottom-up (leaf → root)
@@ -341,12 +367,28 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             "#4466aa", theme.font_size_small, .start, "normal");
     }
 
-    // Draw edges first (behind nodes)
+    // Draw edges first (behind nodes), then labels in a second pass so no arc
+    // can overwrite a label that was drawn in an earlier iteration.
+    const EdgeLabel = struct { x: f32, y: f32, text: []const u8 };
+    var edge_labels: std.ArrayList(EdgeLabel) = .empty;
+    defer edge_labels.deinit(allocator);
+
     for (graph.edges) |e| {
         const from_node = findNode(graph.nodes, e.from) orelse continue;
         const to_node = findNode(graph.nodes, e.to) orelse continue;
         const stroke = e.color orelse theme.edge_color;
         const sw = theme.edge_stroke_width;
+
+        // Use the subgraph's own direction when both endpoints are in the same
+        // subgraph that declares a direction override; otherwise use the parent direction.
+        const e_from_sg = node_subgraph.get(e.from) orelse std.math.maxInt(usize);
+        const e_to_sg   = node_subgraph.get(e.to)   orelse std.math.maxInt(usize);
+        const edge_dir: layout.Direction = blk: {
+            if (e_from_sg == e_to_sg and e_from_sg != std.math.maxInt(usize)) {
+                if (sg_idx_to_dir.get(e_from_sg)) |d| break :blk d;
+            }
+            break :blk direction;
+        };
 
         // ── Self-loop: node connects to itself ────────────────────────────
         if (std.mem.eql(u8, e.from, e.to)) {
@@ -364,7 +406,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             // For each direction: loop exits and re-enters the node on the
             // upstream face (opposite to the normal flow direction), arcing
             // away from the graph body.
-            const loop_d: []const u8 = switch (direction) {
+            const loop_d: []const u8 = switch (edge_dir) {
                 .tb => blk: {
                     // Loop above the node: exit top-left, arc up, enter top-right
                     loop_ux = 0; loop_uy = 1; // arrowhead points down
@@ -423,7 +465,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 });
             try svg.polygon(lp_pts, stroke, stroke, 0);
             if (e.label) |lbl| {
-                try svg.text(lbl_x, lbl_y, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+                try edge_labels.append(allocator, .{ .x = lbl_x, .y = lbl_y, .text = lbl });
             }
             continue;
         }
@@ -433,7 +475,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         // in the graph (where all nodes collapse to layer 0) are also handled.
         // The standard Bezier control points would fold backwards, so instead
         // route the edge around the outside of the graph body.
-        const is_back: bool = switch (direction) {
+        const is_back: bool = switch (edge_dir) {
             .tb => to_node.y <= from_node.y,
             .bt => to_node.y >= from_node.y,
             .lr => to_node.x <= from_node.x,
@@ -455,7 +497,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             var bcy1: f32 = 0;
             var bcx2: f32 = 0;
             var bcy2: f32 = 0;
-            const path_d: []const u8 = switch (direction) {
+            const path_d: []const u8 = switch (edge_dir) {
                 // TB/BT: route around the right side; exit/enter right-center
                 .tb, .bt => blk: {
                     bfx = from_node.x + from_node.w;
@@ -511,7 +553,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             if (e.label) |lbl| {
                 const mid_x = 0.125 * bfx + 0.375 * bcx1 + 0.375 * bcx2 + 0.125 * btx;
                 const mid_y = 0.125 * bfy + 0.375 * bcy1 + 0.375 * bcy2 + 0.125 * bty;
-                try svg.text(mid_x + 4, mid_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+                try edge_labels.append(allocator, .{ .x = mid_x + 4, .y = mid_y - 6, .text = lbl });
             }
             continue;
         }
@@ -519,7 +561,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         // ── Normal forward edge ───────────────────────────────────────────
         // Connection points: exit bottom-center / enter top-center for TB,
         // exit right-center / enter left-center for LR, etc.
-        const fx: f32, const fy: f32, const tx: f32, const ty: f32 = switch (direction) {
+        const fx: f32, const fy: f32, const tx: f32, const ty: f32 = switch (edge_dir) {
             .lr => .{
                 from_node.x + from_node.w,
                 from_node.y + from_node.h / 2,
@@ -552,7 +594,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const elbow_x: f32 = (fx + tx) / 2.0;
         const elbow_y: f32 = (fy + ty) / 2.0;
         var path_buf: [256]u8 = undefined;
-        const path_d = switch (direction) {
+        const path_d = switch (edge_dir) {
             .tb, .bt => try std.fmt.bufPrint(&path_buf,
                 "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}",
                 .{ fx, fy, fx, elbow_y, tx, elbow_y, tx, ty }),
@@ -572,8 +614,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         // Arrowhead direction is determined by the last elbow segment.
         // TB: last segment goes from (tx, mid_y) → (tx, ty) — pointing in fy→ty direction.
         // LR: last segment goes from (mid_x, ty) → (tx, ty) — pointing in fx→tx direction.
-        const tang_x: f32 = switch (direction) { .lr => tx - elbow_x, .rl => tx - elbow_x, .tb, .bt => 0 };
-        const tang_y: f32 = switch (direction) { .tb => ty - elbow_y, .bt => ty - elbow_y, .lr, .rl => 0 };
+        const tang_x: f32 = switch (edge_dir) { .lr => tx - elbow_x, .rl => tx - elbow_x, .tb, .bt => 0 };
+        const tang_y: f32 = switch (edge_dir) { .tb => ty - elbow_y, .bt => ty - elbow_y, .lr, .rl => 0 };
         const tang_len = @sqrt(tang_x * tang_x + tang_y * tang_y);
         if (tang_len > 0.5) {
             const ux = tang_x / tang_len;
@@ -597,10 +639,18 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         // TB/BT: crossing segment is horizontal at elbow_y; label at (mid-x, elbow_y).
         // LR/RL: crossing segment is vertical at elbow_x; label at (elbow_x, mid-y).
         if (e.label) |lbl| {
-            const lbl_x: f32 = switch (direction) { .tb, .bt => (fx + tx) / 2.0, .lr, .rl => elbow_x };
-            const lbl_y: f32 = switch (direction) { .tb, .bt => elbow_y, .lr, .rl => (fy + ty) / 2.0 };
-            try svg.text(lbl_x, lbl_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
+            const lbl_x: f32 = switch (edge_dir) { .tb, .bt => (fx + tx) / 2.0, .lr, .rl => elbow_x };
+            const lbl_y: f32 = switch (edge_dir) { .tb, .bt => elbow_y, .lr, .rl => (fy + ty) / 2.0 };
+            try edge_labels.append(allocator, .{ .x = lbl_x, .y = lbl_y - 6, .text = lbl });
         }
+    }
+
+    // Second pass: draw all edge labels on top of all paths.
+    for (edge_labels.items) |el| {
+        const lw: f32 = @as(f32, @floatFromInt(el.text.len)) * 7.0 + 6.0;
+        const lh: f32 = @as(f32, @floatFromInt(theme.font_size_small)) + 4.0;
+        try svg.rect(el.x - lw / 2.0, el.y - lh + 2.0, lw, lh, 2.0, theme.background, "none", 0);
+        try svg.text(el.x, el.y, el.text, theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
     // Draw nodes (wrapped in <a> if a click href was specified)

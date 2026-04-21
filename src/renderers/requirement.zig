@@ -132,11 +132,17 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             try svg.polygon(pts, theme.line_color, theme.line_color, 0);
         }
 
-        // Relationship kind label at midpoint, offset perpendicular to the edge
+        // Relationship kind label at midpoint, offset perpendicular to the edge.
+        // A white background rect is drawn first so the label stays legible when
+        // edges cross or pass near box boundaries.
         if (kind.len > 0 and len > 1.0) {
-            const perp: f32 = 12.0;
+            const perp: f32 = 18.0;
             const lx = (fx + tx) / 2 + (-dy / len) * perp;
             const ly = (fy + ty) / 2 + (dx / len) * perp;
+            const kw: f32 = @as(f32, @floatFromInt(kind.len)) * 7.0 + 8.0;
+            const kh: f32 = @as(f32, @floatFromInt(theme.font_size_small)) + 4.0;
+            try svg.rect(lx - kw / 2.0, ly - kh + 2.0, kw, kh, 2.0,
+                theme.background, "none", 0);
             try svg.text(lx, ly, kind, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
@@ -148,9 +154,11 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.rect(nd.x, nd.y, NODE_W, nd.h, 4.0, theme.node_fill, color, 1.5);
         // Header band
         try svg.rect(nd.x, nd.y, NODE_W, HEADER_H, 4.0, color, color, 0);
-        // Name in header
+        // Name in header — truncate so it doesn't overflow the box
+        const max_name_len: usize = 22;
+        const display_name = if (nd.name.len > max_name_len) nd.name[0..max_name_len] else nd.name;
         try svg.text(nd.x + NODE_W / 2, nd.y + HEADER_H / 2 + 5,
-            nd.name, theme.background, theme.font_size_small, .middle, "bold");
+            display_name, theme.background, theme.font_size_small, .middle, "bold");
         // Attribute rows
         for (nd.attrs, 0..) |attr, ai| {
             const ay = nd.y + HEADER_H + 4 + @as(f32, @floatFromInt(ai)) * ATTR_H + ATTR_H / 2;

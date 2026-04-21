@@ -105,6 +105,11 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const pct = @round(fraction * 1000.0) / 10.0;
             var label_buf: [64]u8 = undefined;
             const pct_text = try std.fmt.bufPrint(&label_buf, "{d:.1}%", .{pct});
+            // White background so labels stay legible even when adjacent slices crowd them
+            const lbl_w: f32 = @as(f32, @floatFromInt(pct_text.len)) * 7.0 + 6.0;
+            const lbl_h: f32 = @as(f32, @floatFromInt(theme.font_size_small)) + 4.0;
+            try svg.rect(lx - lbl_w / 2.0, ly - lbl_h + 2.0, lbl_w, lbl_h, 2.0,
+                theme.background, "none", 0);
             try svg.text(lx, ly + 4.0, pct_text, theme.pie_text_color, theme.font_size_small, .middle, "normal");
         }
 

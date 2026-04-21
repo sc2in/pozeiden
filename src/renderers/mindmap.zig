@@ -238,11 +238,11 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
         },
         .rect => {
             try svg.rect(x - NODE_W / 2, y - NODE_H / 2, NODE_W, NODE_H, 0, fill, stroke, 1.5);
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(x, y + 4, label, NODE_W - 8, theme.text_color, theme.font_size_small, .middle, "normal");
         },
         .rounded => {
             try svg.rect(x - NODE_W / 2, y - NODE_H / 2, NODE_W, NODE_H, 8, fill, stroke, 1.5);
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(x, y + 4, label, NODE_W - 8, theme.text_color, theme.font_size_small, .middle, "normal");
         },
         .hexagon => {
             const hw = NODE_W / 2;
@@ -260,7 +260,7 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                     x - hw + indent, y + hh,
                 });
             try svg.polygon(pts, fill, stroke, 1.5);
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(x, y + 4, label, NODE_W - 20, theme.text_color, theme.font_size_small, .middle, "normal");
         },
         .ellipse => {
             // SVG arc-based ellipse via path
@@ -271,7 +271,7 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                 "M {d:.1},{d:.1} A {d:.1},{d:.1} 0 1 0 {d:.1},{d:.1} A {d:.1},{d:.1} 0 1 0 {d:.1},{d:.1} Z",
                 .{ x - rx, y, rx, ry, x + rx, y, rx, ry, x - rx, y });
             try svg.path(d, fill, stroke, 1.5, "");
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(x, y + 4, label, NODE_W - 16, theme.text_color, theme.font_size_small, .middle, "normal");
         },
         .cloud => {
             // Cloud: rounded rect with wavy top via multiple small arcs
@@ -292,7 +292,7 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                     x - rw,      y + rh / 2,
                 });
             try svg.path(d, fill, stroke, 1.5, "");
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.textWrapped(x, y + 4, label, NODE_W - 12, theme.text_color, theme.font_size_small, .middle, "normal");
         },
         .bang => {
             // Bang/starburst: 8-point star polygon
@@ -312,7 +312,11 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                 try wr.print("{d:.1},{d:.1}", .{ px, py });
             }
             try svg.polygon(fbs.getWritten(), fill, stroke, 1.5);
-            try svg.text(x, y + 4, label, theme.text_color, theme.font_size_small, .middle, "normal");
+            // White pill behind text so starburst points don't obscure the label
+            const bang_lbl_w = @as(f32, @floatFromInt(label.len)) * 6.5 + 6.0;
+            try svg.rect(x - bang_lbl_w / 2.0, y - 10.0, bang_lbl_w, 16.0, 3.0,
+                theme.background, "none", 0);
+            try svg.textWrapped(x, y + 4, label, NODE_W - 8, theme.text_color, theme.font_size_small, .middle, "normal");
         },
     }
 }
