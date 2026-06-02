@@ -36,7 +36,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     if (flow_list.len == 0) return renderFallback(allocator);
 
     // Collect unique node names in order
-    var name_map = std.StringArrayHashMap(void).init(a);
+    var name_map: std.StringArrayHashMapUnmanaged(void) = .empty;
     var flows: std.ArrayList(Flow) = .empty;
 
     for (flow_list) |fv| {
@@ -45,8 +45,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const to = fn2.getString("to") orelse continue;
         const val: f32 = @floatCast(fn2.getNumber("value") orelse 0.0);
         if (val <= 0) continue;
-        try name_map.put(from, {});
-        try name_map.put(to, {});
+        try name_map.put(a, from, {});
+        try name_map.put(a, to, {});
         try flows.append(a, .{ .from = from, .to = to, .value = val });
     }
 

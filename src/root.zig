@@ -626,7 +626,7 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
             // Strip trailing @{...} metadata — not rendered yet.
             var item_line = line;
             if (std.mem.indexOf(u8, item_line, "@{")) |at| {
-                item_line = std.mem.trimRight(u8, item_line[0..at], " \t");
+                item_line = std.mem.trimEnd(u8, item_line[0..at], " \t");
             }
             // Syntax: id["label"] or "label" (bare string) or plain id
             var item_label = item_line;
@@ -1643,7 +1643,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     const a = arena.allocator();
 
     // class_name → list of member strings
-    var class_map = std.StringArrayHashMap(std.ArrayList([]const u8)).init(a);
+    var class_map: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
     var relations: std.ArrayList(Value) = .empty;
 
     // Relationship patterns (order: longer first)
@@ -1662,7 +1662,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var current_namespace: ?[]const u8 = null; // inside a `namespace Foo {` block
     var namespace_depth: usize = 0; // brace nesting inside namespace
     // namespace_name → list of class names
-    var namespace_map = std.StringArrayHashMap(std.ArrayList([]const u8)).init(a);
+    var namespace_map: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
     // class_name → namespace (for renderer lookup)
     var class_namespace = std.StringHashMap([]const u8).init(a);
     var class_notes: std.ArrayList(Value) = .empty;
@@ -1682,7 +1682,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             const rest = std.mem.trim(u8, line[10..], " \t{");
             current_namespace = rest;
             namespace_depth = 1;
-            const entry = try namespace_map.getOrPut(rest);
+            const entry = try namespace_map.getOrPut(a, rest);
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             continue;
         }
@@ -1706,7 +1706,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             const rest = std.mem.trim(u8, line[6..], " \t");
             const name_end = std.mem.indexOfAny(u8, rest, " {") orelse rest.len;
             const name = std.mem.trim(u8, rest[0..name_end], " \t");
-            const entry = try class_map.getOrPut(name);
+            const entry = try class_map.getOrPut(a, name);
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             // Inline stereotype: "class Foo <<interface>>" or "class Foo <<interface>> {"
             if (name_end < rest.len) {
@@ -1749,7 +1749,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 std.mem.indexOfScalar(u8, lhs, '.') == null)
             {
                 const entry = class_map.getPtr(lhs) orelse blk: {
-                    try class_map.put(lhs, .empty);
+                    try class_map.put(a, lhs, .empty);
                     break :blk class_map.getPtr(lhs).?;
                 };
                 try entry.append(a, member);
@@ -1800,8 +1800,8 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 else
                     .{ left, right };
 
-                if (!class_map.contains(from)) try class_map.put(from, .empty);
-                if (!class_map.contains(to)) try class_map.put(to, .empty);
+                if (!class_map.contains(from)) try class_map.put(a, from, .empty);
+                if (!class_map.contains(to)) try class_map.put(a, to, .empty);
 
                 var rn = Value.Node{ .type_name = "relation", .fields = .{} };
                 try rn.fields.put(a, "from", Value{ .string = from });
@@ -2081,7 +2081,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     const a = arena.allocator();
 
     // entity_name → list of attr nodes
-    var entity_map = std.StringArrayHashMap(std.ArrayList(Value)).init(a);
+    var entity_map: std.StringArrayHashMapUnmanaged(std.ArrayList(Value)) = .empty;
     var relations: std.ArrayList(Value) = .empty;
 
     var current_entity: ?[]const u8 = null;
@@ -2107,7 +2107,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
         {
             const name = std.mem.trim(u8, line[0..std.mem.indexOfScalar(u8, line, '{').?], " \t");
             if (name.len > 0) {
-                if (!entity_map.contains(name)) try entity_map.put(name, .empty);
+                if (!entity_map.contains(name)) try entity_map.put(a, name, .empty);
                 current_entity = name;
             }
             continue;
@@ -2154,7 +2154,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 }
             }
             const rel_str = line[rel_token_start .. connector_pos + rel_token_len];
-            const from = std.mem.trimRight(u8, std.mem.trim(u8, line[0..rel_token_start], " \t"), "|o{}< \t");
+            const from = std.mem.trimEnd(u8, std.mem.trim(u8, line[0..rel_token_start], " \t"), "|o{}< \t");
             // Everything after the rel token
             const after_rel = line[connector_pos + rel_token_len ..];
             const rest = std.mem.trim(u8, after_rel, " \t");
@@ -2167,8 +2167,8 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 "";
 
             if (from.len == 0 or to.len == 0) continue;
-            if (!entity_map.contains(from)) try entity_map.put(from, .empty);
-            if (!entity_map.contains(to)) try entity_map.put(to, .empty);
+            if (!entity_map.contains(from)) try entity_map.put(a, from, .empty);
+            if (!entity_map.contains(to)) try entity_map.put(a, to, .empty);
 
             var rn = Value.Node{ .type_name = "relation", .fields = .{} };
             try rn.fields.put(a, "from", Value{ .string = from });
@@ -2594,7 +2594,7 @@ fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
-        const trimmed_right = std.mem.trimRight(u8, raw, " \t\r");
+        const trimmed_right = std.mem.trimEnd(u8, raw, " \t\r");
         if (trimmed_right.len == 0 or
             std.mem.startsWith(u8, std.mem.trim(u8, trimmed_right, " \t"), "%%")) continue;
         if (first) {

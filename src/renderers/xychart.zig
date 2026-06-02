@@ -137,9 +137,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 const px = chart_x + (@as(f32, @floatFromInt(ci)) + 0.5) * COL_W;
                 const py = chart_bot - norm * CHART_H;
                 if (ci == 0) {
-                    try path_buf.writer(allocator).print("M {d:.1},{d:.1}", .{ px, py });
+                    try path_buf.print(allocator, "M {d:.1},{d:.1}", .{ px, py });
                 } else {
-                    try path_buf.writer(allocator).print(" L {d:.1},{d:.1}", .{ px, py });
+                    try path_buf.print(allocator, " L {d:.1},{d:.1}", .{ px, py });
                 }
                 try svg.circle(px, py, 3.5, color, theme.background, 1.5);
             }

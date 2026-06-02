@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) void {
         const git_describe = b.runAllowFail(
             &.{ "git", "describe", "--tags", "--always" },
             &exit_code,
-            .Ignore,
+            .ignore,
         ) catch "";
         break :blk if (git_describe.len > 0) trimLeadingV(git_describe) else zon.version;
     };
@@ -267,7 +267,7 @@ pub fn build(b: *std.Build) void {
         const mmd = b.path(b.fmt("examples/{s}.mmd", .{name}));
         const run = b.addRunArtifact(exe);
         run.setStdIn(.{ .lazy_path = mmd });
-        const svg = run.captureStdOut();
+        const svg = run.captureStdOut(.{});
         const install = b.addInstallFile(svg, b.fmt("examples/{s}.svg", .{name}));
         examples_step.dependOn(&install.step);
     }

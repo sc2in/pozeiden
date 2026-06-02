@@ -14,39 +14,36 @@ const config = @import("config");
 
 const Format = enum { svg, json };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var arg_it = std.process.Args.Iterator.init(init.minimal.args);
+    _ = arg_it.skip(); // skip argv[0]
 
-    var input_path: ?[]const u8 = null;
-    var output_path: ?[]const u8 = null;
+    var input_path: ?[:0]const u8 = null;
+    var output_path: ?[:0]const u8 = null;
     var format: Format = .svg;
 
-    var i: usize = 1;
-    while (i < args.len) : (i += 1) {
-        if (std.mem.eql(u8, args[i], "-i") and i + 1 < args.len) {
-            i += 1;
-            input_path = args[i];
-        } else if (std.mem.eql(u8, args[i], "-o") and i + 1 < args.len) {
-            i += 1;
-            output_path = args[i];
-        } else if (std.mem.eql(u8, args[i], "--format") and i + 1 < args.len) {
-            i += 1;
-            if (std.mem.eql(u8, args[i], "json")) {
-                format = .json;
-            } else if (!std.mem.eql(u8, args[i], "svg")) {
-                try std.fs.File.stderr().writeAll("error: --format must be svg or json\n");
-                std.process.exit(1);
+    while (arg_it.next()) |arg| {
+        if (std.mem.eql(u8, arg, "-i")) {
+            input_path = arg_it.next();
+        } else if (std.mem.eql(u8, arg, "-o")) {
+            output_path = arg_it.next();
+        } else if (std.mem.eql(u8, arg, "--format")) {
+            if (arg_it.next()) |fmt| {
+                if (std.mem.eql(u8, fmt, "json")) {
+                    format = .json;
+                } else if (!std.mem.eql(u8, fmt, "svg")) {
+                    try std.Io.File.stderr().writeStreamingAll(io, "error: --format must be svg or json\n");
+                    std.process.exit(1);
+                }
             }
-        } else if (std.mem.eql(u8, args[i], "--version") or std.mem.eql(u8, args[i], "-V")) {
-            try std.fs.File.stdout().writeAll(config.version ++ "\n");
+        } else if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-V")) {
+            try std.Io.File.stdout().writeStreamingAll(io, config.version ++ "\n");
             return;
-        } else if (std.mem.eql(u8, args[i], "--help") or std.mem.eql(u8, args[i], "-h")) {
-            try std.fs.File.stderr().writeAll(
+        } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            try std.Io.File.stderr().writeStreamingAll(io,
                 \\Usage: pozeiden [-i input.mmd] [-o output.svg] [--format svg|json]
                 \\
                 \\Reads mermaid diagram text and writes an SVG (default) or JSON envelope.
@@ -67,11 +64,15 @@ pub fn main() !void {
 
     // Read input
     const input = if (input_path) |path| blk: {
-        const file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
-        break :blk try file.readToEndAlloc(allocator, 16 * 1024 * 1024);
+        const file = try std.Io.Dir.cwd().openFile(io, path, .{});
+        defer file.close(io);
+        var rbuf: [4096]u8 = undefined;
+        var rdr = file.reader(io, &rbuf);
+        break :blk try rdr.interface.allocRemaining(allocator, .unlimited);
     } else blk: {
-        break :blk try std.fs.File.stdin().readToEndAlloc(allocator, 16 * 1024 * 1024);
+        var rbuf: [4096]u8 = undefined;
+        var rdr = std.Io.File.stdin().reader(io, &rbuf);
+        break :blk try rdr.interface.allocRemaining(allocator, .unlimited);
     };
     defer allocator.free(input);
 
@@ -87,20 +88,19 @@ pub fn main() !void {
         .svg => svg,
         .json => blk: {
             const type_name = @tagName(diagram_type);
-            var buf = std.ArrayList(u8){};
+            var buf: std.ArrayList(u8) = .empty;
             errdefer buf.deinit(allocator);
-            const w = buf.writer(allocator);
-            try w.writeAll("{\"svg\":\"");
+            try buf.appendSlice(allocator, "{\"svg\":\"");
             for (svg) |c| {
                 switch (c) {
-                    '"' => try w.writeAll("\\\""),
-                    '\\' => try w.writeAll("\\\\"),
-                    '\n' => try w.writeAll("\\n"),
-                    '\r' => try w.writeAll("\\r"),
-                    else => try w.writeByte(c),
+                    '"' => try buf.appendSlice(allocator, "\\\""),
+                    '\\' => try buf.appendSlice(allocator, "\\\\"),
+                    '\n' => try buf.appendSlice(allocator, "\\n"),
+                    '\r' => try buf.appendSlice(allocator, "\\r"),
+                    else => try buf.append(allocator, c),
                 }
             }
-            try w.print("\",\"diagram_type\":\"{s}\"}}\n", .{type_name});
+            try buf.print(allocator, "\",\"diagram_type\":\"{s}\"}}\n", .{type_name});
             break :blk try buf.toOwnedSlice(allocator);
         },
     };
@@ -108,10 +108,10 @@ pub fn main() !void {
 
     // Write output
     if (output_path) |path| {
-        const file = try std.fs.cwd().createFile(path, .{});
-        defer file.close();
-        try file.writeAll(output_bytes);
+        const file = try std.Io.Dir.cwd().createFile(io, path, .{});
+        defer file.close(io);
+        try file.writeStreamingAll(io, output_bytes);
     } else {
-        try std.fs.File.stdout().writeAll(output_bytes);
+        try std.Io.File.stdout().writeStreamingAll(io, output_bytes);
     }
 }

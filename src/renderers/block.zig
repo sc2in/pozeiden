@@ -40,7 +40,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     };
 
     var blocks: std.ArrayList(BlockEntry) = .empty;
-    var block_map = std.StringArrayHashMap(usize).init(a); // id -> index
+    var block_map: std.StringArrayHashMapUnmanaged(usize) = .empty; // id -> index
 
     // Place blocks in grid
     var cur_col: usize = 0;
@@ -62,7 +62,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const x = MARGIN + @as(f32, @floatFromInt(cur_col)) * (CELL_W + GAP);
         const y = MARGIN + @as(f32, @floatFromInt(cur_row)) * (CELL_H + GAP);
 
-        try block_map.put(id, blocks.items.len);
+        try block_map.put(a, id, blocks.items.len);
         try blocks.append(a, BlockEntry{
             .id = id, .label = label, .width = width,
             .grid_col = cur_col, .grid_row = cur_row,
