@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/e7713b176c927fdab81a18801682bd2606491b0a";
     zig2nix.url = "https://flakehub.com/f/Cloudef/zig2nix/0.1.990.tar.gz";
-    zigmark.url = "github:sc2in/zigmark";
+    zigmark.url = "github:sc2in/zigmark/zig-16";
     zigmark.inputs.nixpkgs.follows = "nixpkgs";
   };
 
