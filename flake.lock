@@ -163,11 +163,11 @@
         "zig2nix": "zig2nix_2"
       },
       "locked": {
-        "lastModified": 1780438779,
-        "narHash": "sha256-vaESfF6ki+wYyktCK5tWqI759Qu45nrBW2K+CFk14uI=",
+        "lastModified": 1780441754,
+        "narHash": "sha256-snm5vg+bqRxT0n00jG5/PML/OQjC2+La4W0CiLiJjmc=",
         "owner": "sc2in",
         "repo": "zigmark",
-        "rev": "0647de177624292b7a76637144fa3b7c6e7eb3dc",
+        "rev": "6643308909d957e2a500cb4f1e71fe0734068b69",
         "type": "github"
       },
       "original": {
