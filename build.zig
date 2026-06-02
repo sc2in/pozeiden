@@ -15,10 +15,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const mecha = b.dependency("mecha", .{});
-    const zigmark = b.dependency("zigmark", .{
-        .target = target,
-        .optimize = optimize,
-    });
 
     // Version priority: -Dversion flag > git describe > build.zig.zon
     // The flag lets Nix (and other sandboxed builds) inject the version
@@ -43,7 +39,6 @@ pub fn build(b: *std.Build) void {
     mod.addOptions("config", options);
     mod.addImport("mvzr", mvzr.module("mvzr"));
     mod.addImport("mecha", mecha.module("mecha"));
-    mod.addImport("zigmark", zigmark.module("zigmark"));
 
     const exe = b.addExecutable(.{
         .name = "pozeiden",
@@ -159,10 +154,6 @@ pub fn build(b: *std.Build) void {
         .optimize = .ReleaseSmall,
     });
     const mecha_wasm = b.dependency("mecha", .{});
-    const zigmark_wasm = b.dependency("zigmark", .{
-        .target = wasm_target,
-        .optimize = .ReleaseSmall,
-    });
 
     const mod_wasm = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
@@ -173,7 +164,6 @@ pub fn build(b: *std.Build) void {
     mod_wasm.addOptions("config", options);
     mod_wasm.addImport("mvzr", mvzr_wasm.module("mvzr"));
     mod_wasm.addImport("mecha", mecha_wasm.module("mecha"));
-    mod_wasm.addImport("zigmark", zigmark_wasm.module("zigmark"));
 
     const wasm_exe = b.addExecutable(.{
         .name = "pozeiden",

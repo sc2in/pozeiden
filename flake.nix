@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/e7713b176c927fdab81a18801682bd2606491b0a";
-    zig2nix.url = "https://flakehub.com/f/Cloudef/zig2nix/0.1.885.tar.gz";
+    zig2nix.url = "https://flakehub.com/f/Cloudef/zig2nix/0.1.990.tar.gz";
     zigmark.url = "github:sc2in/zigmark";
     zigmark.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -110,9 +110,9 @@
                 echo "zig is not installed or not in PATH" >&2
                 exit 1
               fi
-              echo "Updating build.zig.zon dependencies..."
-              zig fetch --save .
-              echo "build.zig.zon updated."
+              echo "Regenerating build.zig.zon2json-lock..."
+              env -u ZIG_GLOBAL_CACHE_DIR zig2nix zon2lock
+              echo "build.zig.zon2json-lock updated."
             '')
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.mermaid-cli
