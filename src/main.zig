@@ -27,17 +27,25 @@ pub fn main(init: std.process.Init) !void {
 
     while (arg_it.next()) |arg| {
         if (std.mem.eql(u8, arg, "-i")) {
-            input_path = arg_it.next();
+            input_path = arg_it.next() orelse {
+                try std.Io.File.stderr().writeStreamingAll(io, "error: -i requires a file path\n");
+                std.process.exit(1);
+            };
         } else if (std.mem.eql(u8, arg, "-o")) {
-            output_path = arg_it.next();
+            output_path = arg_it.next() orelse {
+                try std.Io.File.stderr().writeStreamingAll(io, "error: -o requires a file path\n");
+                std.process.exit(1);
+            };
         } else if (std.mem.eql(u8, arg, "--format")) {
-            if (arg_it.next()) |fmt| {
-                if (std.mem.eql(u8, fmt, "json")) {
-                    format = .json;
-                } else if (!std.mem.eql(u8, fmt, "svg")) {
-                    try std.Io.File.stderr().writeStreamingAll(io, "error: --format must be svg or json\n");
-                    std.process.exit(1);
-                }
+            const fmt = arg_it.next() orelse {
+                try std.Io.File.stderr().writeStreamingAll(io, "error: --format requires a value (svg or json)\n");
+                std.process.exit(1);
+            };
+            if (std.mem.eql(u8, fmt, "json")) {
+                format = .json;
+            } else if (!std.mem.eql(u8, fmt, "svg")) {
+                try std.Io.File.stderr().writeStreamingAll(io, "error: --format must be svg or json\n");
+                std.process.exit(1);
             }
         } else if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-V")) {
             try std.Io.File.stdout().writeStreamingAll(io, config.version ++ "\n");
@@ -59,6 +67,11 @@ pub fn main(init: std.process.Init) !void {
                 \\
             );
             return;
+        } else {
+            try std.Io.File.stderr().writeStreamingAll(io, "error: unknown argument '");
+            try std.Io.File.stderr().writeStreamingAll(io, arg);
+            try std.Io.File.stderr().writeStreamingAll(io, "'\n");
+            std.process.exit(1);
         }
     }
 

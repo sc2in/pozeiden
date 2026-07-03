@@ -5,6 +5,7 @@
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
+const xmlEscape = @import("../svg/writer.zig").xmlEscape;
 const theme = @import("../svg/theme.zig");
 
 const LEVEL_RADIUS: f32 = 165;
@@ -202,6 +203,7 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
             if (nl_pos != null) {
                 var tmp: std.ArrayList(u8) = .empty;
                 defer tmp.deinit(allocator);
+                try tmp.ensureTotalCapacity(allocator, label.len * 2 + 256);
                 try tmp.print(allocator,
                     "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" " ++
                     "text-anchor=\"middle\" font-family=\"{s}\">",
@@ -216,15 +218,7 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                     } else {
                         try tmp.print(allocator, "<tspan x=\"{d:.1}\" dy=\"1.2em\">", .{x});
                     }
-                    // XML-escape
-                    for (line) |c| {
-                        switch (c) {
-                            '&' => try tmp.appendSlice(allocator, "&amp;"),
-                            '<' => try tmp.appendSlice(allocator, "&lt;"),
-                            '>' => try tmp.appendSlice(allocator, "&gt;"),
-                            else => try tmp.append(allocator, c),
-                        }
-                    }
+                    try xmlEscape(&tmp, allocator, line);
                     try tmp.appendSlice(allocator, "</tspan>");
                     line_idx += 1;
                 }
@@ -296,9 +290,10 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
             // Bang/starburst: 8-point star polygon
             const or_: f32 = NODE_W / 2 + 4;
             const ir_: f32 = NODE_H / 2;
+            const n_pts: usize = 8;
             var pts: std.ArrayList(u8) = .empty;
             defer pts.deinit(allocator);
-            const n_pts: usize = 8;
+            try pts.ensureTotalCapacity(allocator, n_pts * 2 * 16);
             var pi_: usize = 0;
             while (pi_ < n_pts * 2) : (pi_ += 1) {
                 const angle = std.math.pi * @as(f32, @floatFromInt(pi_)) / @as(f32, @floatFromInt(n_pts));
