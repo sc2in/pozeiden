@@ -47,18 +47,36 @@ const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
 // ── Grammar cache ─────────────────────────────────────────────────────────────
 // Grammars are parsed from embedded source on first use and kept for the
-// process lifetime.  Not safe for concurrent first-call initialization.
+// process lifetime.  All lazy initialisation happens under `grammar_lock` so
+// concurrent first calls (e.g. document pipelines rendering diagrams from
+// multiple threads) cannot race on `grammar_arena` or the cached_* slots.
+// A spinlock rather than a mutex because pozeiden has no std.Io context to
+// lock with; the critical section is a one-time grammar parse and every later
+// call holds it only for a null-check.  On single-threaded targets (WASM) the
+// atomics lower to plain loads/stores.
 
 const LangiumCache = struct {
     merged: *const langium_ast.MergedGrammar,
     compiled: []const langium_runtime.CompiledTerminal,
 };
 
+var grammar_lock: std.atomic.Value(bool) = .init(false);
 var grammar_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 var cached_common_grammar: ?*const langium_ast.Grammar = null;
 var cached_pie: ?LangiumCache = null;
 var cached_git: ?LangiumCache = null;
 
+fn grammarLockAcquire() void {
+    while (grammar_lock.cmpxchgWeak(false, true, .acquire, .monotonic) != null) {
+        std.atomic.spinLoopHint();
+    }
+}
+
+fn grammarLockRelease() void {
+    grammar_lock.store(false, .release);
+}
+
+/// Caller must hold `grammar_lock`.
 fn getCommonGrammar() !*const langium_ast.Grammar {
     if (cached_common_grammar) |g| return g;
     const ga = grammar_arena.allocator();
@@ -82,12 +100,16 @@ fn buildLangiumCache(primary_src: []const u8) !LangiumCache {
 }
 
 fn getPieCache() !LangiumCache {
+    grammarLockAcquire();
+    defer grammarLockRelease();
     if (cached_pie) |c| return c;
     cached_pie = try buildLangiumCache(pie_langium);
     return cached_pie.?;
 }
 
 fn getGitCache() !LangiumCache {
+    grammarLockAcquire();
+    defer grammarLockRelease();
     if (cached_git) |c| return c;
     cached_git = try buildLangiumCache(git_langium);
     return cached_git.?;
@@ -3855,4 +3877,62 @@ test "render init directive unknown theme is silently ignored" {
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "concurrent rendering across threads is safe" {
+    if (@import("builtin").single_threaded) return error.SkipZigTest;
+
+    const pie_src = "pie title Pets\n\"Dogs\" : 60\n\"Cats\" : 40\n";
+    const git_src = "gitGraph\n  commit\n  commit\n  branch dev\n  commit\n";
+    const flow_src = "graph TD\nA-->B\nB-->C\n";
+
+    const Worker = struct {
+        // Each worker uses its own allocator so leak detection stays per-thread.
+        fn run(failed: *std.atomic.Value(bool), font: ?[]const u8) void {
+            var dbg: std.heap.DebugAllocator(.{}) = .init;
+            defer if (dbg.deinit() == .leak) failed.store(true, .release);
+            const a = dbg.allocator();
+
+            var i: usize = 0;
+            while (i < 25) : (i += 1) {
+                // Hit the lazily-initialised langium caches (pie, gitGraph) and
+                // a direct parser (flowchart) from every thread at once.
+                inline for (.{ pie_src, git_src, flow_src }) |src| {
+                    const svg = render(a, src) catch {
+                        failed.store(true, .release);
+                        return;
+                    };
+                    a.free(svg);
+                }
+
+                // Theme isolation: an override must show up in this thread's
+                // output and never leak into threads rendering with defaults.
+                const svg = if (font) |f|
+                    renderWithOptions(a, pie_src, .{ .theme_override = .{ .font_family = f } }) catch {
+                        failed.store(true, .release);
+                        return;
+                    }
+                else
+                    render(a, pie_src) catch {
+                        failed.store(true, .release);
+                        return;
+                    };
+                defer a.free(svg);
+
+                const expected = font orelse "trebuchet ms";
+                if (std.mem.indexOf(u8, svg, expected) == null) failed.store(true, .release);
+                if (font == null and std.mem.indexOf(u8, svg, "PPThreadFont") != null) failed.store(true, .release);
+            }
+        }
+    };
+
+    var failed: std.atomic.Value(bool) = .init(false);
+    const fonts = [_]?[]const u8{ "PPThreadFontA", "PPThreadFontB", null, null };
+    var threads: [fonts.len]std.Thread = undefined;
+    for (fonts, 0..) |font, i| {
+        threads[i] = try std.Thread.spawn(.{}, Worker.run, .{ &failed, font });
+    }
+    for (&threads) |*t| t.join();
+
+    try std.testing.expect(!failed.load(.acquire));
 }
