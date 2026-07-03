@@ -55,6 +55,14 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@main
 
+      - name: Configure permissions
+        # Enable unprivileged user namespaces, required by bubblewrap:
+        # zig2nix's zig-hook runs the compiler inside bwrap, so from-source
+        # builds of zig2nix tooling fail without this on Ubuntu 24.04 runners
+        # ("bwrap: setting up uid map: Permission denied") — which is exactly
+        # how the v0.2.0 release run died when the cache was throttled.
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       - name: Setup Nix cache
         uses: DeterminateSystems/flakehub-cache-action@main
         with:
