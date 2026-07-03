@@ -14,6 +14,9 @@ const config = @import("config");
 
 const Format = enum { svg, json };
 
+// Cap input size to avoid unbounded allocation / OOM on huge or malformed input.
+const max_input_bytes = 16 * 1024 * 1024; // 16 MiB
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
@@ -81,11 +84,11 @@ pub fn main(init: std.process.Init) !void {
         defer file.close(io);
         var rbuf: [4096]u8 = undefined;
         var rdr = file.reader(io, &rbuf);
-        break :blk try rdr.interface.allocRemaining(allocator, .unlimited);
+        break :blk try rdr.interface.allocRemaining(allocator, .limited(max_input_bytes));
     } else blk: {
         var rbuf: [4096]u8 = undefined;
         var rdr = std.Io.File.stdin().reader(io, &rbuf);
-        break :blk try rdr.interface.allocRemaining(allocator, .unlimited);
+        break :blk try rdr.interface.allocRemaining(allocator, .limited(max_input_bytes));
     };
     defer allocator.free(input);
 
