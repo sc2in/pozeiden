@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Thread safety** – `render`/`renderWithOptions` can now be called from
+  multiple threads concurrently. Theme variables (including `ThemeOverride`
+  and `%%{init:}%%` directive application) are `threadlocal`, so overrides on
+  one thread never leak into renders on another, and the lazily-initialised
+  langium grammar caches (pie, gitGraph) are built under a lock so concurrent
+  first calls cannot race. On single-threaded targets (WASM) both mechanisms
+  lower to the previous plain-global behaviour. Adds a multi-threaded stress
+  test.
+
 ## [0.1.2] - 2026-04-21
 
 ### Fixed
