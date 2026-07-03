@@ -171,9 +171,9 @@ fn stripStringQuotes(s: []const u8) []const u8 {
 
 /// Remove "title " prefix and extra whitespace from a TITLE terminal match.
 fn cleanTitle(s: []const u8) []const u8 {
-    var t = std.mem.trimLeft(u8, s, " \t");
-    if (std.mem.startsWith(u8, t, "title")) t = std.mem.trimLeft(u8, t[5..], " \t");
-    return std.mem.trimRight(u8, t, " \t\r\n");
+    var t = std.mem.trimStart(u8, s, " \t");
+    if (std.mem.startsWith(u8, t, "title")) t = std.mem.trimStart(u8, t[5..], " \t");
+    return std.mem.trimEnd(u8, t, " \t\r\n");
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ pub const SvgWriter = struct {
     /// Emit the SVG root element opening tag with explicit `width`/`height`
     /// and a matching `viewBox`.
     pub fn header(self: *SvgWriter, width: u32, height: u32) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{d}\" height=\"{d}\" viewBox=\"0 0 {d} {d}\">\n",
             .{ width, height, width, height },
         );
@@ -54,28 +54,28 @@ pub const SvgWriter = struct {
 
     /// Emit the SVG root element closing tag.
     pub fn footer(self: *SvgWriter) !void {
-        try self.buf.writer(self.allocator).writeAll("</svg>\n");
+        try self.buf.appendSlice(self.allocator, "</svg>\n");
     }
 
     /// Open a `<g>` group element.  Pass `attrs` for additional SVG attributes
     /// (e.g. `"opacity=\"0.5\""`), or an empty string for a plain `<g>`.
     pub fn openGroup(self: *SvgWriter, attrs: []const u8) !void {
         if (attrs.len > 0) {
-            try self.buf.writer(self.allocator).print("<g {s}>\n", .{attrs});
+            try self.buf.print(self.allocator, "<g {s}>\n", .{attrs});
         } else {
-            try self.buf.writer(self.allocator).writeAll("<g>\n");
+            try self.buf.appendSlice(self.allocator, "<g>\n");
         }
     }
 
     /// Close the current `<g>` group element.
     pub fn closeGroup(self: *SvgWriter) !void {
-        try self.buf.writer(self.allocator).writeAll("</g>\n");
+        try self.buf.appendSlice(self.allocator, "</g>\n");
     }
 
     /// Emit a `<defs>` block containing the raw `content` string.
     /// Used for marker, gradient, and filter definitions.
     pub fn defs(self: *SvgWriter, content: []const u8) !void {
-        try self.buf.writer(self.allocator).print("<defs>\n{s}</defs>\n", .{content});
+        try self.buf.print(self.allocator, "<defs>\n{s}</defs>\n", .{content});
     }
 
     /// Emit a `<rect>` element.  `rx` is the corner radius (0 for sharp corners).
@@ -90,7 +90,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" rx=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ x, y, width, height, rx, fill, stroke, stroke_width },
         );
@@ -106,7 +106,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<circle cx=\"{d:.2}\" cy=\"{d:.2}\" r=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ cx, cy, r, fill, stroke, stroke_width },
         );
@@ -122,7 +122,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ x1, y1, x2, y2, stroke, stroke_width },
         );
@@ -141,12 +141,12 @@ pub const SvgWriter = struct {
         extra_attrs: []const u8,
     ) !void {
         if (extra_attrs.len > 0) {
-            try self.buf.writer(self.allocator).print(
+            try self.buf.print(self.allocator,
                 "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" {s}/>\n",
                 .{ d, fill, stroke, stroke_width, extra_attrs },
             );
         } else {
-            try self.buf.writer(self.allocator).print(
+            try self.buf.print(self.allocator,
                 "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
                 .{ d, fill, stroke, stroke_width },
             );
@@ -172,12 +172,12 @@ pub const SvgWriter = struct {
             .middle => "middle",
             .end => "end",
         };
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<text x=\"{d:.2}\" y=\"{d:.2}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
             .{ x, y, fill, font_size, anchor_str, font_weight, theme.font_family },
         );
-        try xmlEscape(self.buf.writer(self.allocator), content);
-        try self.buf.writer(self.allocator).writeAll("</text>\n");
+        try xmlEscape(&self.buf, self.allocator, content);
+        try self.buf.appendSlice(self.allocator, "</text>\n");
     }
 
     /// Emit a `<polygon>` element.  `points` is a space-separated list of
@@ -189,7 +189,7 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<polygon points=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
             .{ points, fill, stroke, stroke_width },
         );
@@ -207,7 +207,7 @@ pub const SvgWriter = struct {
         stroke_width: f32,
         dasharray: []const u8,
     ) !void {
-        try self.buf.writer(self.allocator).print(
+        try self.buf.print(self.allocator,
             "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" stroke-dasharray=\"{s}\"/>\n",
             .{ x1, y1, x2, y2, stroke, stroke_width, dasharray },
         );
@@ -266,38 +266,37 @@ pub const SvgWriter = struct {
             .middle => "middle",
             .end => "end",
         };
-        const w = self.buf.writer(self.allocator);
-        try w.print(
+        try self.buf.print(self.allocator,
             "<text fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
             .{ fill, font_size, anchor_str, font_weight, theme.font_family },
         );
-        try w.print("<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y1 });
-        try xmlEscape(w, line1);
-        try w.writeAll("</tspan>");
-        try w.print("<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y2 });
-        try xmlEscape(w, line2);
-        try w.writeAll("</tspan></text>\n");
+        try self.buf.print(self.allocator, "<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y1 });
+        try xmlEscape(&self.buf, self.allocator, line1);
+        try self.buf.appendSlice(self.allocator, "</tspan>");
+        try self.buf.print(self.allocator, "<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y2 });
+        try xmlEscape(&self.buf, self.allocator, line2);
+        try self.buf.appendSlice(self.allocator, "</tspan></text>\n");
     }
 
     /// Append a raw SVG fragment verbatim.  Use sparingly: no escaping or
     /// validation is applied.  Useful for SVG features (e.g. rotated text)
     /// that do not have a dedicated method.
     pub fn raw(self: *SvgWriter, fragment: []const u8) !void {
-        try self.buf.writer(self.allocator).writeAll(fragment);
+        try self.buf.appendSlice(self.allocator, fragment);
     }
 };
 
-/// Write `s` to `writer` with XML special characters replaced by their
+/// Write `s` to `buf` with XML special characters replaced by their
 /// entity equivalents (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`).
-pub fn xmlEscape(writer: anytype, s: []const u8) !void {
+pub fn xmlEscape(buf: *std.ArrayList(u8), allocator: std.mem.Allocator, s: []const u8) !void {
     for (s) |c| {
         switch (c) {
-            '&' => try writer.writeAll("&amp;"),
-            '<' => try writer.writeAll("&lt;"),
-            '>' => try writer.writeAll("&gt;"),
-            '"' => try writer.writeAll("&quot;"),
-            '\'' => try writer.writeAll("&#39;"),
-            else => try writer.writeByte(c),
+            '&' => try buf.appendSlice(allocator, "&amp;"),
+            '<' => try buf.appendSlice(allocator, "&lt;"),
+            '>' => try buf.appendSlice(allocator, "&gt;"),
+            '"' => try buf.appendSlice(allocator, "&quot;"),
+            '\'' => try buf.appendSlice(allocator, "&#39;"),
+            else => try buf.append(allocator, c),
         }
     }
 }
@@ -573,7 +572,7 @@ test "SvgWriter textWrapped long content emits tspan elements" {
 test "xmlEscape all five special characters" {
     var buf: std.ArrayList(u8) = .empty;
     defer buf.deinit(testing.allocator);
-    try xmlEscape(buf.writer(testing.allocator), "&<>\"'");
+    try xmlEscape(&buf, testing.allocator, "&<>\"'");
     const out = buf.items;
     try testing.expect(std.mem.indexOf(u8, out, "&amp;") != null);
     try testing.expect(std.mem.indexOf(u8, out, "&lt;") != null);

@@ -36,7 +36,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     };
 
     var nodes: std.ArrayList(ReqNode) = .empty;
-    var node_map = std.StringArrayHashMap(usize).init(a);
+    var node_map: std.StringArrayHashMapUnmanaged(usize) = .empty;
 
     // Collect requirements
     for (node.getList("requirements")) |rv| {
@@ -48,7 +48,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         if (rn.getString("risk")) |v| try attrs.append(a, try std.fmt.allocPrint(a, "risk: {s}", .{v}));
         if (rn.getString("verifyMethod")) |v| try attrs.append(a, try std.fmt.allocPrint(a, "verify: {s}", .{v}));
         const h = HEADER_H + @as(f32, @floatFromInt(attrs.items.len)) * ATTR_H + 6;
-        try node_map.put(name, nodes.items.len);
+        try node_map.put(a, name, nodes.items.len);
         try nodes.append(a, ReqNode{ .name = name, .attrs = try attrs.toOwnedSlice(a), .x = 0, .y = 0, .h = h });
     }
 
@@ -60,7 +60,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         if (en.getString("type")) |v| try attrs.append(a, try std.fmt.allocPrint(a, "type: {s}", .{v}));
         if (en.getString("docRef")) |v| try attrs.append(a, try std.fmt.allocPrint(a, "ref: {s}", .{v}));
         const h = HEADER_H + @as(f32, @floatFromInt(attrs.items.len)) * ATTR_H + 6;
-        try node_map.put(name, nodes.items.len);
+        try node_map.put(a, name, nodes.items.len);
         try nodes.append(a, ReqNode{ .name = name, .attrs = try attrs.toOwnedSlice(a), .x = 0, .y = 0, .h = h });
     }
 

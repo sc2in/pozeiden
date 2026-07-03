@@ -18,8 +18,8 @@
 const std = @import("std");
 const pozeiden = @import("pozeiden");
 
-// Module-level GPA backing all C API allocations.
-var gpa_state = std.heap.GeneralPurposeAllocator(.{}){};
+// Module-level allocator backing all C API allocations.
+var gpa_state: std.heap.DebugAllocator(.{}) = .init;
 const gpa = gpa_state.allocator();
 
 // Thread-local last-error buffer (256 bytes; truncates longer messages).

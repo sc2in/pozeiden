@@ -95,7 +95,7 @@ const JisonParser = struct {
     fn parseLexRules(self: *JisonParser, body: []const u8, rules: *std.ArrayList(ast.LexRule)) !void {
         var lines = std.mem.splitScalar(u8, body, '\n');
         while (lines.next()) |raw_line| {
-            const line = std.mem.trimRight(u8, raw_line, "\r");
+            const line = std.mem.trimEnd(u8, raw_line, "\r");
             if (line.len == 0) continue;
             // Skip comment lines
             if (std.mem.startsWith(u8, line, "//") or std.mem.startsWith(u8, line, "/*")) continue;
@@ -116,7 +116,7 @@ const JisonParser = struct {
             }
 
             // Skip leading whitespace
-            rest = std.mem.trimLeft(u8, rest, " \t");
+            rest = std.mem.trimStart(u8, rest, " \t");
             if (rest.len == 0) continue;
             // Skip lines that are pure comment or directives
             if (std.mem.startsWith(u8, rest, "//") or std.mem.startsWith(u8, rest, "%")) continue;
@@ -248,7 +248,7 @@ fn findLastStr(haystack: []const u8, needle: []const u8) ?usize {
 }
 
 fn trimmedWord(s: []const u8) []const u8 {
-    const t = std.mem.trimLeft(u8, s, " \t");
+    const t = std.mem.trimStart(u8, s, " \t");
     var end: usize = 0;
     while (end < t.len and !isWs(t[end])) end += 1;
     return t[0..end];

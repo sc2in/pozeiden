@@ -47,18 +47,36 @@ const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
 // ── Grammar cache ─────────────────────────────────────────────────────────────
 // Grammars are parsed from embedded source on first use and kept for the
-// process lifetime.  Not safe for concurrent first-call initialization.
+// process lifetime.  All lazy initialisation happens under `grammar_lock` so
+// concurrent first calls (e.g. document pipelines rendering diagrams from
+// multiple threads) cannot race on `grammar_arena` or the cached_* slots.
+// A spinlock rather than a mutex because pozeiden has no std.Io context to
+// lock with; the critical section is a one-time grammar parse and every later
+// call holds it only for a null-check.  On single-threaded targets (WASM) the
+// atomics lower to plain loads/stores.
 
 const LangiumCache = struct {
     merged: *const langium_ast.MergedGrammar,
     compiled: []const langium_runtime.CompiledTerminal,
 };
 
+var grammar_lock: std.atomic.Value(bool) = .init(false);
 var grammar_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 var cached_common_grammar: ?*const langium_ast.Grammar = null;
 var cached_pie: ?LangiumCache = null;
 var cached_git: ?LangiumCache = null;
 
+fn grammarLockAcquire() void {
+    while (grammar_lock.cmpxchgWeak(false, true, .acquire, .monotonic) != null) {
+        std.atomic.spinLoopHint();
+    }
+}
+
+fn grammarLockRelease() void {
+    grammar_lock.store(false, .release);
+}
+
+/// Caller must hold `grammar_lock`.
 fn getCommonGrammar() !*const langium_ast.Grammar {
     if (cached_common_grammar) |g| return g;
     const ga = grammar_arena.allocator();
@@ -82,12 +100,16 @@ fn buildLangiumCache(primary_src: []const u8) !LangiumCache {
 }
 
 fn getPieCache() !LangiumCache {
+    grammarLockAcquire();
+    defer grammarLockRelease();
     if (cached_pie) |c| return c;
     cached_pie = try buildLangiumCache(pie_langium);
     return cached_pie.?;
 }
 
 fn getGitCache() !LangiumCache {
+    grammarLockAcquire();
+    defer grammarLockRelease();
     if (cached_git) |c| return c;
     cached_git = try buildLangiumCache(git_langium);
     return cached_git.?;
@@ -626,7 +648,7 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
             // Strip trailing @{...} metadata — not rendered yet.
             var item_line = line;
             if (std.mem.indexOf(u8, item_line, "@{")) |at| {
-                item_line = std.mem.trimRight(u8, item_line[0..at], " \t");
+                item_line = std.mem.trimEnd(u8, item_line[0..at], " \t");
             }
             // Syntax: id["label"] or "label" (bare string) or plain id
             var item_label = item_line;
@@ -1643,7 +1665,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     const a = arena.allocator();
 
     // class_name → list of member strings
-    var class_map = std.StringArrayHashMap(std.ArrayList([]const u8)).init(a);
+    var class_map: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
     var relations: std.ArrayList(Value) = .empty;
 
     // Relationship patterns (order: longer first)
@@ -1662,7 +1684,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var current_namespace: ?[]const u8 = null; // inside a `namespace Foo {` block
     var namespace_depth: usize = 0; // brace nesting inside namespace
     // namespace_name → list of class names
-    var namespace_map = std.StringArrayHashMap(std.ArrayList([]const u8)).init(a);
+    var namespace_map: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
     // class_name → namespace (for renderer lookup)
     var class_namespace = std.StringHashMap([]const u8).init(a);
     var class_notes: std.ArrayList(Value) = .empty;
@@ -1682,7 +1704,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             const rest = std.mem.trim(u8, line[10..], " \t{");
             current_namespace = rest;
             namespace_depth = 1;
-            const entry = try namespace_map.getOrPut(rest);
+            const entry = try namespace_map.getOrPut(a, rest);
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             continue;
         }
@@ -1706,7 +1728,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
             const rest = std.mem.trim(u8, line[6..], " \t");
             const name_end = std.mem.indexOfAny(u8, rest, " {") orelse rest.len;
             const name = std.mem.trim(u8, rest[0..name_end], " \t");
-            const entry = try class_map.getOrPut(name);
+            const entry = try class_map.getOrPut(a, name);
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             // Inline stereotype: "class Foo <<interface>>" or "class Foo <<interface>> {"
             if (name_end < rest.len) {
@@ -1749,7 +1771,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 std.mem.indexOfScalar(u8, lhs, '.') == null)
             {
                 const entry = class_map.getPtr(lhs) orelse blk: {
-                    try class_map.put(lhs, .empty);
+                    try class_map.put(a, lhs, .empty);
                     break :blk class_map.getPtr(lhs).?;
                 };
                 try entry.append(a, member);
@@ -1800,8 +1822,8 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
                 else
                     .{ left, right };
 
-                if (!class_map.contains(from)) try class_map.put(from, .empty);
-                if (!class_map.contains(to)) try class_map.put(to, .empty);
+                if (!class_map.contains(from)) try class_map.put(a, from, .empty);
+                if (!class_map.contains(to)) try class_map.put(a, to, .empty);
 
                 var rn = Value.Node{ .type_name = "relation", .fields = .{} };
                 try rn.fields.put(a, "from", Value{ .string = from });
@@ -2081,7 +2103,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     const a = arena.allocator();
 
     // entity_name → list of attr nodes
-    var entity_map = std.StringArrayHashMap(std.ArrayList(Value)).init(a);
+    var entity_map: std.StringArrayHashMapUnmanaged(std.ArrayList(Value)) = .empty;
     var relations: std.ArrayList(Value) = .empty;
 
     var current_entity: ?[]const u8 = null;
@@ -2107,7 +2129,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
         {
             const name = std.mem.trim(u8, line[0..std.mem.indexOfScalar(u8, line, '{').?], " \t");
             if (name.len > 0) {
-                if (!entity_map.contains(name)) try entity_map.put(name, .empty);
+                if (!entity_map.contains(name)) try entity_map.put(a, name, .empty);
                 current_entity = name;
             }
             continue;
@@ -2154,7 +2176,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 }
             }
             const rel_str = line[rel_token_start .. connector_pos + rel_token_len];
-            const from = std.mem.trimRight(u8, std.mem.trim(u8, line[0..rel_token_start], " \t"), "|o{}< \t");
+            const from = std.mem.trimEnd(u8, std.mem.trim(u8, line[0..rel_token_start], " \t"), "|o{}< \t");
             // Everything after the rel token
             const after_rel = line[connector_pos + rel_token_len ..];
             const rest = std.mem.trim(u8, after_rel, " \t");
@@ -2167,8 +2189,8 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 "";
 
             if (from.len == 0 or to.len == 0) continue;
-            if (!entity_map.contains(from)) try entity_map.put(from, .empty);
-            if (!entity_map.contains(to)) try entity_map.put(to, .empty);
+            if (!entity_map.contains(from)) try entity_map.put(a, from, .empty);
+            if (!entity_map.contains(to)) try entity_map.put(a, to, .empty);
 
             var rn = Value.Node{ .type_name = "relation", .fields = .{} };
             try rn.fields.put(a, "from", Value{ .string = from });
@@ -2594,7 +2616,7 @@ fn renderMindmapDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
-        const trimmed_right = std.mem.trimRight(u8, raw, " \t\r");
+        const trimmed_right = std.mem.trimEnd(u8, raw, " \t\r");
         if (trimmed_right.len == 0 or
             std.mem.startsWith(u8, std.mem.trim(u8, trimmed_right, " \t"), "%%")) continue;
         if (first) {
@@ -3855,4 +3877,62 @@ test "render init directive unknown theme is silently ignored" {
     const svg = try render(std.testing.allocator, input);
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "concurrent rendering across threads is safe" {
+    if (@import("builtin").single_threaded) return error.SkipZigTest;
+
+    const pie_src = "pie title Pets\n\"Dogs\" : 60\n\"Cats\" : 40\n";
+    const git_src = "gitGraph\n  commit\n  commit\n  branch dev\n  commit\n";
+    const flow_src = "graph TD\nA-->B\nB-->C\n";
+
+    const Worker = struct {
+        // Each worker uses its own allocator so leak detection stays per-thread.
+        fn run(failed: *std.atomic.Value(bool), font: ?[]const u8) void {
+            var dbg: std.heap.DebugAllocator(.{}) = .init;
+            defer if (dbg.deinit() == .leak) failed.store(true, .release);
+            const a = dbg.allocator();
+
+            var i: usize = 0;
+            while (i < 25) : (i += 1) {
+                // Hit the lazily-initialised langium caches (pie, gitGraph) and
+                // a direct parser (flowchart) from every thread at once.
+                inline for (.{ pie_src, git_src, flow_src }) |src| {
+                    const svg = render(a, src) catch {
+                        failed.store(true, .release);
+                        return;
+                    };
+                    a.free(svg);
+                }
+
+                // Theme isolation: an override must show up in this thread's
+                // output and never leak into threads rendering with defaults.
+                const svg = if (font) |f|
+                    renderWithOptions(a, pie_src, .{ .theme_override = .{ .font_family = f } }) catch {
+                        failed.store(true, .release);
+                        return;
+                    }
+                else
+                    render(a, pie_src) catch {
+                        failed.store(true, .release);
+                        return;
+                    };
+                defer a.free(svg);
+
+                const expected = font orelse "trebuchet ms";
+                if (std.mem.indexOf(u8, svg, expected) == null) failed.store(true, .release);
+                if (font == null and std.mem.indexOf(u8, svg, "PPThreadFont") != null) failed.store(true, .release);
+            }
+        }
+    };
+
+    var failed: std.atomic.Value(bool) = .init(false);
+    const fonts = [_]?[]const u8{ "PPThreadFontA", "PPThreadFontB", null, null };
+    var threads: [fonts.len]std.Thread = undefined;
+    for (fonts, 0..) |font, i| {
+        threads[i] = try std.Thread.spawn(.{}, Worker.run, .{ &failed, font });
+    }
+    for (&threads) |*t| t.join();
+
+    try std.testing.expect(!failed.load(.acquire));
 }

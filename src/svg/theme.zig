@@ -1,46 +1,47 @@
 //! Mermaid default theme constants.
 //! Colors sourced from mermaid's default theme CSS variables.
 //!
-//! Most fields are runtime-mutable `var`s so that `renderWithOptions` can
-//! temporarily apply a `ThemeOverride` without touching any renderer code.
+//! Most fields are runtime-mutable `threadlocal var`s so that
+//! `renderWithOptions` (and `%%{init:}%%` directives) can temporarily apply a
+//! `ThemeOverride` without touching any renderer code, while renders on other
+//! threads keep their own theme state — callers may render concurrently.
 //! Fields that are arrays or rarely overridden remain compile-time `const`.
-//! This is intentionally not thread-safe; pozeiden targets single-threaded
-//! (WASM) use.
+//! On single-threaded targets (WASM) `threadlocal` lowers to plain globals.
 
-pub var font_size: u32 = 14;
-pub var font_size_small: u32 = 12;
+pub threadlocal var font_size: u32 = 14;
+pub threadlocal var font_size_small: u32 = 12;
 /// CSS font-family string used for all SVG text elements.
 /// Override via `ThemeOverride.font_family` to ensure a font that is available
 /// in your target environment (important for PDF/Typst rendering where system
 /// fonts may not be present).
-pub var font_family: []const u8 = "trebuchet ms, verdana, arial, sans-serif";
+pub threadlocal var font_family: []const u8 = "trebuchet ms, verdana, arial, sans-serif";
 
-pub var background: []const u8 = "#ffffff";
-pub var text_color: []const u8 = "#333333";
-pub var line_color: []const u8 = "#333333";
+pub threadlocal var background: []const u8 = "#ffffff";
+pub threadlocal var text_color: []const u8 = "#333333";
+pub threadlocal var line_color: []const u8 = "#333333";
 
 // Node fill/stroke (flowchart)
-pub var node_fill: []const u8 = "#ececff";
-pub var node_stroke: []const u8 = "#9370db";
+pub threadlocal var node_fill: []const u8 = "#ececff";
+pub threadlocal var node_stroke: []const u8 = "#9370db";
 pub const node_stroke_width: f32 = 1.5;
 
 // Edge color
-pub var edge_color: []const u8 = "#333333";
+pub threadlocal var edge_color: []const u8 = "#333333";
 pub const edge_stroke_width: f32 = 1.5;
 
 // Subgraph
-pub var subgraph_fill: []const u8 = "#fafafa";
-pub var subgraph_stroke: []const u8 = "#cccccc";
+pub threadlocal var subgraph_fill: []const u8 = "#fafafa";
+pub threadlocal var subgraph_stroke: []const u8 = "#cccccc";
 
 // Sequence diagram
-pub var actor_fill: []const u8 = "#ececff";
-pub var actor_stroke: []const u8 = "#9370db";
-pub var signal_color: []const u8 = "#333333";
-pub var label_background: []const u8 = "#ffffff";
-pub var loop_fill: []const u8 = "#fafafa";
-pub var loop_stroke: []const u8 = "#aaaaaa";
-pub var note_fill: []const u8 = "#fff5ad";
-pub var note_stroke: []const u8 = "#aaaaaa";
+pub threadlocal var actor_fill: []const u8 = "#ececff";
+pub threadlocal var actor_stroke: []const u8 = "#9370db";
+pub threadlocal var signal_color: []const u8 = "#333333";
+pub threadlocal var label_background: []const u8 = "#ffffff";
+pub threadlocal var loop_fill: []const u8 = "#fafafa";
+pub threadlocal var loop_stroke: []const u8 = "#aaaaaa";
+pub threadlocal var note_fill: []const u8 = "#fff5ad";
+pub threadlocal var note_stroke: []const u8 = "#aaaaaa";
 
 // Git graph
 pub const git_branch_colors = [_][]const u8{
@@ -89,8 +90,9 @@ pub const ThemeOverride = struct {
     font_family:      ?[]const u8 = null,
 };
 
-/// Apply `ov` to the module-level theme vars.  Call `resetToDefaults` when
-/// rendering is complete.  Not thread-safe.
+/// Apply `ov` to the calling thread's theme vars.  Call `resetToDefaults`
+/// when rendering is complete.  The vars are threadlocal, so overrides on one
+/// thread never leak into renders running on other threads.
 pub fn applyOverride(ov: ThemeOverride) void {
     if (ov.background)      |v| background      = v;
     if (ov.text_color)      |v| text_color       = v;

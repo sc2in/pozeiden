@@ -5,6 +5,7 @@
 const std = @import("std");
 const Value = @import("../diagram/value.zig").Value;
 const SvgWriter = @import("../svg/writer.zig").SvgWriter;
+const xmlEscape = @import("../svg/writer.zig").xmlEscape;
 const theme = @import("../svg/theme.zig");
 
 const LEVEL_RADIUS: f32 = 165;
@@ -178,7 +179,6 @@ fn layoutChildren(
 }
 
 fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, depth: usize, color: []const u8, allocator: std.mem.Allocator) !void {
-    _ = allocator;
     const text_color = if (depth == 0) theme.background else theme.text_color;
     const fill = if (depth == 0) color else theme.background;
     const stroke = color;
@@ -201,10 +201,10 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
             // Render multi-line text with tspan if label contains newlines
             const nl_pos = std.mem.indexOfScalar(u8, label, '\n');
             if (nl_pos != null) {
-                var buf: [1024]u8 = undefined;
-                var fbs = std.io.fixedBufferStream(&buf);
-                const w = fbs.writer();
-                try w.print(
+                var tmp: std.ArrayList(u8) = .empty;
+                defer tmp.deinit(allocator);
+                try tmp.ensureTotalCapacity(allocator, label.len * 2 + 256);
+                try tmp.print(allocator,
                     "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" " ++
                     "text-anchor=\"middle\" font-family=\"{s}\">",
                     .{ x, y, text_color, theme.font_size_small, theme.font_family });
@@ -214,24 +214,16 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
                 const dy_start: f32 = -(@as(f32, @floatFromInt(total_lines)) - 1.0) * 0.6;
                 while (lit.next()) |line| {
                     if (line_idx == 0) {
-                        try w.print("<tspan x=\"{d:.1}\" dy=\"{d:.2}em\">", .{ x, dy_start });
+                        try tmp.print(allocator, "<tspan x=\"{d:.1}\" dy=\"{d:.2}em\">", .{ x, dy_start });
                     } else {
-                        try w.print("<tspan x=\"{d:.1}\" dy=\"1.2em\">", .{x});
+                        try tmp.print(allocator, "<tspan x=\"{d:.1}\" dy=\"1.2em\">", .{x});
                     }
-                    // XML-escape
-                    for (line) |c| {
-                        switch (c) {
-                            '&' => try w.writeAll("&amp;"),
-                            '<' => try w.writeAll("&lt;"),
-                            '>' => try w.writeAll("&gt;"),
-                            else => try w.writeByte(c),
-                        }
-                    }
-                    try w.writeAll("</tspan>");
+                    try xmlEscape(&tmp, allocator, line);
+                    try tmp.appendSlice(allocator, "</tspan>");
                     line_idx += 1;
                 }
-                try w.writeAll("</text>\n");
-                try svg.raw(fbs.getWritten());
+                try tmp.appendSlice(allocator, "</text>\n");
+                try svg.raw(tmp.items);
             } else {
                 try svg.text(x, y + 4, label, text_color, theme.font_size_small, .middle, "normal");
             }
@@ -298,20 +290,20 @@ fn drawNode(svg: *SvgWriter, x: f32, y: f32, label: []const u8, shape: MmShape, 
             // Bang/starburst: 8-point star polygon
             const or_: f32 = NODE_W / 2 + 4;
             const ir_: f32 = NODE_H / 2;
-            var pts_buf: [512]u8 = undefined;
-            var fbs = std.io.fixedBufferStream(&pts_buf);
-            const wr = fbs.writer();
             const n_pts: usize = 8;
+            var pts: std.ArrayList(u8) = .empty;
+            defer pts.deinit(allocator);
+            try pts.ensureTotalCapacity(allocator, n_pts * 2 * 16);
             var pi_: usize = 0;
             while (pi_ < n_pts * 2) : (pi_ += 1) {
                 const angle = std.math.pi * @as(f32, @floatFromInt(pi_)) / @as(f32, @floatFromInt(n_pts));
                 const r = if (pi_ % 2 == 0) or_ else ir_;
                 const px = x + r * @cos(angle - std.math.pi / 2.0);
                 const py = y + r * @sin(angle - std.math.pi / 2.0);
-                if (pi_ > 0) try wr.writeByte(' ');
-                try wr.print("{d:.1},{d:.1}", .{ px, py });
+                if (pi_ > 0) try pts.append(allocator, ' ');
+                try pts.print(allocator, "{d:.1},{d:.1}", .{ px, py });
             }
-            try svg.polygon(fbs.getWritten(), fill, stroke, 1.5);
+            try svg.polygon(pts.items, fill, stroke, 1.5);
             // White pill behind text so starburst points don't obscure the label
             const bang_lbl_w = @as(f32, @floatFromInt(label.len)) * 6.5 + 6.0;
             try svg.rect(x - bang_lbl_w / 2.0, y - 10.0, bang_lbl_w, 16.0, 3.0,
