@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-03
+
+### Changed
+
+- **Update to Zig 0.16.0** including addressing Io-gate
+
 ### Fixed
 
 - **Thread safety** – `render`/`renderWithOptions` can now be called from
