@@ -41,6 +41,16 @@
           ];
         };
 
+        # zon2lock truncates its destination in place before it starts
+        # fetching, so an interrupted regeneration leaves a 0-byte lock
+        # behind; zig2nix then imports an empty Nix file and dies with a
+        # cryptic "syntax error, unexpected end of file". Fail evaluation
+        # early with an actionable message instead.
+        zonLock =
+          if builtins.readFile ./build.zig.zon2json-lock == ""
+          then throw "build.zig.zon2json-lock is empty — regenerate it with `update-zon` inside `nix develop` and commit the result"
+          else ./build.zig.zon2json-lock;
+
         mkPozeiden = optimize:
           env.package {
             pname = "pozeiden";
@@ -48,7 +58,7 @@
             src = buildSrc;
             zigBuildFlags =
               lib.optional (optimize != null) "-Doptimize=${optimize}";
-            zigBuildZonLock = ./build.zig.zon2json-lock;
+            zigBuildZonLock = zonLock;
           };
 
         withDesc = drv: desc:
@@ -104,16 +114,32 @@
             pkgs.zls
             pkgs.bash
             fuzz
-            (pkgs.writeShellScriptBin "update-zon" ''
-              set -euo pipefail
-              if ! command -v zig &>/dev/null; then
-                echo "zig is not installed or not in PATH" >&2
-                exit 1
-              fi
-              echo "Regenerating build.zig.zon2json-lock..."
-              env -u ZIG_GLOBAL_CACHE_DIR zig2nix zon2lock
-              echo "build.zig.zon2json-lock updated."
-            '')
+            (pkgs.writeShellApplication {
+              name = "update-zon";
+              runtimeInputs = [pkgs.git pkgs.jq];
+              meta.description = "Regenerate build.zig.zon2json-lock atomically, validating the result";
+              text = ''
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+                if ! command -v zig &>/dev/null; then
+                  echo "zig is not installed or not in PATH" >&2
+                  exit 1
+                fi
+                echo "Regenerating build.zig.zon2json-lock..."
+                # zon2lock truncates its destination before it starts
+                # fetching, so writing straight to the real lock risks
+                # leaving a 0-byte file behind on failure or ^C. Generate
+                # into a temp file, validate, then move into place.
+                tmp="$(mktemp .build.zig.zon2json-lock.XXXXXX)"
+                trap 'rm -f "$tmp"' EXIT
+                env -u ZIG_GLOBAL_CACHE_DIR zig2nix zon2lock build.zig.zon "$tmp"
+                if ! jq -e 'type == "object"' "$tmp" >/dev/null 2>&1; then
+                  echo "error: generated lock is empty or invalid JSON; keeping existing build.zig.zon2json-lock" >&2
+                  exit 1
+                fi
+                mv -f "$tmp" build.zig.zon2json-lock
+                echo "build.zig.zon2json-lock updated."
+              '';
+            })
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.mermaid-cli
             # bench compares against mmdc; gracefully skipped when not in PATH
@@ -135,9 +161,11 @@
             echo "To update Zig dependencies, run: update-zon"
             echo "To run the fuzzer, run: fuzz [port]  (default port: 8080)"
             if [ -f build.zig.zon ]; then
-              if [ ! -f build.zig.zon2json-lock ] || [ build.zig.zon -nt build.zig.zon2json-lock ]; then
-                echo "zig2nix: regenerating build.zig.zon2json-lock..."
-                zig2nix zon2lock
+              # -s (not -f): a 0-byte lock left behind by an interrupted
+              # regeneration is newer than build.zig.zon, so a plain mtime
+              # check would consider it fresh forever.
+              if [ ! -s build.zig.zon2json-lock ] || [ build.zig.zon -nt build.zig.zon2json-lock ]; then
+                update-zon
               fi
             fi
           '';
