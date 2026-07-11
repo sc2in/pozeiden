@@ -3932,6 +3932,8 @@ test "security: deeply nested state diagram does not overflow col_count" {
     const svg = try render(gpa, buf.items);
     defer gpa.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "</svg>") != null);
+}
+
 // ── Security regression: SVG output injection (GHSA-p2c5) ───────────────────
 // Untrusted diagram text must never break out of an attribute/element into the
 // emitted SVG. Consumers embed this SVG raw in HTML, so a leak here is XSS.

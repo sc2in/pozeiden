@@ -10,8 +10,8 @@
 <text x="400.00" y="370.00" fill="#aaaaaa" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Long Bets&quot;</text>
 <text x="74.00" y="496.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Low Effort</text>
 <text x="510.00" y="496.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">High Effort</text>
-<text x="56.0" y="480.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90 56.0 480.0)">Low Impact</text>
-<text x="56.0" y="44.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90 56.0 44.0)">High Impact</text>
+<text x="56.0" y="480.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90.0 56.0 480.0)">Low Impact</text>
+<text x="56.0" y="44.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90.0 56.0 44.0)">High Impact</text>
 <circle cx="444.00" cy="84.00" r="5.00" fill="#12b886" stroke="#ffffff" stroke-width="1.5"/>
 <text x="452.00" y="88.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Observability stack</text>
 <circle cx="158.00" cy="150.00" r="5.00" fill="#228be6" stroke="#ffffff" stroke-width="1.5"/>
