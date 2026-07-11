@@ -94,14 +94,18 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     if (entities.items.len == 0) return renderFallback(allocator);
 
+    // Arrays sized to the actual row count so a large diagram cannot index
+    // past their bounds (row indices are idx/GRID_COLS, always < n_rows).
     const n_rows = (entities.items.len + GRID_COLS - 1) / GRID_COLS;
-    var max_attrs_per_row = [_]usize{0} ** 64;
+    const max_attrs_per_row = try a.alloc(usize, n_rows + 1);
+    @memset(max_attrs_per_row, 0);
     for (entities.items) |en| {
-        if (en.row < 64 and en.attrs.len > max_attrs_per_row[en.row])
+        if (en.attrs.len > max_attrs_per_row[en.row])
             max_attrs_per_row[en.row] = en.attrs.len;
     }
 
-    var row_y = [_]f32{0} ** 65;
+    const row_y = try a.alloc(f32, n_rows + 1);
+    @memset(row_y, 0);
     row_y[0] = MARGIN;
     for (0..n_rows) |r| {
         const h = HEADER_H + @as(f32, @floatFromInt(max_attrs_per_row[r])) * ATTR_H + 8;

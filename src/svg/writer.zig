@@ -2,9 +2,13 @@
 //!
 //! `SvgWriter` accumulates SVG markup in an internal `ArrayList(u8)`.
 //! Callers write elements via typed methods (`rect`, `circle`, `text`, etc.),
-//! then call `toOwnedSlice` to obtain the final string.  Text content is
-//! automatically XML-escaped; attribute values must be safe before being
-//! passed in.
+//! then call `toOwnedSlice` to obtain the final string.  Text content and the
+//! user-controllable attribute values (`fill`, `stroke`, `font-weight`,
+//! `font-family`) are XML-escaped automatically, so untrusted color/style
+//! strings cannot break out of a quoted attribute.  The structural escape
+//! hatches — `openGroup(attrs)`, `defs(content)`, `path(extra_attrs)` and
+//! `raw(fragment)` — are emitted verbatim and MUST only be passed
+//! renderer-controlled (non-user) markup.
 //!
 //! Typical usage:
 //! ```zig
@@ -41,6 +45,15 @@ pub const SvgWriter = struct {
     /// The writer must not be used after this call.
     pub fn toOwnedSlice(self: *SvgWriter) ![]u8 {
         return self.buf.toOwnedSlice(self.allocator);
+    }
+
+    /// Emit ` name="value"` with `value` XML-escaped.  Used for the
+    /// user-controllable colour/font attributes so an embedded `"` or `>`
+    /// cannot break out of the attribute or the element.
+    fn attrEsc(self: *SvgWriter, name: []const u8, value: []const u8) !void {
+        try self.buf.print(self.allocator, " {s}=\"", .{name});
+        try xmlEscape(&self.buf, self.allocator, value);
+        try self.buf.append(self.allocator, '"');
     }
 
     /// Emit the SVG root element opening tag with explicit `width`/`height`
@@ -91,9 +104,12 @@ pub const SvgWriter = struct {
         stroke_width: f32,
     ) !void {
         try self.buf.print(self.allocator,
-            "<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" rx=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-            .{ x, y, width, height, rx, fill, stroke, stroke_width },
+            "<rect x=\"{d:.2}\" y=\"{d:.2}\" width=\"{d:.2}\" height=\"{d:.2}\" rx=\"{d:.2}\"",
+            .{ x, y, width, height, rx },
         );
+        try self.attrEsc("fill", fill);
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
     }
 
     /// Emit a `<circle>` element centred at (`cx`, `cy`) with radius `r`.
@@ -107,9 +123,12 @@ pub const SvgWriter = struct {
         stroke_width: f32,
     ) !void {
         try self.buf.print(self.allocator,
-            "<circle cx=\"{d:.2}\" cy=\"{d:.2}\" r=\"{d:.2}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-            .{ cx, cy, r, fill, stroke, stroke_width },
+            "<circle cx=\"{d:.2}\" cy=\"{d:.2}\" r=\"{d:.2}\"",
+            .{ cx, cy, r },
         );
+        try self.attrEsc("fill", fill);
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
     }
 
     /// Emit a solid `<line>` element.
@@ -123,9 +142,11 @@ pub const SvgWriter = struct {
         stroke_width: f32,
     ) !void {
         try self.buf.print(self.allocator,
-            "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-            .{ x1, y1, x2, y2, stroke, stroke_width },
+            "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\"",
+            .{ x1, y1, x2, y2 },
         );
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
     }
 
     /// Emit a `<path>` element with SVG path data `d`.
@@ -140,16 +161,16 @@ pub const SvgWriter = struct {
         stroke_width: f32,
         extra_attrs: []const u8,
     ) !void {
+        try self.buf.print(self.allocator, "<path d=\"{s}\"", .{d});
+        try self.attrEsc("fill", fill);
+        try self.attrEsc("stroke", stroke);
         if (extra_attrs.len > 0) {
             try self.buf.print(self.allocator,
-                "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" {s}/>\n",
-                .{ d, fill, stroke, stroke_width, extra_attrs },
+                " stroke-width=\"{d:.1}\" {s}/>\n",
+                .{ stroke_width, extra_attrs },
             );
         } else {
-            try self.buf.print(self.allocator,
-                "<path d=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-                .{ d, fill, stroke, stroke_width },
-            );
+            try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
         }
     }
 
@@ -172,10 +193,12 @@ pub const SvgWriter = struct {
             .middle => "middle",
             .end => "end",
         };
-        try self.buf.print(self.allocator,
-            "<text x=\"{d:.2}\" y=\"{d:.2}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
-            .{ x, y, fill, font_size, anchor_str, font_weight, theme.font_family },
-        );
+        try self.buf.print(self.allocator, "<text x=\"{d:.2}\" y=\"{d:.2}\"", .{ x, y });
+        try self.attrEsc("fill", fill);
+        try self.buf.print(self.allocator, " font-size=\"{d}\" text-anchor=\"{s}\"", .{ font_size, anchor_str });
+        try self.attrEsc("font-weight", font_weight);
+        try self.attrEsc("font-family", theme.font_family);
+        try self.buf.append(self.allocator, '>');
         try xmlEscape(&self.buf, self.allocator, content);
         try self.buf.appendSlice(self.allocator, "</text>\n");
     }
@@ -189,10 +212,10 @@ pub const SvgWriter = struct {
         stroke: []const u8,
         stroke_width: f32,
     ) !void {
-        try self.buf.print(self.allocator,
-            "<polygon points=\"{s}\" fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-            .{ points, fill, stroke, stroke_width },
-        );
+        try self.buf.print(self.allocator, "<polygon points=\"{s}\"", .{points});
+        try self.attrEsc("fill", fill);
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
     }
 
     /// Emit a `<line>` element with `stroke-dasharray` set to `dasharray`
@@ -208,8 +231,13 @@ pub const SvgWriter = struct {
         dasharray: []const u8,
     ) !void {
         try self.buf.print(self.allocator,
-            "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\" stroke=\"{s}\" stroke-width=\"{d:.1}\" stroke-dasharray=\"{s}\"/>\n",
-            .{ x1, y1, x2, y2, stroke, stroke_width, dasharray },
+            "<line x1=\"{d:.2}\" y1=\"{d:.2}\" x2=\"{d:.2}\" y2=\"{d:.2}\"",
+            .{ x1, y1, x2, y2 },
+        );
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator,
+            " stroke-width=\"{d:.1}\" stroke-dasharray=\"{s}\"/>\n",
+            .{ stroke_width, dasharray },
         );
     }
 
@@ -266,10 +294,12 @@ pub const SvgWriter = struct {
             .middle => "middle",
             .end => "end",
         };
-        try self.buf.print(self.allocator,
-            "<text fill=\"{s}\" font-size=\"{d}\" text-anchor=\"{s}\" font-weight=\"{s}\" font-family=\"{s}\">",
-            .{ fill, font_size, anchor_str, font_weight, theme.font_family },
-        );
+        try self.buf.appendSlice(self.allocator, "<text");
+        try self.attrEsc("fill", fill);
+        try self.buf.print(self.allocator, " font-size=\"{d}\" text-anchor=\"{s}\"", .{ font_size, anchor_str });
+        try self.attrEsc("font-weight", font_weight);
+        try self.attrEsc("font-family", theme.font_family);
+        try self.buf.append(self.allocator, '>');
         try self.buf.print(self.allocator, "<tspan x=\"{d:.2}\" y=\"{d:.2}\">", .{ x, y1 });
         try xmlEscape(&self.buf, self.allocator, line1);
         try self.buf.appendSlice(self.allocator, "</tspan>");
@@ -278,13 +308,115 @@ pub const SvgWriter = struct {
         try self.buf.appendSlice(self.allocator, "</tspan></text>\n");
     }
 
+    /// Emit a `<text>` element rotated `deg` degrees about (`ox`, `oy`).
+    /// Content, `fill`, and the theme font-family are XML-escaped.
+    pub fn textRotated(
+        self: *SvgWriter,
+        x: f32,
+        y: f32,
+        content: []const u8,
+        fill: []const u8,
+        font_size: u32,
+        anchor: TextAnchor,
+        deg: f32,
+        ox: f32,
+        oy: f32,
+    ) !void {
+        const anchor_str: []const u8 = switch (anchor) {
+            .start => "start",
+            .middle => "middle",
+            .end => "end",
+        };
+        try self.buf.print(self.allocator, "<text x=\"{d:.1}\" y=\"{d:.1}\"", .{ x, y });
+        try self.attrEsc("fill", fill);
+        try self.buf.print(self.allocator, " font-size=\"{d}\" text-anchor=\"{s}\"", .{ font_size, anchor_str });
+        try self.attrEsc("font-family", theme.font_family);
+        try self.buf.print(self.allocator, " transform=\"rotate({d:.1} {d:.1} {d:.1})\">", .{ deg, ox, oy });
+        try xmlEscape(&self.buf, self.allocator, content);
+        try self.buf.appendSlice(self.allocator, "</text>\n");
+    }
+
+    /// Emit an `<ellipse>` element centred at (`cx`, `cy`).
+    pub fn ellipse(
+        self: *SvgWriter,
+        cx: f32,
+        cy: f32,
+        rx: f32,
+        ry: f32,
+        fill: []const u8,
+        stroke: []const u8,
+        stroke_width: f32,
+    ) !void {
+        try self.buf.print(self.allocator,
+            "<ellipse cx=\"{d:.1}\" cy=\"{d:.1}\" rx=\"{d:.1}\" ry=\"{d:.1}\"",
+            .{ cx, cy, rx, ry },
+        );
+        try self.attrEsc("fill", fill);
+        try self.attrEsc("stroke", stroke);
+        try self.buf.print(self.allocator, " stroke-width=\"{d:.1}\"/>\n", .{stroke_width});
+    }
+
+    /// Open an `<a>` hyperlink around subsequent elements.  The URL is
+    /// scheme-validated (only `http`/`https`/`mailto` and scheme-less relative
+    /// URLs are allowed; `javascript:`/`data:`/`vbscript:` and other schemes are
+    /// rejected) and XML-escaped.  Returns `true` if the anchor was emitted — in
+    /// which case the caller MUST later call `closeAnchor` — or `false` if the
+    /// URL was rejected, in which case no anchor was written.
+    pub fn openAnchor(self: *SvgWriter, url: []const u8) !bool {
+        if (!isSafeUrl(url)) return false;
+        try self.buf.appendSlice(self.allocator, "<a href=\"");
+        try xmlEscape(&self.buf, self.allocator, url);
+        try self.buf.appendSlice(self.allocator, "\" target=\"_blank\" rel=\"noopener noreferrer\">");
+        return true;
+    }
+
+    /// Close an `<a>` hyperlink previously opened with `openAnchor`.
+    pub fn closeAnchor(self: *SvgWriter) !void {
+        try self.buf.appendSlice(self.allocator, "</a>\n");
+    }
+
     /// Append a raw SVG fragment verbatim.  Use sparingly: no escaping or
-    /// validation is applied.  Useful for SVG features (e.g. rotated text)
-    /// that do not have a dedicated method.
+    /// validation is applied.  Only pass renderer-controlled (non-user) markup.
     pub fn raw(self: *SvgWriter, fragment: []const u8) !void {
         try self.buf.appendSlice(self.allocator, fragment);
     }
 };
+
+/// Return true if `url` is safe to place in an `href` attribute: a scheme-less
+/// (relative/anchor) URL, or one whose scheme is `http`, `https`, or `mailto`.
+/// ASCII whitespace and control bytes are ignored while parsing the scheme,
+/// matching how browsers normalise URLs (so `java\tscript:` is still caught).
+pub fn isSafeUrl(url: []const u8) bool {
+    var scheme_buf: [16]u8 = undefined;
+    var n: usize = 0;
+    var seen_scheme_char = false;
+    for (url) |c| {
+        if (c <= 0x20) continue; // whitespace/control: browsers strip these
+        switch (c) {
+            ':' => {
+                if (!seen_scheme_char) return true; // leading ':' — not a scheme
+                if (n > scheme_buf.len) return false; // scheme too long to be allowlisted
+                const scheme = scheme_buf[0..n];
+                return std.mem.eql(u8, scheme, "http") or
+                    std.mem.eql(u8, scheme, "https") or
+                    std.mem.eql(u8, scheme, "mailto");
+            },
+            '/', '?', '#' => return true, // path/query/fragment first → relative
+            'a'...'z', '0'...'9', '+', '.', '-' => {
+                if (n < scheme_buf.len) scheme_buf[n] = c;
+                n += 1;
+                seen_scheme_char = true;
+            },
+            'A'...'Z' => {
+                if (n < scheme_buf.len) scheme_buf[n] = c + 32; // to lowercase
+                n += 1;
+                seen_scheme_char = true;
+            },
+            else => return true, // any other char before ':' → not a scheme
+        }
+    }
+    return true; // no ':' → relative URL
+}
 
 /// Write `s` to `buf` with XML special characters replaced by their
 /// entity equivalents (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`).
@@ -567,6 +699,48 @@ test "SvgWriter textWrapped long content emits tspan elements" {
     const out = try w.toOwnedSlice();
     defer testing.allocator.free(out);
     try testing.expect(std.mem.indexOf(u8, out, "<tspan") != null);
+}
+
+test "SvgWriter rect escapes a breakout in the fill value" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.rect(0, 0, 10, 10, 0, "red\">", "#000", 1.0);
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    // The raw breakout fill="red"> must not appear; the quote/gt are escaped.
+    try testing.expect(std.mem.indexOf(u8, out, "fill=\"red\">") == null);
+    try testing.expect(std.mem.indexOf(u8, out, "&quot;") != null);
+}
+
+test "SvgWriter text escapes font-weight attribute value" {
+    var w = SvgWriter.init(testing.allocator);
+    defer w.deinit();
+    try w.text(0, 0, "hi", "#000", 12, .start, "bold\"onx=\"y");
+    const out = try w.toOwnedSlice();
+    defer testing.allocator.free(out);
+    try testing.expect(std.mem.indexOf(u8, out, "onx=\"") == null);
+}
+
+test "isSafeUrl allows http, https, mailto, and relative URLs" {
+    try testing.expect(isSafeUrl("https://example.com"));
+    try testing.expect(isSafeUrl("http://example.com/path?q=1"));
+    try testing.expect(isSafeUrl("HTTPS://EXAMPLE.COM"));
+    try testing.expect(isSafeUrl("mailto:a@b.com"));
+    try testing.expect(isSafeUrl("/relative/path"));
+    try testing.expect(isSafeUrl("#anchor"));
+    try testing.expect(isSafeUrl("./page.html"));
+    try testing.expect(isSafeUrl("")); // empty href is harmless
+}
+
+test "isSafeUrl rejects dangerous schemes including obfuscated ones" {
+    try testing.expect(!isSafeUrl("javascript:alert(1)"));
+    try testing.expect(!isSafeUrl("JavaScript:alert(1)"));
+    try testing.expect(!isSafeUrl("data:text/html,<script>alert(1)</script>"));
+    try testing.expect(!isSafeUrl("vbscript:msgbox(1)"));
+    // Whitespace/control obfuscation the browser would strip must still be caught.
+    try testing.expect(!isSafeUrl("java\tscript:alert(1)"));
+    try testing.expect(!isSafeUrl("  javascript:alert(1)"));
+    try testing.expect(!isSafeUrl("java\nscript:alert(1)"));
 }
 
 test "xmlEscape all five special characters" {

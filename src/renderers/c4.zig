@@ -143,18 +143,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         });
     }
 
-    // Compute per-row max description lines
+    // Compute per-row max description lines. Arrays are sized to the actual
+    // row count (row indices are idx/GRID_COLS, always < n_rows), so an
+    // arbitrarily large diagram cannot index past their bounds.
     const n_rows = (elems.items.len + GRID_COLS - 1) / GRID_COLS;
-    var max_desc_per_row = [_]usize{0} ** 64;
+    const max_desc_per_row = try a.alloc(usize, n_rows + 1);
+    @memset(max_desc_per_row, 0);
     for (elems.items) |el| {
-        if (el.row < 64) {
-            const dl = descLines(el.desc);
-            if (dl > max_desc_per_row[el.row]) max_desc_per_row[el.row] = dl;
-        }
+        const dl = descLines(el.desc);
+        if (dl > max_desc_per_row[el.row]) max_desc_per_row[el.row] = dl;
     }
 
     // Compute row Y offsets
-    var row_y = [_]f32{0} ** 65;
+    const row_y = try a.alloc(f32, n_rows + 1);
+    @memset(row_y, 0);
     const title_h: f32 = if (title.len > 0) 40 else 0;
     row_y[0] = MARGIN + title_h;
     for (0..n_rows) |r| {
@@ -206,7 +208,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const bx = elemX(min_col) - BOUNDARY_PAD;
         const by = row_y[min_row] - BOUNDARY_PAD;
         const bw = elemX(max_col) + BOX_W + BOUNDARY_PAD - bx;
-        const bh = row_y[max_row] + boxHeightAtRow(max_row, &max_desc_per_row) + BOUNDARY_PAD - by;
+        const bh = row_y[max_row] + boxHeightAtRow(max_row, max_desc_per_row) + BOUNDARY_PAD - by;
         const bstroke = if (bnd.is_enterprise) "#333333" else BOUNDARY_STROKE;
         const bstroke_w: f32 = if (bnd.is_enterprise) 2.5 else 1.0;
         const bfill = if (bnd.is_enterprise) "#f5f5f5" else "#fafafa";
@@ -226,8 +228,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const ti = elemByAlias(elems.items, rel.to) orelse continue;
         const fc = fi;
         const tc = ti;
-        const fbh = boxHeight(if (fc.row < 64) max_desc_per_row[fc.row] else 0);
-        const tbh = boxHeight(if (tc.row < 64) max_desc_per_row[tc.row] else 0);
+        const fbh = boxHeight(max_desc_per_row[fc.row]);
+        const tbh = boxHeight(max_desc_per_row[tc.row]);
 
         const fcx = elemX(fc.col) + BOX_W / 2;
         const fcy_mid = row_y[fc.row] + fbh / 2;
@@ -298,7 +300,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     for (elems.items) |el| {
         const bx = elemX(el.col);
         const by = row_y[el.row];
-        const bh = boxHeight(if (el.row < 64) max_desc_per_row[el.row] else 0);
+        const bh = boxHeight(max_desc_per_row[el.row]);
         const fill = elemFill(el.kind);
         const text_col = if (isLightText(el.kind)) TEXT_LIGHT else TEXT_DARK;
         const stroke = elemStroke(el.kind);
@@ -406,7 +408,7 @@ fn boxHeight(max_desc_lines: usize) f32 {
     return BOX_HEADER_H + @as(f32, @floatFromInt(max_desc_lines)) * BOX_DESC_LINE_H + BOX_PAD_BOTTOM + 16;
 }
 
-fn boxHeightAtRow(row: usize, max_desc_per_row: *const [64]usize) f32 {
+fn boxHeightAtRow(row: usize, max_desc_per_row: []const usize) f32 {
     return boxHeight(max_desc_per_row[row]);
 }
 

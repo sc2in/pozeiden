@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="380" viewBox="0 0 700 380">
+<rect x="0.00" y="0.00" width="700.00" height="380.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<line x1="180.00" y1="70.00" x2="360.00" y2="70.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,74.5 360.0,70.0 352.0,65.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="180.00" y1="150.00" x2="360.00" y2="150.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,154.5 360.0,150.0 352.0,145.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="340.00" y1="150.00" x2="360.00" y2="150.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,154.5 360.0,150.0 352.0,145.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="500.00" y1="150.00" x2="520.00" y2="150.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="512.0,154.5 520.0,150.0 512.0,145.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="140.00" y1="180.00" x2="160.00" y2="200.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="151.2,197.5 160.0,200.0 157.5,191.2" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="340.00" y1="230.00" x2="360.00" y2="230.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,234.5 360.0,230.0 352.0,225.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="125.00" y1="180.00" x2="175.00" y2="280.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="167.4,274.9 175.0,280.0 175.4,270.8" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="340.00" y1="310.00" x2="360.00" y2="310.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,314.5 360.0,310.0 352.0,305.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<line x1="340.00" y1="310.00" x2="520.00" y2="310.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="512.0,314.5 520.0,310.0 512.0,305.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 360.0 87.5 L 360.0 106.7 L 180.0 106.7 L 180.0 132.5" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="175.5,124.5 180.0,132.5 184.5,124.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 370.0 100.0 L 370.0 113.3 L 330.0 113.3 L 330.0 120.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="325.5,112.0 330.0,120.0 334.5,112.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 240.0 180.0 L 240.0 190.0 L 220.0 190.0 L 220.0 200.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="215.5,192.0 220.0,200.0 224.5,192.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 360.0 286.7 L 360.0 266.7 L 280.0 266.7 L 280.0 260.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="284.5,268.0 280.0,260.0 275.5,268.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 520.0 296.0 L 520.0 273.3 L 340.0 273.3 L 340.0 260.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="344.5,268.0 340.0,260.0 335.5,268.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="40.00" y="40.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#12b886" stroke-width="2.0"/>
+<text x="110.00" y="74.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Internet</text>
+<rect x="360.00" y="40.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#228be6" stroke-width="2.0"/>
+<text x="430.00" y="74.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Load Balancer</text>
+<rect x="40.00" y="120.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#fd7e14" stroke-width="2.0"/>
+<text x="110.00" y="154.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API Server 1</text>
+<rect x="200.00" y="120.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#fa5252" stroke-width="2.0"/>
+<text x="270.00" y="154.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API Server 2</text>
+<rect x="360.00" y="120.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#be4bdb" stroke-width="2.0"/>
+<text x="430.00" y="154.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Redis Primary</text>
+<rect x="520.00" y="120.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#74c0fc" stroke-width="2.0"/>
+<text x="590.00" y="154.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Redis Replica</text>
+<rect x="40.00" y="200.00" width="300.00" height="60.00" rx="6.00" fill="#ececff" stroke="#ffd43b" stroke-width="2.0"/>
+<text x="190.00" y="234.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Postgres Primary</text>
+<rect x="360.00" y="200.00" width="300.00" height="60.00" rx="6.00" fill="#ececff" stroke="#51cf66" stroke-width="2.0"/>
+<text x="510.00" y="234.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Postgres Replica</text>
+<rect x="40.00" y="280.00" width="300.00" height="60.00" rx="6.00" fill="#ececff" stroke="#ff6b6b" stroke-width="2.0"/>
+<text x="190.00" y="314.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Job Queue</text>
+<rect x="360.00" y="280.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#cc5de8" stroke-width="2.0"/>
+<text x="430.00" y="314.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Worker 1</text>
+<rect x="520.00" y="280.00" width="140.00" height="60.00" rx="6.00" fill="#ececff" stroke="#339af0" stroke-width="2.0"/>
+<text x="590.00" y="314.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Worker 2</text>
+</svg>

@@ -66,15 +66,18 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     if (nodes.items.len == 0) return renderFallback(allocator);
 
-    // Assign grid positions
-    var max_row_h = [_]f32{0.0} ** 64;
+    // Assign grid positions. Arrays sized to the actual row count so a large
+    // diagram cannot index past their bounds (row = idx/COLS, always < n_rows).
+    const n_rows = (nodes.items.len + COLS - 1) / COLS;
+    const max_row_h = try a.alloc(f32, n_rows + 1);
+    @memset(max_row_h, 0.0);
     for (nodes.items, 0..) |nd, i| {
         const row = i / COLS;
-        if (row < 64 and nd.h > max_row_h[row]) max_row_h[row] = nd.h;
+        if (nd.h > max_row_h[row]) max_row_h[row] = nd.h;
     }
-    var row_y = [_]f32{0.0} ** 65;
+    const row_y = try a.alloc(f32, n_rows + 1);
+    @memset(row_y, 0.0);
     row_y[0] = MARGIN;
-    const n_rows = (nodes.items.len + COLS - 1) / COLS;
     for (0..n_rows) |r| row_y[r + 1] = row_y[r] + max_row_h[r] + ROW_GAP;
 
     for (nodes.items, 0..) |*nd, i| {

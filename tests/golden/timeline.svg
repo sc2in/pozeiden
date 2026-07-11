@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1580" height="334" viewBox="0 0 1580 334">
+<rect x="0.00" y="0.00" width="1580.00" height="334.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<text x="790.00" y="43.00" fill="#333333" font-size="16" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Evolution of the Web</text>
+<line x1="40.00" y1="176.00" x2="1540.00" y2="176.00" stroke="#333333" stroke-width="2.5"/>
+<line x1="115.00" y1="168.00" x2="115.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="44.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<text x="115.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">1991</text>
+<rect x="50.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="116.00" y="207.00">World Wide Web</tspan><tspan x="116.00" y="221.00">invented</tspan></text>
+<rect x="50.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="116.00" y="243.00">: First website at</tspan><tspan x="116.00" y="257.00">CERN</tspan></text>
+<line x1="265.00" y1="168.00" x2="265.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="194.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<text x="265.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">1994</text>
+<rect x="200.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#51cf66" stroke-width="1.0"/>
+<text x="266.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Netscape Navigator</text>
+<rect x="200.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#51cf66" stroke-width="1.0"/>
+<text x="266.00" y="250.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">: PHP 1.0 released</text>
+<line x1="415.00" y1="168.00" x2="415.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="344.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#ffd43b" stroke="none" stroke-width="0.0"/>
+<text x="415.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">1995</text>
+<rect x="350.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#ffd43b" stroke-width="1.0"/>
+<text x="416.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">JavaScript created</text>
+<rect x="350.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#ffd43b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="416.00" y="243.00">: Apache HTTP</tspan><tspan x="416.00" y="257.00">Server</tspan></text>
+<line x1="565.00" y1="168.00" x2="565.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="494.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<text x="565.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2004</text>
+<rect x="500.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#ff6b6b" stroke-width="1.0"/>
+<text x="566.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Facebook launched</text>
+<rect x="500.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#ff6b6b" stroke-width="1.0"/>
+<text x="566.00" y="250.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">: Firefox 1.0</text>
+<line x1="715.00" y1="168.00" x2="715.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="644.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<text x="715.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2006</text>
+<rect x="650.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#cc5de8" stroke-width="1.0"/>
+<text x="716.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Twitter launches</text>
+<rect x="650.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#cc5de8" stroke-width="1.0"/>
+<text x="716.00" y="250.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">: AWS S3 and EC2</text>
+<line x1="865.00" y1="168.00" x2="865.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="794.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<text x="865.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2008</text>
+<rect x="800.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#20c997" stroke-width="1.0"/>
+<text x="866.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Chrome browser</text>
+<rect x="800.00" y="232.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#20c997" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="866.00" y="243.00">: V8 JavaScript</tspan><tspan x="866.00" y="257.00">engine</tspan></text>
+<line x1="1015.00" y1="168.00" x2="1015.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="944.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#fd7e14" stroke="none" stroke-width="0.0"/>
+<text x="1015.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2009</text>
+<rect x="950.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#fd7e14" stroke-width="1.0"/>
+<text x="1016.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Node.js created</text>
+<line x1="1165.00" y1="168.00" x2="1165.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="1094.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#339af0" stroke="none" stroke-width="0.0"/>
+<text x="1165.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2013</text>
+<rect x="1100.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#339af0" stroke-width="1.0"/>
+<text x="1166.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">React released</text>
+<line x1="1315.00" y1="168.00" x2="1315.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="1244.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<text x="1315.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2015</text>
+<rect x="1250.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#74c0fc" stroke-width="1.0"/>
+<text x="1316.00" y="214.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ES6 standard</text>
+<line x1="1465.00" y1="168.00" x2="1465.00" y2="184.00" stroke="#333333" stroke-width="2.0"/>
+<rect x="1394.00" y="126.00" width="142.00" height="28.00" rx="4.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<text x="1465.00" y="145.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">2016</text>
+<rect x="1400.00" y="196.00" width="132.00" height="28.00" rx="3.00" fill="#f8f9fa" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="1466.00" y="207.00">Progressive Web</tspan><tspan x="1466.00" y="221.00">Apps</tspan></text>
+</svg>
