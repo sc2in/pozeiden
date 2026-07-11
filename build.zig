@@ -14,7 +14,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const mecha = b.dependency("mecha", .{});
 
     // Version priority: -Dversion flag > git describe > build.zig.zon
     // The flag lets Nix (and other sandboxed builds) inject the version
@@ -38,7 +37,6 @@ pub fn build(b: *std.Build) void {
     });
     mod.addOptions("config", options);
     mod.addImport("mvzr", mvzr.module("mvzr"));
-    mod.addImport("mecha", mecha.module("mecha"));
 
     const exe = b.addExecutable(.{
         .name = "pozeiden",
@@ -167,8 +165,6 @@ pub fn build(b: *std.Build) void {
         .target = wasm_target,
         .optimize = .ReleaseSmall,
     });
-    const mecha_wasm = b.dependency("mecha", .{});
-
     const mod_wasm = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = wasm_target,
@@ -177,7 +173,6 @@ pub fn build(b: *std.Build) void {
     });
     mod_wasm.addOptions("config", options);
     mod_wasm.addImport("mvzr", mvzr_wasm.module("mvzr"));
-    mod_wasm.addImport("mecha", mecha_wasm.module("mecha"));
 
     const wasm_exe = b.addExecutable(.{
         .name = "pozeiden",

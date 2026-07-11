@@ -47,14 +47,44 @@ pub const DiagramType = enum {
     unknown,
 };
 
+/// If `text` opens with a complete YAML front-matter block — a line that is
+/// exactly `---` (after any leading blank lines) followed later by another line
+/// that is exactly `---` — return the slice after the closing delimiter.
+/// Otherwise (no opener, or an unterminated one) return `text` unchanged, so a
+/// stray `---` is still handled leniently by the caller.
+fn stripFrontmatter(text: []const u8) []const u8 {
+    var pos: usize = 0;
+    var opened = false;
+    while (pos < text.len) {
+        const nl = std.mem.indexOfScalarPos(u8, text, pos, '\n') orelse text.len;
+        const line = std.mem.trim(u8, text[pos..nl], " \t\r");
+        const next = if (nl < text.len) nl + 1 else text.len;
+        if (line.len != 0) {
+            if (!opened) {
+                if (std.mem.eql(u8, line, "---")) {
+                    opened = true;
+                } else {
+                    return text; // first content line isn't a delimiter
+                }
+            } else if (std.mem.eql(u8, line, "---")) {
+                return text[next..]; // closing delimiter — body follows
+            }
+        }
+        pos = next;
+    }
+    return text; // opener never closed → treat as ordinary content
+}
+
 /// Return the diagram type by inspecting the first non-blank, non-comment line
 /// of `text`.  Returns `.unknown` if no recognised keyword is found.
 pub fn detect(text: []const u8) DiagramType {
-    var lines = std.mem.splitScalar(u8, text, '\n');
+    // Skip a complete leading `---` … `---` YAML front-matter block so its body
+    // lines (e.g. `title:`, `config:`) are not mistaken for the diagram keyword.
+    var lines = std.mem.splitScalar(u8, stripFrontmatter(text), '\n');
     while (lines.next()) |raw_line| {
         const line = std.mem.trim(u8, raw_line, " \t\r");
         if (line.len == 0) continue;
-        // Skip YAML front matter delimiter
+        // Skip a stray/unterminated front-matter delimiter line.
         if (std.mem.startsWith(u8, line, "---")) continue;
         // Skip %%-style comments and directives
         if (std.mem.startsWith(u8, line, "%%")) continue;
@@ -198,4 +228,25 @@ test "detect skips %% comment lines" {
 
 test "detect bare graph keyword (no direction)" {
     try std.testing.expectEqual(DiagramType.flowchart, detect("graph\nA-->B\n"));
+}
+
+test "detect skips a full YAML front-matter block with a title" {
+    try std.testing.expectEqual(
+        DiagramType.pie,
+        detect("---\ntitle: My Chart\n---\npie\n\"A\" : 1\n"),
+    );
+}
+
+test "detect skips front-matter with a nested config block" {
+    try std.testing.expectEqual(
+        DiagramType.flowchart,
+        detect("---\ntitle: Flow\nconfig:\n  theme: dark\n---\ngraph TD\nA-->B\n"),
+    );
+}
+
+test "detect handles front-matter preceded by blank lines" {
+    try std.testing.expectEqual(
+        DiagramType.state,
+        detect("\n---\ntitle: S\n---\nstateDiagram-v2\n[*] --> A\n"),
+    );
 }

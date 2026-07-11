@@ -1,5 +1,5 @@
 //! Flowchart SVG renderer.
-//! Builds a Graph from the Jison runtime's Value AST, runs layout, and emits SVG.
+//! Builds a Graph from the parsed Value AST, runs layout, and emits SVG.
 //! Expects a Value.node with `nodes` (id, label, shape), `edges` (from, to, label,
 //! style), `subgraphs` (label, members list), and optional `direction` ("TB"/"LR"/etc.).
 const std = @import("std");
@@ -14,10 +14,8 @@ const arrow_marker_defs = @import("../svg/writer.zig").arrow_marker_defs;
 /// `edges` (list of nodes with `from`, `to`, `label`, `style`), optional `subgraphs`
 /// (with `label` and `members` list), and optional `direction` ("TB"/"LR"/"RL"/"BT").
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
-    // Build graph from the flat Jison-parse output.
-    // The Jison runtime for flowchart doesn't produce a structured AST like Langium;
-    // instead we receive what was extracted.  For now we accept a Value.node with
-    // fields: "nodes" (list of node records) and "edges" (list of edge records).
+    // Build graph from the flat parsed output: a Value.node with
+    // fields "nodes" (list of node records) and "edges" (list of edge records).
     const node = value.asNode() orelse return renderFallback(allocator, "flowchart");
 
     // Collect nodes
