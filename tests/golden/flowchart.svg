@@ -86,7 +86,7 @@
 <text x="110.00" y="1182.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Audit Log</text>
 <polygon points="240.0,1156.0 380.0,1156.0 380.0,1200.0 240.0,1200.0 255.4,1178.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
 <text x="310.00" y="1182.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Publish to Queue</text>
-<a href="https://example.com/success" target="_blank"><circle cx="210.00" cy="1302.00" r="22.00" fill="#2ecc71" stroke="#27ae60" stroke-width="1.5"/>
+<a href="https://example.com/success" target="_blank" rel="noopener noreferrer"><circle cx="210.00" cy="1302.00" r="22.00" fill="#2ecc71" stroke="#27ae60" stroke-width="1.5"/>
 <circle cx="210.00" cy="1302.00" r="19.00" fill="none" stroke="#27ae60" stroke-width="1.5"/>
 <text x="210.00" y="1306.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Done</text>
 </a>

@@ -125,9 +125,22 @@ pub const RenderError = error{
     /// A grammar file embedded in the binary failed to parse (should not occur
     /// with an unmodified build).
     ParseError,
+    /// The input exceeded `max_input_bytes`.  Guards against resource-exhaustion
+    /// from untrusted input on the library and C-API paths (which are otherwise
+    /// unbounded — the CLI/WASM wrappers impose their own byte limits).
+    InputTooLarge,
+    /// The diagram declared more nodes/edges than a renderer will lay out (see
+    /// `svg/layout.zig` limits).  Guards against super-linear layout cost.
+    DiagramTooLarge,
     /// Memory allocation failed.
     OutOfMemory,
 };
+
+/// Maximum accepted input size for `render`/`renderWithOptions` (and thus the
+/// C API).  4 MiB comfortably exceeds any real diagram while bounding the work
+/// an embedder can be forced to do by untrusted input.  Inputs larger than this
+/// yield `error.InputTooLarge`.
+pub const max_input_bytes: usize = 4 * 1024 * 1024;
 
 /// Render `mermaid_text` to a self-contained SVG string.
 ///
@@ -137,6 +150,10 @@ pub const RenderError = error{
 ///
 /// The caller owns the returned slice and must free it with `allocator`.
 pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u8 {
+    // Bound untrusted input up front so every entry point (library, C API,
+    // renderWithOptions) is protected, not just the CLI/WASM wrappers.
+    if (mermaid_text.len > max_input_bytes) return error.InputTooLarge;
+
     // Apply %%{init: {...}}%% directive overrides for this render call.
     const applied_init = applyInitDirective(mermaid_text);
     defer if (applied_init) theme.resetToDefaults();
@@ -3904,6 +3921,8 @@ test "security: deeply nested state diagram does not overflow col_count" {
     const svg = try render(gpa, buf.items);
     defer gpa.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "</svg>") != null);
+}
+
 // ── Security regression: SVG output injection (GHSA-p2c5) ───────────────────
 // Untrusted diagram text must never break out of an attribute/element into the
 // emitted SVG. Consumers embed this SVG raw in HTML, so a leak here is XSS.
@@ -3958,6 +3977,37 @@ test "security: quadrant y-axis label cannot inject script" {
     const svg = try render(std.testing.allocator, "quadrantChart\nx-axis Low --> High\ny-axis \"a</text><script>alert(1)</script>\" --> Hi\nCampaign A: [0.3, 0.6]\n");
     defer std.testing.allocator.free(svg);
     try std.testing.expect(std.mem.indexOf(u8, svg, "<script") == null);
+}
+
+// ── Resource limits (issue #37) ─────────────────────────────────────────────
+
+test "render rejects input larger than max_input_bytes" {
+    const big = try std.testing.allocator.alloc(u8, max_input_bytes + 1);
+    defer std.testing.allocator.free(big);
+    @memset(big, 'a');
+    try std.testing.expectError(error.InputTooLarge, render(std.testing.allocator, big));
+}
+
+test "render accepts input at the max_input_bytes boundary" {
+    // A buffer exactly at the cap must not be rejected for size (it renders
+    // as an unknown-type fallback, which is fine — we only assert no error).
+    const buf = try std.testing.allocator.alloc(u8, max_input_bytes);
+    defer std.testing.allocator.free(buf);
+    @memset(buf, 'a');
+    const svg = try render(std.testing.allocator, buf);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+}
+
+test "render rejects an oversized flowchart with DiagramTooLarge" {
+    const gpa = std.testing.allocator;
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    try buf.appendSlice(gpa, "graph TD\n");
+    // 1500 distinct nodes (> layout.max_nodes = 1000), well under the byte cap.
+    var i: usize = 0;
+    while (i < 1500) : (i += 1) try buf.print(gpa, "n{d}\n", .{i});
+    try std.testing.expectError(error.DiagramTooLarge, render(gpa, buf.items));
 }
 
 test "concurrent rendering across threads is safe" {

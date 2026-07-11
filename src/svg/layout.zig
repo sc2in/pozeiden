@@ -88,8 +88,17 @@ pub const Graph = struct {
 /// Assign `(x, y)` coordinates to every node in `graph` using a three-phase
 /// Sugiyama algorithm: cycle-breaking → layer assignment → barycenter ordering
 /// → coordinates. Modifies `graph.nodes` and `graph.edges` in place.
+/// Node ordering is currently super-linear in node/edge count, so cap the
+/// graph size to keep worst-case layout time bounded for untrusted input.
+/// These limits are far beyond any legible flowchart; larger graphs yield
+/// `error.DiagramTooLarge`.
+pub const max_nodes: usize = 1000;
+pub const max_edges: usize = 2000;
+
 pub fn layout(allocator: std.mem.Allocator, graph: *Graph) !void {
     if (graph.nodes.len == 0) return;
+    if (graph.nodes.len > max_nodes or graph.edges.len > max_edges)
+        return error.DiagramTooLarge;
 
     // 0. Break cycles: mark back edges as reversed so BFS layer assignment works
     try breakCycles(allocator, graph);
