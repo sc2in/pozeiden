@@ -289,7 +289,21 @@ async function fetchExample(name) {
 let wasm = null, lastSvg = '';
 const buf = () => wasm ? wasm.memory.buffer : new ArrayBuffer(0);
 
-const wasiShim = { wasi_snapshot_preview1: {
+// Minimal WASI (wasi_snapshot_preview1) shim. The Zig std library pulls in a
+// handful of WASI imports transitively (random_get, clock_time_get, environ_*,
+// …) even though rendering itself is deterministic and never depends on them —
+// so every imported field must resolve or WebAssembly.instantiate fails with a
+// LinkError. We implement the few that could actually be called and stub the
+// rest; extra fields the module does not import are simply ignored.
+const WASI_OK = 0, WASI_BADF = 8;
+// The Zig std library imports ~27 wasi_snapshot_preview1 functions transitively
+// (random_get, clock_time_get, environ_*, and many fd_*/path_* operations),
+// even though rendering is deterministic and touches none of them. Every field
+// the module imports must resolve to a Function or WebAssembly.instantiate
+// throws a LinkError. We implement the few that could actually run and let a
+// Proxy return a harmless EBADF stub for everything else — so the module links
+// regardless of which imports a future std pulls in.
+const wasiImpl = {
   fd_write(fd, iov, n, nw) {
     const v = new DataView(buf()); let w = 0;
     for (let i = 0; i < n; i++) {
@@ -297,11 +311,40 @@ const wasiShim = { wasi_snapshot_preview1: {
       if (fd === 2) console.warn('[wasm]', new TextDecoder().decode(new Uint8Array(buf(), b, l)));
       w += l;
     }
-    v.setUint32(nw, w, true); return 0;
+    v.setUint32(nw, w, true); return WASI_OK;
   },
-  fd_read(){ return 8; }, fd_filestat_get(){ return 8; },
-  fd_seek(){ return 8; }, fd_pwrite(){ return 8; },
-}};
+  // Fill the buffer with cryptographically-random bytes (chunked to respect
+  // crypto.getRandomValues' 65536-byte cap).
+  random_get(ptr, len) {
+    let off = 0;
+    while (off < len) {
+      const chunk = Math.min(len - off, 65536);
+      crypto.getRandomValues(new Uint8Array(buf(), ptr + off, chunk));
+      off += chunk;
+    }
+    return WASI_OK;
+  },
+  clock_time_get(_id, _precision, out) {
+    new DataView(buf()).setBigUint64(out, BigInt(Date.now()) * 1000000n, true); // ns since epoch
+    return WASI_OK;
+  },
+  clock_res_get(_id, out) {
+    new DataView(buf()).setBigUint64(out, 1000000n, true);
+    return WASI_OK;
+  },
+  environ_sizes_get(countOut, sizeOut) {
+    const v = new DataView(buf());
+    v.setUint32(countOut, 0, true); v.setUint32(sizeOut, 0, true);
+    return WASI_OK;
+  },
+  environ_get() { return WASI_OK; },
+  proc_exit(code) { throw new Error('wasm called proc_exit(' + code + ')'); },
+};
+const wasiShim = {
+  wasi_snapshot_preview1: new Proxy(wasiImpl, {
+    get: (target, name) => target[name] ?? (() => WASI_BADF),
+  }),
+};
 
 // ── Timing ────────────────────────────────────────────────────────────────────
 function fmt(ms) {
