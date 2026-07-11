@@ -3879,6 +3879,59 @@ test "render init directive unknown theme is silently ignored" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
 }
 
+// ── Regression: grid-layout renderers must not overflow row arrays (GHSA-rg4m)
+// Diagrams with more than GRID_COLS*64 = 192 elements previously indexed past
+// fixed [64]/[65] arrays, aborting in safe builds and corrupting memory in the
+// safety-off wasm build. Render well past that threshold and assert valid SVG.
+
+test "security: large grid diagrams do not overflow row arrays" {
+    const gpa = std.testing.allocator;
+
+    const Gen = struct {
+        fn run(a: std.mem.Allocator, header: []const u8, comptime line_fmt: []const u8) !void {
+            var buf: std.ArrayList(u8) = .empty;
+            defer buf.deinit(a);
+            try buf.appendSlice(a, header);
+            var i: usize = 0;
+            while (i < 300) : (i += 1) try buf.print(a, line_fmt, .{i});
+            const svg = try render(a, buf.items);
+            defer a.free(svg);
+            try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
+            try std.testing.expect(std.mem.indexOf(u8, svg, "</svg>") != null);
+        }
+    };
+
+    try Gen.run(gpa, "C4Context\n", "Person(p{0d}, \"P{0d}\")\n");
+    try Gen.run(gpa, "classDiagram\n", "class C{0d}\n");
+    try Gen.run(gpa, "erDiagram\n", "E{0d}\n");
+}
+
+test "security: large requirement diagram does not overflow row arrays" {
+    const gpa = std.testing.allocator;
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    try buf.appendSlice(gpa, "requirementDiagram\n");
+    var i: usize = 0;
+    while (i < 300) : (i += 1)
+        try buf.print(gpa, "requirement r{d} {{\nid: {d}\ntext: t\nrisk: high\nverifymethod: test\n}}\n", .{ i, i });
+    const svg = try render(gpa, buf.items);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "</svg>") != null);
+}
+
+test "security: deeply nested state diagram does not overflow col_count" {
+    const gpa = std.testing.allocator;
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    try buf.appendSlice(gpa, "stateDiagram-v2\n");
+    var i: usize = 0;
+    while (i < 200) : (i += 1) try buf.print(gpa, "state s{d} {{\n", .{i});
+    try buf.appendSlice(gpa, "x\n");
+    i = 0;
+    while (i < 200) : (i += 1) try buf.appendSlice(gpa, "}\n");
+    const svg = try render(gpa, buf.items);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "</svg>") != null);
 // ── Security regression: SVG output injection (GHSA-p2c5) ───────────────────
 // Untrusted diagram text must never break out of an attribute/element into the
 // emitted SVG. Consumers embed this SVG raw in HTML, so a leak here is XSS.
