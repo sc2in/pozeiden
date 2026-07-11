@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="708" viewBox="0 0 780 708">
+<rect x="0.00" y="0.00" width="780.00" height="708.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<line x1="390.00" y1="407.00" x2="390.00" y2="93.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="394.5,101.0 390.0,93.0 385.5,101.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="372.50" y="236.00" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="408.00" y="250.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="390.00" y1="407.00" x2="130.00" y2="93.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="138.6,96.3 130.0,93.0 131.6,102.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="245.36" y="224.52" width="57.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="273.86" y="238.52" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">refines</text>
+<line x1="650.00" y1="407.00" x2="650.00" y2="259.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="654.5,267.0 650.0,259.0 645.5,267.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="632.50" y="319.00" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="668.00" y="333.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="650.00" y1="407.00" x2="130.00" y2="259.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="138.9,256.9 130.0,259.0 136.5,265.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="359.43" y="301.69" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="394.93" y="315.69" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="130.00" y1="573.00" x2="390.00" y2="259.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="388.4,268.0 390.0,259.0 381.4,262.3" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="238.36" y="413.48" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="273.86" y="427.48" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="130.00" y1="573.00" x2="130.00" y2="93.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="134.5,101.0 130.0,93.0 125.5,101.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="112.50" y="319.00" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="148.00" y="333.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="390.00" y1="573.00" x2="650.00" y2="93.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="650.1,102.2 650.0,93.0 642.2,97.9" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="500.33" y="327.57" width="71.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="535.83" y="341.57" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">satisfies</text>
+<line x1="650.00" y1="407.00" x2="130.00" y2="259.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="138.9,256.9 130.0,259.0 136.5,265.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="366.43" y="301.69" width="57.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="394.93" y="315.69" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">refines</text>
+<line x1="390.00" y1="407.00" x2="130.00" y2="425.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="137.7,420.0 130.0,425.0 138.3,428.9" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="233.76" y="384.04" width="50.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="258.76" y="398.04" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">traces</text>
+<rect x="40.00" y="40.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#12b886" stroke-width="1.5"/>
+<rect x="40.00" y="40.00" width="180.00" height="28.00" rx="4.00" fill="#12b886" stroke="#12b886" stroke-width="0.0"/>
+<text x="130.00" y="59.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">sys_req</text>
+<text x="46.00" y="81.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: SYS-001</text>
+<text x="46.00" y="99.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: The system shall s</text>
+<text x="46.00" y="117.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: high</text>
+<text x="46.00" y="135.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: test</text>
+<rect x="300.00" y="40.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#228be6" stroke-width="1.5"/>
+<rect x="300.00" y="40.00" width="180.00" height="28.00" rx="4.00" fill="#228be6" stroke="#228be6" stroke-width="0.0"/>
+<text x="390.00" y="59.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">auth_req</text>
+<text x="306.00" y="81.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: FUNC-001</text>
+<text x="306.00" y="99.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: Users must authent</text>
+<text x="306.00" y="117.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: high</text>
+<text x="306.00" y="135.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: test</text>
+<rect x="560.00" y="40.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#fd7e14" stroke-width="1.5"/>
+<rect x="560.00" y="40.00" width="180.00" height="28.00" rx="4.00" fill="#fd7e14" stroke="#fd7e14" stroke-width="0.0"/>
+<text x="650.00" y="59.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">data_req</text>
+<text x="566.00" y="81.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: FUNC-002</text>
+<text x="566.00" y="99.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: All user data must</text>
+<text x="566.00" y="117.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: high</text>
+<text x="566.00" y="135.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: inspection</text>
+<rect x="40.00" y="206.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#fa5252" stroke-width="1.5"/>
+<rect x="40.00" y="206.00" width="180.00" height="28.00" rx="4.00" fill="#fa5252" stroke="#fa5252" stroke-width="0.0"/>
+<text x="130.00" y="225.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">perf_req</text>
+<text x="46.00" y="247.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: PERF-001</text>
+<text x="46.00" y="265.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: API p99 latency mu</text>
+<text x="46.00" y="283.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: medium</text>
+<text x="46.00" y="301.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: analysis</text>
+<rect x="300.00" y="206.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#be4bdb" stroke-width="1.5"/>
+<rect x="300.00" y="206.00" width="180.00" height="28.00" rx="4.00" fill="#be4bdb" stroke="#be4bdb" stroke-width="0.0"/>
+<text x="390.00" y="225.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">avail_req</text>
+<text x="306.00" y="247.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: PERF-002</text>
+<text x="306.00" y="265.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: System availabilit</text>
+<text x="306.00" y="283.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: high</text>
+<text x="306.00" y="301.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: analysis</text>
+<rect x="560.00" y="206.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#74c0fc" stroke-width="1.5"/>
+<rect x="560.00" y="206.00" width="180.00" height="28.00" rx="4.00" fill="#74c0fc" stroke="#74c0fc" stroke-width="0.0"/>
+<text x="650.00" y="225.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">api_req</text>
+<text x="566.00" y="247.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: INTF-001</text>
+<text x="566.00" y="265.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: Public API must co</text>
+<text x="566.00" y="283.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: low</text>
+<text x="566.00" y="301.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: inspection</text>
+<rect x="40.00" y="372.00" width="180.00" height="106.00" rx="4.00" fill="#ececff" stroke="#ffd43b" stroke-width="1.5"/>
+<rect x="40.00" y="372.00" width="180.00" height="28.00" rx="4.00" fill="#ffd43b" stroke="#ffd43b" stroke-width="0.0"/>
+<text x="130.00" y="391.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">cloud_req</text>
+<text x="46.00" y="413.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">id: DC-001</text>
+<text x="46.00" y="431.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">text: All infrastructure</text>
+<text x="46.00" y="449.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">risk: medium</text>
+<text x="46.00" y="467.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">verify: demonstration</text>
+<rect x="300.00" y="372.00" width="180.00" height="70.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.5"/>
+<rect x="300.00" y="372.00" width="180.00" height="28.00" rx="4.00" fill="#51cf66" stroke="#51cf66" stroke-width="0.0"/>
+<text x="390.00" y="391.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">auth_service</text>
+<text x="306.00" y="413.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">type: software</text>
+<text x="306.00" y="431.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ref: /docs/services/auth</text>
+<rect x="560.00" y="372.00" width="180.00" height="70.00" rx="4.00" fill="#ececff" stroke="#ff6b6b" stroke-width="1.5"/>
+<rect x="560.00" y="372.00" width="180.00" height="28.00" rx="4.00" fill="#ff6b6b" stroke="#ff6b6b" stroke-width="0.0"/>
+<text x="650.00" y="391.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">api_gateway</text>
+<text x="566.00" y="413.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">type: software</text>
+<text x="566.00" y="431.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ref: /docs/services/gate</text>
+<rect x="40.00" y="538.00" width="180.00" height="70.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.5"/>
+<rect x="40.00" y="538.00" width="180.00" height="28.00" rx="4.00" fill="#cc5de8" stroke="#cc5de8" stroke-width="0.0"/>
+<text x="130.00" y="557.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">load_balancer</text>
+<text x="46.00" y="579.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">type: hardware</text>
+<text x="46.00" y="597.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ref: /docs/infra/lb</text>
+<rect x="300.00" y="538.00" width="180.00" height="70.00" rx="4.00" fill="#ececff" stroke="#339af0" stroke-width="1.5"/>
+<rect x="300.00" y="538.00" width="180.00" height="28.00" rx="4.00" fill="#339af0" stroke="#339af0" stroke-width="0.0"/>
+<text x="390.00" y="557.00" fill="#ffffff" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">encryption_module</text>
+<text x="306.00" y="579.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">type: software</text>
+<text x="306.00" y="597.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ref: /docs/security/encr</text>
+</svg>

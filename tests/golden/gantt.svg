@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="908" viewBox="0 0 660 908">
+<rect x="0.00" y="0.00" width="660.00" height="908.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<text x="330.00" y="53.00" fill="#333333" font-size="16" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">E-Commerce Platform Launch</text>
+<rect x="160.00" y="66.00" width="480.00" height="812.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="160.00" y="66.00" width="480.00" height="112.00" rx="0.00" fill="#f1f3f5" stroke="none" stroke-width="0.0"/>
+<rect x="160.00" y="178.00" width="480.00" height="140.00" rx="0.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<rect x="160.00" y="318.00" width="480.00" height="168.00" rx="0.00" fill="#f1f3f5" stroke="none" stroke-width="0.0"/>
+<rect x="160.00" y="486.00" width="480.00" height="140.00" rx="0.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<rect x="160.00" y="626.00" width="480.00" height="140.00" rx="0.00" fill="#f1f3f5" stroke="none" stroke-width="0.0"/>
+<rect x="160.00" y="766.00" width="480.00" height="112.00" rx="0.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<line x1="160.00" y1="66.00" x2="160.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="256.00" y1="66.00" x2="256.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="352.00" y1="66.00" x2="352.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="448.00" y1="66.00" x2="448.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="544.00" y1="66.00" x2="544.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="640.00" y1="66.00" x2="640.00" y2="878.00" stroke="#ced4da" stroke-width="1.0" stroke-dasharray="4,4"/>
+<rect x="228.57" y="66.00" width="27.43" height="812.00" rx="0.00" fill="#eeeeee" stroke="none" stroke-width="0.0"/>
+<rect x="324.57" y="66.00" width="27.43" height="812.00" rx="0.00" fill="#eeeeee" stroke="none" stroke-width="0.0"/>
+<rect x="420.57" y="66.00" width="27.43" height="812.00" rx="0.00" fill="#eeeeee" stroke="none" stroke-width="0.0"/>
+<rect x="516.57" y="66.00" width="27.43" height="812.00" rx="0.00" fill="#eeeeee" stroke="none" stroke-width="0.0"/>
+<rect x="612.57" y="66.00" width="27.43" height="812.00" rx="0.00" fill="#eeeeee" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="66.00" width="620.00" height="28.00" rx="0.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="85.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Discovery</text>
+<text x="156.00" y="112.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Stakeholder interviews</text>
+<rect x="160.00" y="99.00" width="23.53" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="140.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Competitive analysis</text>
+<rect x="183.53" y="127.00" width="14.12" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="168.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Requirements doc</text>
+<rect x="197.65" y="155.00" width="18.82" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="178.00" width="620.00" height="28.00" rx="0.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="197.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Design</text>
+<text x="156.00" y="224.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">UX research</text>
+<rect x="216.47" y="211.00" width="23.53" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="252.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Wireframes</text>
+<rect x="240.00" y="239.00" width="23.53" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="280.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Visual design</text>
+<rect x="263.53" y="267.00" width="32.94" height="18.00" rx="3.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="308.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Design review</text>
+<rect x="296.47" y="295.00" width="9.41" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="318.00" width="620.00" height="28.00" rx="0.00" fill="#ffd43b" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="337.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Backend</text>
+<text x="156.00" y="364.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Database schema</text>
+<rect x="305.88" y="351.00" width="14.12" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="392.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Auth service</text>
+<rect x="320.00" y="379.00" width="23.53" height="18.00" rx="3.00" fill="#95a5a6" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="420.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Product API</text>
+<rect x="343.53" y="407.00" width="32.94" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="448.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Order service</text>
+<rect x="376.47" y="435.00" width="28.24" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="476.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Payment integration</text>
+<rect x="404.71" y="463.00" width="23.53" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="486.00" width="620.00" height="28.00" rx="0.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="505.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Frontend</text>
+<text x="156.00" y="532.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Component library</text>
+<rect x="428.24" y="519.00" width="23.53" height="18.00" rx="3.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="560.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Product pages</text>
+<rect x="451.76" y="547.00" width="23.53" height="18.00" rx="3.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="588.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Cart and checkout</text>
+<rect x="475.29" y="575.00" width="28.24" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="616.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Admin dashboard</text>
+<rect x="503.53" y="603.00" width="23.53" height="18.00" rx="3.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="626.00" width="620.00" height="28.00" rx="0.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="645.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">QA</text>
+<text x="156.00" y="672.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Integration tests</text>
+<rect x="527.06" y="659.00" width="23.53" height="18.00" rx="3.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="700.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">E2E tests</text>
+<rect x="550.59" y="687.00" width="23.53" height="18.00" rx="3.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="728.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Performance testing</text>
+<rect x="574.12" y="715.00" width="14.12" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="756.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Security audit</text>
+<rect x="588.24" y="743.00" width="18.82" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<rect x="20.00" y="766.00" width="620.00" height="28.00" rx="0.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<text x="26.00" y="785.00" fill="#ffffff" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Launch</text>
+<text x="156.00" y="812.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Staging deploy</text>
+<rect x="607.06" y="799.00" width="0.00" height="18.00" rx="3.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="840.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Beta period</text>
+<rect x="607.06" y="827.00" width="32.94" height="18.00" rx="3.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<text x="156.00" y="868.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Production launch</text>
+<rect x="640.00" y="855.00" width="0.00" height="18.00" rx="3.00" fill="#e55039" stroke="none" stroke-width="0.0"/>
+<line x1="352.00" y1="66.00" x2="352.00" y2="878.00" stroke="#e03131" stroke-width="2.0" stroke-dasharray="6,3"/>
+<text x="355.00" y="62.00" fill="#e03131" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Today</text>
+</svg>

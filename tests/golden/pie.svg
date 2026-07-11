@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="400" viewBox="0 0 700 400">
+<rect x="0.00" y="0.00" width="700.00" height="400.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<text x="350.00" y="32.00" fill="#333333" font-size="16" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Q4 2024 — Infrastructure Cost Breakdown</text>
+<path d="M 195.00 200.00 L 195.00 50.00 A 150.00 150.00 0 0 1 208.74 349.37 Z" fill="#12b886" stroke="#ffffff" stroke-width="2.0"/>
+<rect x="344.32" y="178.20" width="41.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="364.82" y="196.20" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">48.5%</text>
+<path d="M 195.00 200.00 L 208.74 349.37 A 150.00 150.00 0 0 1 48.02 229.93 Z" fill="#228be6" stroke="#ffffff" stroke-width="2.0"/>
+<rect x="73.10" y="322.45" width="41.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="93.60" y="340.45" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">23.3%</text>
+<path d="M 195.00 200.00 L 48.02 229.93 A 150.00 150.00 0 0 1 54.73 146.84 Z" fill="#fd7e14" stroke="#ffffff" stroke-width="2.0"/>
+<rect x="8.55" y="172.30" width="34.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="25.55" y="190.30" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">9.0%</text>
+<path d="M 195.00 200.00 L 54.73 146.84 A 150.00 150.00 0 0 1 95.23 87.99 Z" fill="#fa5252" stroke="#ffffff" stroke-width="2.0"/>
+<rect x="37.95" y="89.63" width="34.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="54.95" y="107.63" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">7.7%</text>
+<path d="M 195.00 200.00 L 95.23 87.99 A 150.00 150.00 0 0 1 129.00 65.30 Z" fill="#be4bdb" stroke="#ffffff" stroke-width="2.0"/>
+<path d="M 195.00 200.00 L 129.00 65.30 A 150.00 150.00 0 0 1 145.19 58.51 Z" fill="#74c0fc" stroke="#ffffff" stroke-width="2.0"/>
+<path d="M 195.00 200.00 L 145.19 58.51 A 150.00 150.00 0 0 1 174.66 51.39 Z" fill="#ffd43b" stroke="#ffffff" stroke-width="2.0"/>
+<path d="M 195.00 200.00 L 174.66 51.39 A 150.00 150.00 0 0 1 195.00 50.00 Z" fill="#51cf66" stroke="#ffffff" stroke-width="2.0"/>
+<rect x="420.00" y="70.00" width="14.00" height="14.00" rx="2.00" fill="#12b886" stroke="#12b886" stroke-width="0.0"/>
+<text x="440.00" y="82.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Compute (EC2/GKE) [4820.0]</text>
+<rect x="420.00" y="94.00" width="14.00" height="14.00" rx="2.00" fill="#228be6" stroke="#228be6" stroke-width="0.0"/>
+<text x="440.00" y="106.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Database (RDS/Cloud SQL) [2310.0]</text>
+<rect x="420.00" y="118.00" width="14.00" height="14.00" rx="2.00" fill="#fd7e14" stroke="#fd7e14" stroke-width="0.0"/>
+<text x="440.00" y="130.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Storage (S3/GCS) [890.0]</text>
+<rect x="420.00" y="142.00" width="14.00" height="14.00" rx="2.00" fill="#fa5252" stroke="#fa5252" stroke-width="0.0"/>
+<text x="440.00" y="154.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Networking &amp; CDN [760.0]</text>
+<rect x="420.00" y="166.00" width="14.00" height="14.00" rx="2.00" fill="#be4bdb" stroke="#be4bdb" stroke-width="0.0"/>
+<text x="440.00" y="178.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Monitoring &amp; Logging [430.0]</text>
+<rect x="420.00" y="190.00" width="14.00" height="14.00" rx="2.00" fill="#74c0fc" stroke="#74c0fc" stroke-width="0.0"/>
+<text x="440.00" y="202.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Container Registry [185.0]</text>
+<rect x="420.00" y="214.00" width="14.00" height="14.00" rx="2.00" fill="#ffd43b" stroke="#ffd43b" stroke-width="0.0"/>
+<text x="440.00" y="226.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">DNS &amp; Load Balancers [320.0]</text>
+<rect x="420.00" y="238.00" width="14.00" height="14.00" rx="2.00" fill="#51cf66" stroke="#51cf66" stroke-width="0.0"/>
+<text x="440.00" y="250.00" fill="#333333" font-size="14" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Support Plans [215.0]</text>
+</svg>
