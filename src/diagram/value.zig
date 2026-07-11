@@ -1,6 +1,7 @@
-//! Generic diagram AST value produced by both the Langium and Jison runtimes.
+//! Generic diagram AST value produced by the Langium runtime and the
+//! hand-written direct parsers.
 //!
-//! Both grammar backends produce a `Value` tree that the renderers consume.
+//! Each parser backend produces a `Value` tree that the renderers consume.
 //! All slices inside a `Value` tree point into the arena allocator that was
 //! passed to the runtime; renderers must not free individual fields.
 const std = @import("std");

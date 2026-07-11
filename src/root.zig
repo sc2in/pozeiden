@@ -14,8 +14,6 @@ const detect = @import("detect.zig");
 /// Re-exported from `detect.zig` for library consumers.
 pub const DiagramType = detect.DiagramType;
 const Value = @import("diagram/value.zig").Value;
-const jison_parser = @import("jison/parser.zig");
-const jison_runtime = @import("jison/runtime.zig");
 const langium_ast = @import("langium/ast.zig");
 const langium_parser = @import("langium/parser.zig");
 const langium_runtime = @import("langium/runtime.zig");
@@ -42,8 +40,6 @@ const theme = @import("svg/theme.zig");
 const common_langium = @embedFile("grammars/common.langium");
 const pie_langium = @embedFile("grammars/pie.langium");
 const git_langium = @embedFile("grammars/gitGraph.langium");
-const flow_jison = @embedFile("grammars/flow.jison");
-const seq_jison = @embedFile("grammars/sequenceDiagram.jison");
 
 // ── Grammar cache ─────────────────────────────────────────────────────────────
 // Grammars are parsed from embedded source on first use and kept for the
@@ -325,30 +321,6 @@ fn renderLangium(
     };
 
     // Render to SVG; result must be allocated with the caller's allocator
-    return renderer(allocator, value);
-}
-
-fn renderJison(
-    allocator: std.mem.Allocator,
-    input: []const u8,
-    grammar_src: []const u8,
-    renderer: fn (std.mem.Allocator, Value) anyerror![]const u8,
-) ![]const u8 {
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const a = arena.allocator();
-
-    // Parse the .jison grammar
-    const grammar = jison_parser.parse(a, grammar_src) catch return error.ParseError;
-    const grammar_heap = try a.create(@TypeOf(grammar));
-    grammar_heap.* = grammar;
-
-    // Run the Jison runtime to produce a Value AST
-    var runtime = jison_runtime.Runtime.init(a, grammar_heap) catch return error.ParseError;
-    const value = runtime.run(input) catch {
-        return renderer(allocator, Value{ .null = {} });
-    };
-
     return renderer(allocator, value);
 }
 
