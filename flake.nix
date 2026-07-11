@@ -38,6 +38,8 @@
             ./playground
             ./examples
             ./include
+            ./golden_test.zig
+            ./tests
           ];
         };
 
@@ -84,13 +86,29 @@
       }
     );
 
-    # `nix flake check` / omnix ci — runs `zig build test`
+    # `nix flake check` / omnix ci — build/test gates run on every PR.
     checks = forAllSystems (system: {
       test = self.packages.${system}.default.overrideAttrs (old: {
         pname = "pozeiden-test";
         buildPhase = "zig build test";
         installPhase = "touch $out";
-        meta = (old.meta or {}) // {description = "Run zig build test";};
+        meta = (old.meta or {}) // {description = "Run zig build test (Debug)";};
+      });
+      # Exercise the shipped optimisation path with safety checks on, so bugs
+      # that only appear under release optimisation are caught in CI.
+      test-release-safe = self.packages.${system}.default.overrideAttrs (old: {
+        pname = "pozeiden-test-release-safe";
+        buildPhase = "zig build test -Doptimize=ReleaseSafe";
+        installPhase = "touch $out";
+        meta = (old.meta or {}) // {description = "Run zig build test (ReleaseSafe)";};
+      });
+      # Smoke-run the fuzz targets once each (no coverage-guided search) so the
+      # byte-in render/detect paths are exercised on every PR.
+      fuzz-smoke = self.packages.${system}.default.overrideAttrs (old: {
+        pname = "pozeiden-fuzz-smoke";
+        buildPhase = "zig build fuzz";
+        installPhase = "touch $out";
+        meta = (old.meta or {}) // {description = "Smoke-run the fuzz targets";};
       });
     });
 

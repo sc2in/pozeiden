@@ -1,5 +1,5 @@
 //! Flowchart SVG renderer.
-//! Builds a Graph from the Jison runtime's Value AST, runs layout, and emits SVG.
+//! Builds a Graph from the parsed Value AST, runs layout, and emits SVG.
 //! Expects a Value.node with `nodes` (id, label, shape), `edges` (from, to, label,
 //! style), `subgraphs` (label, members list), and optional `direction` ("TB"/"LR"/etc.).
 const std = @import("std");
@@ -14,10 +14,8 @@ const arrow_marker_defs = @import("../svg/writer.zig").arrow_marker_defs;
 /// `edges` (list of nodes with `from`, `to`, `label`, `style`), optional `subgraphs`
 /// (with `label` and `members` list), and optional `direction` ("TB"/"LR"/"RL"/"BT").
 pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
-    // Build graph from the flat Jison-parse output.
-    // The Jison runtime for flowchart doesn't produce a structured AST like Langium;
-    // instead we receive what was extracted.  For now we accept a Value.node with
-    // fields: "nodes" (list of node records) and "edges" (list of edge records).
+    // Build graph from the flat parsed output: a Value.node with
+    // fields "nodes" (list of node records) and "edges" (list of edge records).
     const node = value.asNode() orelse return renderFallback(allocator, "flowchart");
 
     // Collect nodes
@@ -653,15 +651,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.text(el.x, el.y, el.text, theme.text_color, theme.font_size_small, .middle, "normal");
     }
 
-    // Draw nodes (wrapped in <a> if a click href was specified)
+    // Draw nodes (wrapped in <a> if a click href was specified).
+    // openAnchor validates the URL scheme and escapes it; a rejected/unsafe
+    // URL (e.g. javascript:) renders the node without a link.
     for (graph.nodes) |n| {
         if (n.href) |url| {
-            var link_buf: [512]u8 = undefined;
-            const open_tag = try std.fmt.bufPrint(&link_buf,
-                "<a href=\"{s}\" target=\"_blank\">", .{url});
-            try svg.raw(open_tag);
+            const linked = try svg.openAnchor(url);
             try drawNode(&svg, n);
-            try svg.raw("</a>\n");
+            if (linked) try svg.closeAnchor();
         } else {
             try drawNode(&svg, n);
         }
@@ -714,12 +711,8 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
             // Cylinder: rect body with elliptical top cap
             const ry: f32 = h * 0.18;
             try svg.rect(x, y + ry, w, h - ry, 0, nfill, nstroke, theme.node_stroke_width);
+            try svg.ellipse(cx, y + ry, w / 2, ry, nfill, nstroke, theme.node_stroke_width);
             var buf: [384]u8 = undefined;
-            const top_ellipse = try std.fmt.bufPrint(&buf,
-                "<ellipse cx=\"{d:.1}\" cy=\"{d:.1}\" rx=\"{d:.1}\" ry=\"{d:.1}\" " ++
-                "fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-                .{ cx, y + ry, w / 2, ry, nfill, nstroke, theme.node_stroke_width });
-            try svg.raw(top_ellipse);
             const bot_d = try std.fmt.bufPrint(&buf,
                 "M {d:.1},{d:.1} A {d:.1},{d:.1},0,0,1,{d:.1},{d:.1}",
                 .{ x, y + h - ry, w / 2, ry, x + w, y + h - ry });
@@ -776,12 +769,7 @@ fn drawNode(svg: *SvgWriter, n: layout.GraphNode) !void {
             try svg.polygon(pts, nfill, nstroke, theme.node_stroke_width);
         },
         .ellipse => {
-            var buf: [256]u8 = undefined;
-            const ellipse_svg = try std.fmt.bufPrint(&buf,
-                "<ellipse cx=\"{d:.1}\" cy=\"{d:.1}\" rx=\"{d:.1}\" ry=\"{d:.1}\" " ++
-                "fill=\"{s}\" stroke=\"{s}\" stroke-width=\"{d:.1}\"/>\n",
-                .{ cx, cy, w / 2, h / 2, nfill, nstroke, theme.node_stroke_width });
-            try svg.raw(ellipse_svg);
+            try svg.ellipse(cx, cy, w / 2, h / 2, nfill, nstroke, theme.node_stroke_width);
         },
         else => {
             try svg.rect(x, y, w, h, 4.0, nfill, nstroke, theme.node_stroke_width);

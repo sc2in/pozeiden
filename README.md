@@ -81,7 +81,7 @@ Add pozeiden as a dependency in your `build.zig.zon`:
 ```zig
 .dependencies = .{
     .pozeiden = .{
-        .url = "https://github.com/sc2in/pozeiden/archive/refs/tags/v0.1.0.tar.gz",
+        .url = "https://github.com/sc2in/pozeiden/archive/refs/tags/v0.2.0.tar.gz",
         .hash = "...",  // run: zig fetch --save <url>
     },
 },

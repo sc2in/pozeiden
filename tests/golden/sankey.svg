@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="580" viewBox="0 0 1000 580">
+<rect x="0.00" y="0.00" width="1000.00" height="580.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<path d="M 110.0,90.0 C 190.0,90.0 190.0,66.0 270.0,66.0 L 270.0,198.3 C 190.0,198.3 190.0,222.3 110.0,222.3 Z" fill="#12b886" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,222.3 C 190.0,222.3 190.0,206.3 270.0,206.3 L 270.0,302.8 C 190.0,302.8 190.0,318.8 110.0,318.8 Z" fill="#228be6" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,318.8 C 190.0,318.8 190.0,310.8 270.0,310.8 L 270.0,371.5 C 190.0,371.5 190.0,379.5 110.0,379.5 Z" fill="#fd7e14" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,379.5 C 190.0,379.5 190.0,379.5 270.0,379.5 L 270.0,423.1 C 190.0,423.1 190.0,423.1 110.0,423.1 Z" fill="#fa5252" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,423.1 C 190.0,423.1 190.0,431.1 270.0,431.1 L 270.0,463.8 C 190.0,463.8 190.0,455.8 110.0,455.8 Z" fill="#be4bdb" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,455.8 C 190.0,455.8 190.0,471.8 270.0,471.8 L 270.0,493.5 C 190.0,493.5 190.0,477.5 110.0,477.5 Z" fill="#74c0fc" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 110.0,477.5 C 190.0,477.5 190.0,501.5 270.0,501.5 L 270.0,514.0 C 190.0,514.0 190.0,490.0 110.0,490.0 Z" fill="#ffd43b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,66.0 C 370.0,66.0 370.0,82.0 450.0,82.0 L 450.0,187.8 C 370.0,187.8 370.0,171.8 290.0,171.8 Z" fill="#51cf66" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,171.8 C 370.0,171.8 370.0,431.8 450.0,431.8 L 450.0,458.2 C 370.0,458.2 370.0,198.3 290.0,198.3 Z" fill="#ff6b6b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,206.3 C 370.0,206.3 370.0,187.8 450.0,187.8 L 450.0,262.5 C 370.0,262.5 370.0,281.0 290.0,281.0 Z" fill="#cc5de8" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,281.0 C 370.0,281.0 370.0,458.2 450.0,458.2 L 450.0,480.0 C 370.0,480.0 370.0,302.8 290.0,302.8 Z" fill="#339af0" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,310.8 C 370.0,310.8 370.0,262.5 450.0,262.5 L 450.0,317.0 C 370.0,317.0 370.0,365.3 290.0,365.3 Z" fill="#20c997" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,365.3 C 370.0,365.3 370.0,480.0 450.0,480.0 L 450.0,486.3 C 370.0,486.3 370.0,371.5 290.0,371.5 Z" fill="#12b886" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,379.5 C 370.0,379.5 370.0,317.0 450.0,317.0 L 450.0,359.0 C 370.0,359.0 370.0,421.5 290.0,421.5 Z" fill="#228be6" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,421.5 C 370.0,421.5 370.0,494.3 450.0,494.3 L 450.0,496.3 C 370.0,496.3 370.0,423.5 290.0,423.5 Z" fill="#fd7e14" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,431.1 C 370.0,431.1 370.0,359.0 450.0,359.0 L 450.0,390.9 C 370.0,390.9 370.0,463.0 290.0,463.0 Z" fill="#fa5252" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,463.0 C 370.0,463.0 370.0,496.3 450.0,496.3 L 450.0,498.3 C 370.0,498.3 370.0,465.0 290.0,465.0 Z" fill="#be4bdb" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,471.8 C 370.0,471.8 370.0,390.9 450.0,390.9 L 450.0,412.0 C 370.0,412.0 370.0,492.8 290.0,492.8 Z" fill="#74c0fc" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,492.8 C 370.0,492.8 370.0,498.3 450.0,498.3 L 450.0,500.3 C 370.0,500.3 370.0,494.8 290.0,494.8 Z" fill="#ffd43b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,501.5 C 370.0,501.5 370.0,412.0 450.0,412.0 L 450.0,423.8 C 370.0,423.8 370.0,513.4 290.0,513.4 Z" fill="#51cf66" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 290.0,513.4 C 370.0,513.4 370.0,500.3 450.0,500.3 L 450.0,502.3 C 370.0,502.3 370.0,515.4 290.0,515.4 Z" fill="#ff6b6b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 470.0,82.0 C 550.0,82.0 550.0,124.9 630.0,124.9 L 630.0,208.9 C 550.0,208.9 550.0,166.0 470.0,166.0 Z" fill="#cc5de8" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 470.0,166.0 C 550.0,166.0 550.0,216.9 630.0,216.9 L 630.0,283.9 C 550.0,283.9 550.0,233.0 470.0,233.0 Z" fill="#339af0" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 470.0,233.0 C 550.0,233.0 550.0,291.9 630.0,291.9 L 630.0,403.9 C 550.0,403.9 550.0,345.0 470.0,345.0 Z" fill="#20c997" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 470.0,345.0 C 550.0,345.0 550.0,411.9 630.0,411.9 L 630.0,432.2 C 550.0,432.2 550.0,365.3 470.0,365.3 Z" fill="#12b886" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 470.0,365.3 C 550.0,365.3 550.0,440.2 630.0,440.2 L 630.0,455.1 C 550.0,455.1 550.0,380.2 470.0,380.2 Z" fill="#228be6" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,124.9 C 730.0,124.9 730.0,126.5 810.0,126.5 L 810.0,156.1 C 730.0,156.1 730.0,154.5 650.0,154.5 Z" fill="#fd7e14" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,154.5 C 730.0,154.5 730.0,164.1 810.0,164.1 L 810.0,181.2 C 730.0,181.2 730.0,171.6 650.0,171.6 Z" fill="#fa5252" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,171.6 C 730.0,171.6 730.0,189.2 810.0,189.2 L 810.0,212.5 C 730.0,212.5 730.0,194.9 650.0,194.9 Z" fill="#be4bdb" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,194.9 C 730.0,194.9 730.0,220.5 810.0,220.5 L 810.0,234.5 C 730.0,234.5 730.0,208.9 650.0,208.9 Z" fill="#74c0fc" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,216.9 C 730.0,216.9 730.0,262.8 810.0,262.8 L 810.0,293.9 C 730.0,293.9 730.0,248.1 650.0,248.1 Z" fill="#ffd43b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,248.1 C 730.0,248.1 730.0,234.5 810.0,234.5 L 810.0,254.8 C 730.0,254.8 730.0,268.3 650.0,268.3 Z" fill="#51cf66" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,268.3 C 730.0,268.3 730.0,301.9 810.0,301.9 L 810.0,317.5 C 730.0,317.5 730.0,283.9 650.0,283.9 Z" fill="#ff6b6b" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,291.9 C 730.0,291.9 730.0,325.5 810.0,325.5 L 810.0,379.9 C 730.0,379.9 730.0,346.3 650.0,346.3 Z" fill="#cc5de8" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,346.3 C 730.0,346.3 730.0,387.9 810.0,387.9 L 810.0,426.8 C 730.0,426.8 730.0,385.3 650.0,385.3 Z" fill="#339af0" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<path d="M 650.0,385.3 C 730.0,385.3 730.0,434.8 810.0,434.8 L 810.0,453.5 C 730.0,453.5 730.0,403.9 650.0,403.9 Z" fill="#20c997" stroke="none" stroke-width="0.0" fill-opacity="0.45"/>
+<rect x="90.00" y="90.00" width="20.00" height="400.00" rx="2.00" fill="#12b886" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="66.00" width="20.00" height="132.30" rx="2.00" fill="#228be6" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="206.30" width="20.00" height="96.50" rx="2.00" fill="#fd7e14" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="310.79" width="20.00" height="60.70" rx="2.00" fill="#fa5252" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="379.49" width="20.00" height="43.58" rx="2.00" fill="#be4bdb" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="431.07" width="20.00" height="32.68" rx="2.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="471.76" width="20.00" height="21.79" rx="2.00" fill="#ffd43b" stroke="none" stroke-width="0.0"/>
+<rect x="270.00" y="501.55" width="20.00" height="12.45" rx="2.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<rect x="450.00" y="82.00" width="20.00" height="341.79" rx="2.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<rect x="450.00" y="431.79" width="20.00" height="54.47" rx="2.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<rect x="450.00" y="494.26" width="20.00" height="3.74" rx="2.00" fill="#339af0" stroke="none" stroke-width="0.0"/>
+<rect x="630.00" y="124.89" width="20.00" height="84.05" rx="2.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<rect x="630.00" y="216.94" width="20.00" height="66.93" rx="2.00" fill="#12b886" stroke="none" stroke-width="0.0"/>
+<rect x="630.00" y="291.87" width="20.00" height="112.06" rx="2.00" fill="#228be6" stroke="none" stroke-width="0.0"/>
+<rect x="630.00" y="411.93" width="20.00" height="20.23" rx="2.00" fill="#fd7e14" stroke="none" stroke-width="0.0"/>
+<rect x="630.00" y="440.16" width="20.00" height="14.94" rx="2.00" fill="#fa5252" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="126.48" width="20.00" height="29.57" rx="2.00" fill="#be4bdb" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="164.05" width="20.00" height="17.12" rx="2.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="189.18" width="20.00" height="23.35" rx="2.00" fill="#ffd43b" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="220.52" width="20.00" height="34.24" rx="2.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="262.76" width="20.00" height="31.13" rx="2.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="301.89" width="20.00" height="15.56" rx="2.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="325.46" width="20.00" height="54.47" rx="2.00" fill="#339af0" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="387.93" width="20.00" height="38.91" rx="2.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
+<rect x="810.00" y="434.84" width="20.00" height="18.68" rx="2.00" fill="#12b886" stroke="none" stroke-width="0.0"/>
+<text x="84.00" y="294.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Primary Energy Sources</text>
+<text x="296.00" y="136.15" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Coal Power</text>
+<text x="296.00" y="258.54" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Natural Gas Power</text>
+<text x="296.00" y="345.14" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Nuclear Power</text>
+<text x="296.00" y="405.28" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Hydro Power</text>
+<text x="296.00" y="451.42" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Wind Power</text>
+<text x="296.00" y="486.65" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Solar Power</text>
+<text x="296.00" y="511.77" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Other Renewables</text>
+<text x="476.00" y="256.89" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Grid Electricity</text>
+<text x="476.00" y="463.03" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Heat Losses</text>
+<text x="476.00" y="500.13" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Losses</text>
+<text x="656.00" y="170.92" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Residential</text>
+<text x="656.00" y="254.40" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Commercial</text>
+<text x="656.00" y="351.90" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Industrial</text>
+<text x="656.00" y="426.05" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Transport</text>
+<text x="656.00" y="451.63" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Grid Losses</text>
+<text x="836.00" y="145.27" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Heating</text>
+<text x="836.00" y="176.61" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Cooling</text>
+<text x="836.00" y="204.85" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Appliances</text>
+<text x="836.00" y="241.64" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Lighting</text>
+<text x="836.00" y="282.33" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HVAC</text>
+<text x="836.00" y="313.67" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Equipment</text>
+<text x="836.00" y="356.69" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Motors</text>
+<text x="836.00" y="411.39" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Process Heat</text>
+<text x="836.00" y="448.18" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Other</text>
+</svg>

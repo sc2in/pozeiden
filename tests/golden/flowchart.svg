@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1364" viewBox="0 0 760 1364">
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#333333"/>
+  </marker>
+  <marker id="arrow-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#333333" stroke-width="1.5"/>
+  </marker>
+</defs>
+<rect x="0.00" y="0.00" width="760.00" height="1364.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<rect x="124.00" y="24.00" width="612.00" height="76.00" rx="6.00" fill="#f0f4ff" stroke="#b0c0e8" stroke-width="1.2"/>
+<text x="130.00" y="37.00" fill="#4466aa" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Input Layer</text>
+<rect x="24.00" y="272.00" width="372.00" height="696.00" rx="6.00" fill="#f0f4ff" stroke="#b0c0e8" stroke-width="1.2"/>
+<text x="30.00" y="285.00" fill="#4466aa" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Processing Layer</text>
+<rect x="24.00" y="1016.00" width="372.00" height="324.00" rx="6.00" fill="#f0f4ff" stroke="#b0c0e8" stroke-width="1.2"/>
+<text x="30.00" y="1029.00" fill="#4466aa" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Output Layer</text>
+<path d="M 280.0 62.0 L 320.0 62.0 L 320.0 62.0 L 360.0 62.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="352.0,66.5 360.0,62.0 352.0,57.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 500.0 62.0 L 540.0 62.0 L 540.0 62.0 L 580.0 62.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="572.0,66.5 580.0,62.0 572.0,57.5" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 650.0 84.0 C 650.0 256.0 210.0 256.0 210.0 84.0" fill="none" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,5"/>
+<polygon points="214.5,92.0 210.0,84.0 205.5,92.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 110.0 332.0 L 110.0 372.0 L 210.0 372.0 L 210.0 412.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,404.0 210.0,412.0 214.5,404.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 456.0 L 210.0 496.0 L 210.0 496.0 L 210.0 536.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,528.0 210.0,536.0 214.5,528.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 580.0 L 210.0 620.0 L 110.0 620.0 L 110.0 660.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="105.5,652.0 110.0,660.0 114.5,652.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 580.0 L 210.0 620.0 L 310.0 620.0 L 310.0 660.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="305.5,652.0 310.0,660.0 314.5,652.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 310.0 704.0 L 310.0 744.0 L 210.0 744.0 L 210.0 784.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,776.0 210.0,784.0 214.5,776.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 828.0 L 210.0 868.0 L 210.0 868.0 L 210.0 908.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,900.0 210.0,908.0 214.5,900.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 1076.0 L 210.0 1116.0 L 310.0 1116.0 L 310.0 1156.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="305.5,1148.0 310.0,1156.0 314.5,1148.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 1076.0 L 210.0 1116.0 L 110.0 1116.0 L 110.0 1156.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="105.5,1148.0 110.0,1156.0 114.5,1148.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 310.0 1200.0 L 310.0 1240.0 L 210.0 1240.0 L 210.0 1280.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,1272.0 210.0,1280.0 214.5,1272.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 430.0 84.0 L 430.0 186.0 L 110.0 186.0 L 110.0 288.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="105.5,280.0 110.0,288.0 114.5,280.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 210.0 952.0 L 210.0 992.0 L 210.0 992.0 L 210.0 1032.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,1024.0 210.0,1032.0 214.5,1024.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<path d="M 110.0 704.0 L 110.0 868.0 L 210.0 868.0 L 210.0 1032.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<polygon points="205.5,1024.0 210.0,1032.0 214.5,1024.0" fill="#333333" stroke="#333333" stroke-width="0.0"/>
+<rect x="530.00" y="42.00" width="20.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="540.00" y="56.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">No</text>
+<rect x="413.50" y="193.00" width="41.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="434.00" y="207.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">retry</text>
+<rect x="146.50" y="600.00" width="27.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="160.00" y="614.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Yes</text>
+<rect x="250.00" y="600.00" width="20.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="260.00" y="614.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">No</text>
+<rect x="256.50" y="166.00" width="27.00" height="16.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="270.00" y="180.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Yes</text>
+<rect x="140.00" y="40.00" width="140.00" height="44.00" rx="22.00" fill="#2ecc71" stroke="#27ae60" stroke-width="1.5"/>
+<text x="210.00" y="66.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Start</text>
+<polygon points="430.0,40.0 500.0,62.0 430.0,84.0 360.0,62.0" fill="#f39c12" stroke="#e67e22" stroke-width="1.5"/>
+<text fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="430.00" y="58.00">Valid</tspan><tspan x="430.00" y="74.00">Request?</tspan></text>
+<rect x="40.00" y="295.92" width="140.00" height="36.08" rx="0.00" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+<ellipse cx="110.0" cy="295.9" rx="70.0" ry="7.9" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+<path d="M 40.0,324.1 A 70.0,7.9,0,0,1,180.0,324.1" fill="none" stroke="#2980b9" stroke-width="1.5"/>
+<text x="110.00" y="314.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Load from DB</text>
+<polygon points="593.2,40.0 720.0,40.0 706.8,84.0 580.0,84.0" fill="#ff6b6b" stroke="#c0392b" stroke-width="1.5"/>
+<text fill="#fff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="650.00" y="58.00">Error</tspan><tspan x="650.00" y="74.00">Response</tspan></text>
+<rect x="140.00" y="412.00" width="140.00" height="44.00" rx="0.00" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+<line x1="148.00" y1="412.00" x2="148.00" y2="456.00" stroke="#2980b9" stroke-width="1.5"/>
+<line x1="272.00" y1="412.00" x2="272.00" y2="456.00" stroke="#2980b9" stroke-width="1.5"/>
+<text x="210.00" y="438.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Enrich Data</text>
+<polygon points="175.0,536.0 245.0,536.0 280.0,558.0 245.0,580.0 175.0,580.0 140.0,558.0" fill="#f39c12" stroke="#e67e22" stroke-width="1.5"/>
+<text fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="210.00" y="554.00">Cache</tspan><tspan x="210.00" y="570.00">hit?</tspan></text>
+<polygon points="53.2,660.0 180.0,660.0 166.8,704.0 40.0,704.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="110.00" y="678.00">Return</tspan><tspan x="110.00" y="694.00">cached</tspan></text>
+<polygon points="253.2,660.0 366.8,660.0 380.0,704.0 240.0,704.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="678.00">Heavy</tspan><tspan x="310.00" y="694.00">Process</tspan></text>
+<polygon points="140.0,784.0 266.8,784.0 280.0,828.0 153.2,828.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="210.00" y="810.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Auth Check</text>
+<rect x="140.00" y="915.92" width="140.00" height="36.08" rx="0.00" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+<ellipse cx="210.0" cy="915.9" rx="70.0" ry="7.9" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/>
+<path d="M 140.0,944.1 A 70.0,7.9,0,0,1,280.0,944.1" fill="none" stroke="#2980b9" stroke-width="1.5"/>
+<text x="210.00" y="934.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Write to DB</text>
+<rect x="140.00" y="1032.00" width="140.00" height="44.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="210.00" y="1058.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Format Response</text>
+<polygon points="40.0,1156.0 180.0,1156.0 166.8,1200.0 53.2,1200.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="110.00" y="1182.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Audit Log</text>
+<polygon points="240.0,1156.0 380.0,1156.0 380.0,1200.0 240.0,1200.0 255.4,1178.0" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="310.00" y="1182.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Publish to Queue</text>
+<a href="https://example.com/success" target="_blank" rel="noopener noreferrer"><circle cx="210.00" cy="1302.00" r="22.00" fill="#2ecc71" stroke="#27ae60" stroke-width="1.5"/>
+<circle cx="210.00" cy="1302.00" r="19.00" fill="none" stroke="#27ae60" stroke-width="1.5"/>
+<text x="210.00" y="1306.00" fill="#fff" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Done</text>
+</a>
+</svg>

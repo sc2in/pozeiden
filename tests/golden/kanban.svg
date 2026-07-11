@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1012" height="332" viewBox="0 0 1012 332">
+<rect x="0.00" y="0.00" width="1012.00" height="332.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<rect x="24.00" y="24.00" width="180.00" height="36.00" rx="6.00" fill="#74c0fc" stroke="none" stroke-width="0.0"/>
+<text x="114.00" y="47.00" fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">backlog</text>
+<rect x="24.00" y="60.00" width="180.00" height="248.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="32.00" y="68.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="114.00" y="85.00">Implement distributed</tspan><tspan x="114.00" y="99.00">tracing with...</tspan></text>
+<rect x="32.00" y="116.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="114.00" y="133.00">Upgrade Kubernetes</tspan><tspan x="114.00" y="147.00">cluster to 1.29</tspan></text>
+<rect x="32.00" y="164.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="114.00" y="181.00">Add dark mode theme</tspan><tspan x="114.00" y="195.00">support</tspan></text>
+<rect x="32.00" y="212.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#74c0fc" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="114.00" y="229.00">Write runbook for</tspan><tspan x="114.00" y="243.00">incident P1 response</tspan></text>
+<rect x="220.00" y="24.00" width="180.00" height="36.00" rx="6.00" fill="#51cf66" stroke="none" stroke-width="0.0"/>
+<text x="310.00" y="47.00" fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">todo</text>
+<rect x="220.00" y="60.00" width="180.00" height="248.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="228.00" y="68.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="85.00">Refactor auth</tspan><tspan x="310.00" y="99.00">middleware to use OIDC</tspan></text>
+<rect x="228.00" y="116.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="133.00">Add audit logging to</tspan><tspan x="310.00" y="147.00">all write endpoints</tspan></text>
+<rect x="228.00" y="164.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="181.00">Build admin user</tspan><tspan x="310.00" y="195.00">management UI</tspan></text>
+<rect x="228.00" y="212.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="229.00">Migrate cron jobs to</tspan><tspan x="310.00" y="243.00">Kubernetes CronJob...</tspan></text>
+<rect x="228.00" y="260.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#51cf66" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="310.00" y="277.00">Write E2E tests for</tspan><tspan x="310.00" y="291.00">checkout flow</tspan></text>
+<rect x="416.00" y="24.00" width="180.00" height="36.00" rx="6.00" fill="#ffd43b" stroke="none" stroke-width="0.0"/>
+<text x="506.00" y="47.00" fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">in-progress</text>
+<rect x="416.00" y="60.00" width="180.00" height="248.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="424.00" y="68.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ffd43b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="506.00" y="85.00">Integrate Stripe</tspan><tspan x="506.00" y="99.00">webhook handler</tspan></text>
+<rect x="424.00" y="116.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ffd43b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="506.00" y="133.00">Implement real-time</tspan><tspan x="506.00" y="147.00">notification badge</tspan></text>
+<rect x="424.00" y="164.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ffd43b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="506.00" y="181.00">Performance tune</tspan><tspan x="506.00" y="195.00">PostgreSQL query...</tspan></text>
+<rect x="612.00" y="24.00" width="180.00" height="36.00" rx="6.00" fill="#ff6b6b" stroke="none" stroke-width="0.0"/>
+<text x="702.00" y="47.00" fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">review</text>
+<rect x="612.00" y="60.00" width="180.00" height="248.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="620.00" y="68.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ff6b6b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="702.00" y="85.00">Add Redis caching</tspan><tspan x="702.00" y="99.00">layer to product API</tspan></text>
+<rect x="620.00" y="116.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ff6b6b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="702.00" y="133.00">Redesign dashboard</tspan><tspan x="702.00" y="147.00">layout for mobile</tspan></text>
+<rect x="620.00" y="164.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#ff6b6b" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="702.00" y="181.00">Terraform module for</tspan><tspan x="702.00" y="195.00">VPC peering</tspan></text>
+<rect x="808.00" y="24.00" width="180.00" height="36.00" rx="6.00" fill="#cc5de8" stroke="none" stroke-width="0.0"/>
+<text x="898.00" y="47.00" fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">done</text>
+<rect x="808.00" y="60.00" width="180.00" height="248.00" rx="0.00" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.0"/>
+<rect x="816.00" y="68.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="898.00" y="85.00">Deploy Kafka event bus</tspan><tspan x="898.00" y="99.00">to staging</tspan></text>
+<rect x="816.00" y="116.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="898.00" y="133.00">Write OpenAPI spec for</tspan><tspan x="898.00" y="147.00">v2 endpoints</tspan></text>
+<rect x="816.00" y="164.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="898.00" y="181.00">Add CSV export to</tspan><tspan x="898.00" y="195.00">analytics page</tspan></text>
+<rect x="816.00" y="212.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="898.00" y="229.00">Set up Grafana</tspan><tspan x="898.00" y="243.00">alerting for SLO...</tspan></text>
+<rect x="816.00" y="260.00" width="164.00" height="40.00" rx="4.00" fill="#ececff" stroke="#cc5de8" stroke-width="1.0"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="898.00" y="277.00">Automate regression</tspan><tspan x="898.00" y="291.00">suite in CI</tspan></text>
+</svg>

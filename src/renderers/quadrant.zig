@@ -71,24 +71,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     try svg.text(plot_x + 4, plot_y + PLOT_SIZE + 16, x_left, theme.text_color, qfs, .start, "normal");
     try svg.text(plot_x + PLOT_SIZE, plot_y + PLOT_SIZE + 16, x_right, theme.text_color, qfs, .end, "normal");
 
-    // Y-axis labels via raw SVG (rotated text)
+    // Y-axis labels (rotated text). textRotated escapes the label content,
+    // fill, and font-family.
     {
-        var buf: [512]u8 = undefined;
         const yl_x = plot_x - 14;
         const yl_bot_y = plot_y + PLOT_SIZE;
         const yl_top_y = plot_y + 4;
-        const frag_bot = try std.fmt.bufPrint(&buf,
-            "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"end\" " ++
-            "font-family=\"{s}\" " ++
-            "transform=\"rotate(-90 {d:.1} {d:.1})\">{s}</text>\n",
-            .{ yl_x, yl_bot_y, theme.text_color, qfs, theme.font_family, yl_x, yl_bot_y, y_bottom });
-        try svg.raw(frag_bot);
-        const frag_top = try std.fmt.bufPrint(&buf,
-            "<text x=\"{d:.1}\" y=\"{d:.1}\" fill=\"{s}\" font-size=\"{d}\" text-anchor=\"end\" " ++
-            "font-family=\"{s}\" " ++
-            "transform=\"rotate(-90 {d:.1} {d:.1})\">{s}</text>\n",
-            .{ yl_x, yl_top_y, theme.text_color, qfs, theme.font_family, yl_x, yl_top_y, y_top });
-        try svg.raw(frag_top);
+        try svg.textRotated(yl_x, yl_bot_y, y_bottom, theme.text_color, qfs, .end, -90, yl_x, yl_bot_y);
+        try svg.textRotated(yl_x, yl_top_y, y_top, theme.text_color, qfs, .end, -90, yl_x, yl_top_y);
     }
 
     // Points

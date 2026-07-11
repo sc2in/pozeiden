@@ -285,12 +285,16 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         s.depth = depth_map.get(s.id) orelse global_max_depth + 1;
     }
 
-    // Assign global columns
-    var col_count = [_]usize{0} ** 128;
+    // Assign global columns. Size to the actual depth range (max depth is
+    // global_max_depth + 1) so deep nesting cannot index past the array; the
+    // old fixed [128] array was sliced by global_max_depth + 2 below and could
+    // read out of bounds on a deeply nested diagram.
+    const col_count = try a.alloc(usize, global_max_depth + 2);
+    @memset(col_count, 0);
     for (states.items) |*s| {
         if (s.is_member) continue;
         const d = s.depth;
-        if (d < 128) {
+        if (d < col_count.len) {
             s.col = col_count[d];
             col_count[d] += 1;
         }
@@ -407,7 +411,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // states in the global grid.
 
     var max_global_col: usize = 0;
-    for (col_count[0 .. global_max_depth + 2]) |c| { if (c > max_global_col) max_global_col = c; }
+    for (col_count) |c| { if (c > max_global_col) max_global_col = c; }
     const N_ROWS = global_max_depth + 2;
     const N_COLS = if (max_global_col > 0) max_global_col else 1;
 
