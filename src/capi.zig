@@ -19,8 +19,13 @@ const std = @import("std");
 const pozeiden = @import("pozeiden");
 
 // Module-level allocator backing all C API allocations.
-var gpa_state: std.heap.DebugAllocator(.{}) = .init;
-const gpa = gpa_state.allocator();
+//
+// smp_allocator is thread-safe (sharded per-CPU) and low-overhead, so
+// concurrent pozeiden_render calls from a multi-threaded embedder are safe and
+// do not serialise on a single global mutex. It replaces DebugAllocator, whose
+// leak-tracking metadata and global lock were inappropriate for a shipping
+// shared library.
+const gpa = std.heap.smp_allocator;
 
 // Thread-local last-error buffer (256 bytes; truncates longer messages).
 threadlocal var last_err_buf: [256]u8 = undefined;
