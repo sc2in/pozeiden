@@ -14,6 +14,13 @@ const detect = @import("detect.zig");
 /// Re-exported from `detect.zig` for library consumers.
 pub const DiagramType = detect.DiagramType;
 const Value = @import("diagram/value.zig").Value;
+
+const parse_util = @import("parse_util.zig");
+/// Shared line-parser helpers (see `parse_util.zig`).
+const isSkippable = parse_util.isSkippable;
+const splitFirst = parse_util.splitFirst;
+const stripQuotes = parse_util.stripQuotes;
+
 const langium_ast = @import("langium/ast.zig");
 const langium_parser = @import("langium/parser.zig");
 const langium_runtime = @import("langium/runtime.zig");
@@ -343,7 +350,7 @@ fn renderBlockDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -470,7 +477,7 @@ fn renderRequirementDirect(allocator: std.mem.Allocator, text: []const u8) ![]co
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -582,7 +589,7 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
                 continue;
             }
             const line = std.mem.trim(u8, raw, " \t\r");
-            if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+            if (isSkippable(line)) continue;
             if (std.mem.startsWith(u8, line, "title ")) continue;
             // Count leading spaces/tabs
             var ind: usize = 0;
@@ -602,7 +609,7 @@ fn renderKanbanDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             // "kanban" or "kanban title" on first line
@@ -1682,7 +1689,7 @@ fn renderClassDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -1907,7 +1914,7 @@ fn renderStateDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2100,7 +2107,7 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2206,13 +2213,6 @@ fn renderErDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
 }
 
 /// Split `s` on the first occurrence of `delim`, returning [before, after].
-fn splitFirst(s: []const u8, delim: u8) [2][]const u8 {
-    if (std.mem.indexOfScalar(u8, s, delim)) |i| {
-        return .{ s[0..i], std.mem.trim(u8, s[i + 1 ..], " \t") };
-    }
-    return .{ s, "" };
-}
-
 // ─── gantt parser ─────────────────────────────────────────────────────────────
 
 fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
@@ -2231,7 +2231,7 @@ fn renderGanttDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u8
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2342,7 +2342,7 @@ fn renderTimelineDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2423,7 +2423,7 @@ fn renderXyChartDirect(allocator: std.mem.Allocator, text: []const u8) ![]const 
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2523,7 +2523,7 @@ fn renderQuadrantDirect(allocator: std.mem.Allocator, text: []const u8) ![]const
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2718,7 +2718,7 @@ fn renderSankeyDirect(allocator: std.mem.Allocator, text: []const u8) ![]const u
     var first = true;
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
         if (first) {
             first = false;
             continue;
@@ -2922,12 +2922,6 @@ fn nextArg(args: []const u8, n: usize) []const u8 {
         idx += 1;
     }
     return "";
-}
-
-fn stripQuotes(s: []const u8) []const u8 {
-    const t = std.mem.trim(u8, s, " \t");
-    if (t.len >= 2 and t[0] == '"' and t[t.len - 1] == '"') return t[1 .. t.len - 1];
-    return t;
 }
 
 fn renderUnknown(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
