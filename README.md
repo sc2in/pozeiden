@@ -28,6 +28,48 @@ Supported interfaces: Zig library, C shared library, WebAssembly (wasm32-wasi), 
 | Requirement diagram | `requirementDiagram`                                                       |
 | Kanban board        | `kanban`                                                                   |
 
+## Limitations
+
+pozeiden targets the common, static subset of mermaid. Known gaps as of the
+current release:
+
+- **Unsupported diagram types.** `journey`, `packet`, `architecture`,
+  `treemap`, and `radar` are not implemented. Unrecognised input renders a
+  minimal fallback SVG rather than erroring — pass `RenderOptions.strict = true`
+  (see below) to get `error.UnknownDiagramType` instead.
+- **No markdown string labels.** Backtick/`**bold**` markdown inside labels is
+  rendered literally, not formatted.
+- **No `@{ shape: … }` (mermaid v11) node syntax.** Use the classic shape
+  delimiters (`[]`, `()`, `{}`, `([])`, `[()]`, …).
+- **Narrow `%%{init: …}%%` support.** Only the `dark`/`forest`/`neutral` theme
+  presets and the `themeVariables` keys `primaryColor`, `primaryTextColor`,
+  `primaryBorderColor`, `lineColor`, `background`, `mainBkg`, and `fontFamily`
+  are honoured. Other init keys are ignored.
+- **YAML front matter is skipped, not applied.** A leading `--- … ---` block is
+  ignored for detection but its `title`/`config` settings are not consumed.
+- **`click … call` callbacks are not supported** (only `click … href` links,
+  which are scheme-validated and escaped). This is intentional for the
+  embed-SVG-in-HTML use case.
+- **Resource limits.** Input above 4 MiB (`pozeiden.max_input_bytes`) yields
+  `error.InputTooLarge`; flowcharts above 1000 nodes / 2000 edges yield
+  `error.DiagramTooLarge`.
+
+### Rendering untrusted input
+
+pozeiden escapes text and attribute values and validates link schemes, so its
+SVG is safe to embed. When rendering untrusted diagrams into a published page,
+prefer `renderWithOptions(..., .{ .strict = true })` so an unrecognised or
+malformed diagram surfaces as an error you can handle (e.g. fall back to a code
+block) instead of silently emitting a fallback SVG.
+
+### Fonts
+
+The default font family is `"trebuchet ms, verdana, arial, sans-serif"`. On
+headless/Nix hosts the leading faces are usually absent; the SVG still renders
+via the generic `sans-serif` fallback, but to match a specific environment set
+`RenderOptions.theme_override.font_family` (or `%%{init: {'themeVariables':
+{'fontFamily': '…'}}}%%`).
+
 ## Requirements
 
 - Zig **0.16.0** or later
