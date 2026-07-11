@@ -46,20 +46,35 @@ export fn get_output_ptr() [*]u8 {
 
 /// Render the mermaid text in the input buffer.
 /// `len` — number of UTF-8 bytes written to the input buffer.
-/// Returns the SVG byte length written to the output buffer (0 on error).
+/// Returns the byte length written to the output buffer.  On any failure —
+/// input larger than the input buffer, a render error, or an SVG larger than
+/// the output buffer — the error diagram is written and its length returned,
+/// rather than silently truncating the input or output into malformed markup.
 export fn render(len: u32) u32 {
+    // Reject over-large input instead of silently clamping it to a truncated,
+    // syntactically broken diagram.
+    if (len > input_buf.len) return emitError();
+
     // Fresh FBA every call → zero accumulated heap state between renders.
     var fba = std.heap.FixedBufferAllocator.init(&scratch_buf);
     // ArenaAllocator over FBA handles ArrayList growth correctly (FBA alone
     // can only resize the most-recently-allocated block).
     var arena = std.heap.ArenaAllocator.init(fba.allocator());
 
-    const input = input_buf[0..@min(len, input_buf.len)];
-    const svg = pozeiden.render(arena.allocator(), input) catch error_svg;
+    const input = input_buf[0..len];
+    const svg = pozeiden.render(arena.allocator(), input) catch return emitError();
 
-    const out_len = @min(svg.len, output_buf.len);
-    @memcpy(output_buf[0..out_len], svg[0..out_len]);
-    return @intCast(out_len);
+    // Don't emit a truncated (malformed) SVG if it overflows the output buffer.
+    if (svg.len > output_buf.len) return emitError();
+
+    @memcpy(output_buf[0..svg.len], svg);
+    return @intCast(svg.len);
+}
+
+/// Write the static error diagram to the output buffer and return its length.
+fn emitError() u32 {
+    @memcpy(output_buf[0..error_svg.len], error_svg);
+    return @intCast(error_svg.len);
 }
 
 const error_svg =
