@@ -2,6 +2,61 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-11
+
+### Security
+
+- **SVG output injection / stored XSS** (GHSA-p2c5-qmq5-3r4f) – `SvgWriter` now
+  XML-escapes the user-controllable attribute values (`fill`, `stroke`,
+  `font-weight`, `font-family`), so `style`/`classDef`/`linkStyle` colours and
+  `%%{init:}%%` theme variables can no longer break out of a quoted attribute.
+  Flowchart `click … href` links are scheme-validated (only `http`/`https`/
+  `mailto` and relative URLs; `javascript:`/`data:`/`vbscript:` are rejected,
+  including whitespace-obfuscated variants) and escaped, and now carry
+  `rel="noopener noreferrer"`. The quadrant y-axis labels are escaped too.
+- **Out-of-bounds read/write on valid diagrams** (GHSA-rg4m-w3p2-gf3p) – the
+  grid-layout renderers (`c4`, `class`, `er`, `requirement`) and state diagrams
+  sized fixed `[64]`/`[128]` row/column arrays that a diagram with enough
+  elements or deep enough nesting could index past — a crash/DoS in safe builds
+  and memory corruption in the safety-off WASM build. These arrays are now
+  sized to the actual row/depth count, so large diagrams render fully instead
+  of aborting.
+
+### Added
+
+- **Resource limits** on the library and C-API paths, which were previously
+  unbounded. Input larger than `pozeiden.max_input_bytes` (4 MiB) returns
+  `error.InputTooLarge`; a flowchart above 1000 nodes / 2000 edges returns
+  `error.DiagramTooLarge`. Adds the `InputTooLarge` and `DiagramTooLarge`
+  variants to `RenderError`.
+- **Golden-file test suite** covering all 17 diagram types, regenerable with
+  `zig build update-golden`, plus end-to-end security-regression tests.
+- **CI** now runs the fuzz targets (`zig build fuzz`) and the test suite under
+  `ReleaseSafe` on every PR; `src/fuzz.zig` is updated for the Zig 0.16
+  `std.testing.fuzz` API (it previously did not compile).
+- **README “Limitations” section** documenting unsupported diagram types,
+  markdown-string labels, `@{shape}` syntax, the `%%{init}%%` subset, front
+  matter handling, and the resource limits.
+
+### Changed
+
+- The C shared library now uses `std.heap.smp_allocator` instead of
+  `DebugAllocator` — still thread-safe for concurrent `pozeiden_render`, but
+  without leak-tracking overhead or a single global lock serialising renders.
+- WASM `render()` emits the error diagram instead of silently truncating
+  over-large input (>1 MiB) or output (>512 KiB) into malformed SVG.
+- Diagram detection now skips a complete leading `--- … ---` YAML front-matter
+  block, so front-matter-authored diagrams render instead of falling back to a
+  raw-text dump.
+
+### Fixed
+
+- **Playground** – completed the WebAssembly WASI shim so `pozeiden.wasm` links
+  in the browser (it was failing with `LinkError: … 'random_get' is not a
+  Function`).
+- Removed the dead jison parser subsystem and the unused `mecha` dependency;
+  fixed the `mvzr` dependency version pin and the README install version.
+
 ## [0.2.0] - 2026-07-03
 
 ### Changed
