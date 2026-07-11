@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="904" height="1030" viewBox="0 0 904 1030">
+<rect x="0.00" y="0.00" width="904.00" height="1030.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<rect x="28.00" y="28.00" width="424.00" height="206.00" rx="8.00" fill="#f0f4ff" stroke="#8888cc" stroke-width="1.5"/>
+<text x="36.00" y="42.00" fill="#6666aa" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Core</text>
+<rect x="28.00" y="28.00" width="664.00" height="448.00" rx="8.00" fill="#f0f4ff" stroke="#8888cc" stroke-width="1.5"/>
+<text x="36.00" y="42.00" fill="#6666aa" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Domain</text>
+<line x1="520.00" y1="131.00" x2="200.00" y2="111.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="200.0,111.0 209.6,117.6 210.4,105.6" fill="#ffffff" stroke="#333333" stroke-width="1.5"/>
+<line x1="120.00" y1="302.00" x2="120.00" y2="182.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="120.0,182.0 114.0,192.0 126.0,192.0" fill="#ffffff" stroke="#333333" stroke-width="1.5"/>
+<line x1="600.00" y1="302.00" x2="120.00" y2="182.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="120.0,182.0 128.2,190.2 131.2,178.6" fill="#ffffff" stroke="#333333" stroke-width="1.5"/>
+<line x1="440.00" y1="565.00" x2="520.00" y2="565.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="520.0,565.0 510.0,559.0 510.0,571.0" fill="#ffffff" stroke="#333333" stroke-width="1.5"/>
+<line x1="200.00" y1="767.00" x2="280.00" y2="767.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="280.0,767.0 270.0,761.0 260.0,767.0 270.0,773.0" fill="#9370db" stroke="#333333" stroke-width="1.5"/>
+<text x="240.00" y="761.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">contains</text>
+<line x1="600.00" y1="788.00" x2="120.00" y2="868.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="130.9,872.3 120.0,868.0 128.9,860.4" fill="none" stroke="#333333" stroke-width="1.5"/>
+<text x="360.00" y="822.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">references</text>
+<line x1="440.00" y1="889.00" x2="520.00" y2="889.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="510.0,883.0 520.0,889.0 510.0,895.0" fill="none" stroke="#333333" stroke-width="1.5"/>
+<text x="480.00" y="883.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">places</text>
+<line x1="600.00" y1="222.00" x2="120.00" y2="544.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="131.6,543.4 120.0,544.0 125.0,533.4" fill="none" stroke="#333333" stroke-width="1.5"/>
+<text x="360.00" y="377.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">has</text>
+<rect x="40.00" y="40.00" width="160.00" height="162.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="120.00" y="54.00" fill="#666666" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&lt;&lt;abstract&gt;&gt;</text>
+<text x="120.00" y="81.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Entity</text>
+<line x1="40.00" y1="92.00" x2="200.00" y2="92.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="48.00" y="108.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+id : UUID</text>
+<text x="48.00" y="128.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+createdAt : DateTime</text>
+<text x="48.00" y="148.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+updatedAt : DateTime</text>
+<text x="48.00" y="168.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+equals(other Entity) </text>
+<text x="48.00" y="188.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+hashCode() : int</text>
+<rect x="280.00" y="40.00" width="160.00" height="142.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="360.00" y="54.00" fill="#666666" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&lt;&lt;interface&gt;&gt;</text>
+<text x="360.00" y="81.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Repository&lt;T&gt;</text>
+<line x1="280.00" y1="92.00" x2="440.00" y2="92.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="288.00" y="108.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+findById(id UUID) : T</text>
+<text x="288.00" y="128.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+findAll() : List&lt;T&gt;</text>
+<text x="288.00" y="148.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+save(entity T) : T</text>
+<text x="288.00" y="168.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+delete(id UUID) : voi</text>
+<rect x="520.00" y="40.00" width="160.00" height="182.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="600.00" y="61.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">User</text>
+<line x1="520.00" y1="72.00" x2="680.00" y2="72.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="528.00" y="88.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+email : String</text>
+<text x="528.00" y="108.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+passwordHash : String</text>
+<text x="528.00" y="128.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">-salt : String</text>
+<text x="528.00" y="148.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+role : Role</text>
+<text x="528.00" y="168.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+activate() : void</text>
+<text x="528.00" y="188.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+deactivate() : void</text>
+<text x="528.00" y="208.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+checkPassword(raw Str</text>
+<rect x="40.00" y="302.00" width="160.00" height="162.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="120.00" y="323.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Order</text>
+<line x1="40.00" y1="334.00" x2="200.00" y2="334.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="48.00" y="350.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+status : OrderStatus</text>
+<text x="48.00" y="370.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+total : Money</text>
+<text x="48.00" y="390.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+items : List&lt;LineItem</text>
+<text x="48.00" y="410.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+place() : void</text>
+<text x="48.00" y="430.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+cancel() : void</text>
+<text x="48.00" y="450.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+addItem(item LineItem</text>
+<rect x="280.00" y="302.00" width="160.00" height="122.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="360.00" y="323.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">LineItem</text>
+<line x1="280.00" y1="334.00" x2="440.00" y2="334.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="288.00" y="350.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+product : Product</text>
+<text x="288.00" y="370.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+quantity : int</text>
+<text x="288.00" y="390.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+price : Money</text>
+<text x="288.00" y="410.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+subtotal() : Money</text>
+<rect x="520.00" y="302.00" width="160.00" height="102.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="600.00" y="323.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Product</text>
+<line x1="520.00" y1="334.00" x2="680.00" y2="334.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="528.00" y="350.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+name : String</text>
+<text x="528.00" y="370.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+price : Money</text>
+<text x="528.00" y="390.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">+stock : int</text>
+<rect x="40.00" y="544.00" width="160.00" height="122.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="120.00" y="558.00" fill="#666666" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&lt;&lt;enumeration&gt;&gt;</text>
+<text x="120.00" y="585.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Role</text>
+<line x1="40.00" y1="596.00" x2="200.00" y2="596.00" stroke="#9370db" stroke-width="1.0"/>
+<text x="48.00" y="612.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">ADMIN</text>
+<text x="48.00" y="632.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">USER</text>
+<text x="48.00" y="652.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">GUEST</text>
+<rect x="280.00" y="544.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="360.00" y="565.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">UserRepository</text>
+<line x1="280.00" y1="576.00" x2="440.00" y2="576.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="520.00" y="544.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="600.00" y="565.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Repository&lt;User&gt;</text>
+<line x1="520.00" y1="576.00" x2="680.00" y2="576.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="40.00" y="746.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="120.00" y="767.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Order &quot;1&quot;</text>
+<line x1="40.00" y1="778.00" x2="200.00" y2="778.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="280.00" y="746.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="360.00" y="767.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;1..*&quot; LineItem</text>
+<line x1="280.00" y1="778.00" x2="440.00" y2="778.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="520.00" y="746.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="600.00" y="767.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">LineItem &quot;many&quot;</text>
+<line x1="520.00" y1="778.00" x2="680.00" y2="778.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="40.00" y="868.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="120.00" y="889.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;1&quot; Product</text>
+<line x1="40.00" y1="900.00" x2="200.00" y2="900.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="280.00" y="868.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="360.00" y="889.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">User &quot;1&quot;</text>
+<line x1="280.00" y1="900.00" x2="440.00" y2="900.00" stroke="#9370db" stroke-width="1.0"/>
+<rect x="520.00" y="868.00" width="160.00" height="42.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="600.00" y="889.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;0..*&quot; Order</text>
+<line x1="520.00" y1="900.00" x2="680.00" y2="900.00" stroke="#9370db" stroke-width="1.0"/>
+<line x1="680.00" y1="131.00" x2="692.00" y2="131.00" stroke="#aaaaaa" stroke-width="1.0" stroke-dasharray="4,3"/>
+<rect x="692.00" y="108.00" width="160.00" height="46.00" rx="4.00" fill="#fffde7" stroke="#f0c040" stroke-width="1.2"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="772.00" y="124.00">Core aggregate root —</tspan><tspan x="772.00" y="138.00">owns the auth lifecycle</tspan></text>
+<line x1="120.00" y1="302.00" x2="120.00" y2="292.00" stroke="#aaaaaa" stroke-width="1.0" stroke-dasharray="4,3"/>
+<rect x="40.00" y="246.00" width="160.00" height="46.00" rx="4.00" fill="#fffde7" stroke="#f0c040" stroke-width="1.2"/>
+<text fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif"><tspan x="120.00" y="262.00">Raises OrderPlaced</tspan><tspan x="120.00" y="276.00">domain event on place()</tspan></text>
+</svg>

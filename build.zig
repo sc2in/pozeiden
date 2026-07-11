@@ -85,6 +85,20 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(capi_tests).step);
 
+    // Golden-file tests — render examples/*.mmd and diff against the committed
+    // baselines in tests/golden/ (regenerate with `zig build update-golden`).
+    const golden_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("golden_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "pozeiden", .module = mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(golden_tests).step);
+
     // ── check step ────────────────────────────────────────────────────────────
     // Semantic analysis without running — used by ZLS and CI.
     //
@@ -261,6 +275,24 @@ pub fn build(b: *std.Build) void {
         const install = b.addInstallFile(svg, b.fmt("examples/{s}.svg", .{name}));
         examples_step.dependOn(&install.step);
     }
+
+    // ── update-golden step ────────────────────────────────────────────────────
+    // Regenerate the committed golden baselines that src/golden_test.zig checks
+    // against.  Run after an intentional rendering change; review the diff.
+    //
+    //   zig build update-golden
+    //   git diff tests/golden/
+
+    const update_golden = b.addUpdateSourceFiles();
+    for (example_names) |name| {
+        const mmd = b.path(b.fmt("examples/{s}.mmd", .{name}));
+        const run = b.addRunArtifact(exe);
+        run.setStdIn(.{ .lazy_path = mmd });
+        const svg = run.captureStdOut(.{});
+        update_golden.addCopyFileToSource(svg, b.fmt("tests/golden/{s}.svg", .{name}));
+    }
+    const update_golden_step = b.step("update-golden", "Regenerate golden SVG baselines in tests/golden/");
+    update_golden_step.dependOn(&update_golden.step);
 
     // ── fuzz step ─────────────────────────────────────────────────────────────
     // Smoke test:               zig build fuzz

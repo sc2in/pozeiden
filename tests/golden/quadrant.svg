@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="580" height="580" viewBox="0 0 580 580">
+<rect x="0.00" y="0.00" width="580.00" height="580.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<text x="290.00" y="30.00" fill="#333333" font-size="16" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Engineering Initiatives — Impact vs Effort</text>
+<rect x="70.00" y="40.00" width="440.00" height="440.00" rx="0.00" fill="#fafafa" stroke="#cccccc" stroke-width="1.0"/>
+<line x1="290.00" y1="40.00" x2="290.00" y2="480.00" stroke="#cccccc" stroke-width="1.0"/>
+<line x1="70.00" y1="260.00" x2="510.00" y2="260.00" stroke="#cccccc" stroke-width="1.0"/>
+<text x="180.00" y="150.00" fill="#aaaaaa" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Quick Wins&quot;</text>
+<text x="400.00" y="150.00" fill="#aaaaaa" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Plan Carefully&quot;</text>
+<text x="180.00" y="370.00" fill="#aaaaaa" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Avoid / Deprioritize&quot;</text>
+<text x="400.00" y="370.00" fill="#aaaaaa" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Long Bets&quot;</text>
+<text x="74.00" y="496.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Low Effort</text>
+<text x="510.00" y="496.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">High Effort</text>
+<text x="56.0" y="480.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90 56.0 480.0)">Low Impact</text>
+<text x="56.0" y="44.0" fill="#333333" font-size="12" text-anchor="end" font-family="trebuchet ms, verdana, arial, sans-serif" transform="rotate(-90 56.0 44.0)">High Impact</text>
+<circle cx="444.00" cy="84.00" r="5.00" fill="#12b886" stroke="#ffffff" stroke-width="1.5"/>
+<text x="452.00" y="88.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Observability stack</text>
+<circle cx="158.00" cy="150.00" r="5.00" fill="#228be6" stroke="#ffffff" stroke-width="1.5"/>
+<text x="166.00" y="154.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API rate limiting</text>
+<circle cx="312.00" cy="128.00" r="5.00" fill="#fd7e14" stroke="#ffffff" stroke-width="1.5"/>
+<text x="320.00" y="132.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">DB query optimizer</text>
+<circle cx="136.00" cy="348.00" r="5.00" fill="#fa5252" stroke="#ffffff" stroke-width="1.5"/>
+<text x="144.00" y="352.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Dark mode UI</text>
+<circle cx="488.00" cy="172.00" r="5.00" fill="#be4bdb" stroke="#ffffff" stroke-width="1.5"/>
+<text x="496.00" y="176.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Migrate to K8s</text>
+<circle cx="246.00" cy="106.00" r="5.00" fill="#74c0fc" stroke="#ffffff" stroke-width="1.5"/>
+<text x="254.00" y="110.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">OAuth2 SSO</text>
+<circle cx="290.00" cy="238.00" r="5.00" fill="#ffd43b" stroke="#ffffff" stroke-width="1.5"/>
+<text x="298.00" y="242.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Audit log service</text>
+<circle cx="422.00" cy="304.00" r="5.00" fill="#51cf66" stroke="#ffffff" stroke-width="1.5"/>
+<text x="430.00" y="308.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Remove legacy PHP</text>
+<circle cx="378.00" cy="194.00" r="5.00" fill="#ff6b6b" stroke="#ffffff" stroke-width="1.5"/>
+<text x="386.00" y="198.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">GraphQL gateway</text>
+<circle cx="334.00" cy="282.00" r="5.00" fill="#cc5de8" stroke="#ffffff" stroke-width="1.5"/>
+<text x="342.00" y="286.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">i18n / l10n</text>
+<circle cx="466.00" cy="216.00" r="5.00" fill="#339af0" stroke="#ffffff" stroke-width="1.5"/>
+<text x="474.00" y="220.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Real-time collab</text>
+<circle cx="400.00" cy="326.00" r="5.00" fill="#20c997" stroke="#ffffff" stroke-width="1.5"/>
+<text x="408.00" y="330.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Offline mode</text>
+</svg>

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1268" height="1030" viewBox="0 0 1268 1030">
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#333333"/>
+  </marker>
+  <marker id="arrow-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#333333" stroke-width="1.5"/>
+  </marker>
+</defs>
+<rect x="0.00" y="0.00" width="1268.00" height="1030.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<rect x="0.00" y="20.00" width="400.00" height="990.00" rx="6.00" fill="rgb(200,220,255)" stroke="none" stroke-width="0.0"/>
+<text x="200.00" y="34.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Client Side</text>
+<rect x="320.00" y="20.00" width="560.00" height="990.00" rx="6.00" fill="rgb(220,255,220)" stroke="none" stroke-width="0.0"/>
+<text x="600.00" y="34.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Server Side</text>
+<rect x="30.00" y="440.00" width="1208.00" height="470.00" rx="4.00" fill="#fff8f0" stroke="#e8c8a0" stroke-width="1.0"/>
+<text x="34.00" y="454.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">alt Invalid credentials</text>
+<rect x="30.00" y="790.00" width="1208.00" height="120.00" rx="4.00" fill="#f0f4ff" stroke="#b0c0e8" stroke-width="1.0"/>
+<text x="34.00" y="804.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">loop Poll for notifications</text>
+<line x1="30.00" y1="587.50" x2="1238.00" y2="587.50" stroke="#aaaaaa" stroke-width="1.0" stroke-dasharray="4,3"/>
+<text x="34.00" y="584.50" fill="#333333" font-size="12" text-anchor="start" font-weight="italic" font-family="trebuchet ms, verdana, arial, sans-serif">Valid credentials</text>
+<line x1="100.00" y1="60.00" x2="100.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="260.00" y1="60.00" x2="260.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="420.00" y1="60.00" x2="420.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="580.00" y1="60.00" x2="580.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="740.00" y1="60.00" x2="740.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="900.00" y1="60.00" x2="900.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<line x1="1060.00" y1="60.00" x2="1060.00" y2="970.00" stroke="#333333" stroke-width="1.0" stroke-dasharray="4,4"/>
+<rect x="575.00" y="275.00" width="10.00" height="75.00" rx="2.00" fill="#ececff" stroke="#9370db" stroke-width="1.0"/>
+<rect x="575.00" y="225.00" width="10.00" height="225.00" rx="2.00" fill="#ececff" stroke="#9370db" stroke-width="1.0"/>
+<rect x="415.00" y="175.00" width="10.00" height="475.00" rx="2.00" fill="#ececff" stroke="#9370db" stroke-width="1.0"/>
+<rect x="255.00" y="125.00" width="10.00" height="625.00" rx="2.00" fill="#ececff" stroke="#9370db" stroke-width="1.0"/>
+<rect x="735.00" y="375.00" width="10.00" height="525.00" rx="2.00" fill="#ececff" stroke="#9370db" stroke-width="1.0"/>
+<circle cx="100.00" cy="28.00" r="8.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="36.00" x2="100.00" y2="50.00" stroke="#9370db" stroke-width="1.5"/>
+<line x1="86.00" y1="40.90" x2="114.00" y2="40.90" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="50.00" x2="90.00" y2="60.00" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="50.00" x2="110.00" y2="60.00" stroke="#9370db" stroke-width="1.5"/>
+<text x="100.00" y="72.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">User</text>
+<circle cx="100.00" cy="978.00" r="8.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="986.00" x2="100.00" y2="1000.00" stroke="#9370db" stroke-width="1.5"/>
+<line x1="86.00" y1="990.90" x2="114.00" y2="990.90" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="1000.00" x2="90.00" y2="1010.00" stroke="#9370db" stroke-width="1.5"/>
+<line x1="100.00" y1="1000.00" x2="110.00" y2="1010.00" stroke="#9370db" stroke-width="1.5"/>
+<text x="100.00" y="1022.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">User</text>
+<rect x="200.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="260.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Browser</text>
+<rect x="200.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="260.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Browser</text>
+<rect x="360.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="420.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API</text>
+<rect x="360.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="420.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API</text>
+<rect x="520.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="580.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Auth</text>
+<rect x="520.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="580.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Auth</text>
+<rect x="680.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="740.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">DB</text>
+<rect x="680.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="740.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">DB</text>
+<rect x="840.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="900.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">EmailSvc</text>
+<rect x="840.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="900.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">EmailSvc</text>
+<rect x="1000.00" y="20.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="1060.00" y="44.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Audit</text>
+<rect x="1000.00" y="970.00" width="120.00" height="40.00" rx="4.00" fill="#ececff" stroke="#9370db" stroke-width="1.5"/>
+<text x="1060.00" y="994.00" fill="#333333" font-size="14" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Audit</text>
+<line x1="1052.00" y1="892.00" x2="1068.00" y2="908.00" stroke="#cc0000" stroke-width="2.0"/>
+<line x1="1068.00" y1="892.00" x2="1052.00" y2="908.00" stroke="#cc0000" stroke-width="2.0"/>
+<rect x="968.00" y="682.00" width="100.00" height="28.00" rx="4.00" fill="#fffde7" stroke="#f0c040" stroke-width="1.2"/>
+<text x="1018.00" y="700.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">fire-and-forget</text>
+<rect x="48.00" y="882.00" width="744.00" height="28.00" rx="4.00" fill="#fffde7" stroke="#f0c040" stroke-width="1.2"/>
+<text x="420.00" y="900.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Full auth flow complete</text>
+<line x1="100.00" y1="125.00" x2="260.00" y2="125.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="252.0,121.0 260.0,125.0 252.0,129.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="180.00" y="119.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">1. Submit login form</text>
+<line x1="260.00" y1="175.00" x2="420.00" y2="175.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="412.0,171.0 420.0,175.0 412.0,179.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="340.00" y="169.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">2. POST /auth/login</text>
+<line x1="420.00" y1="225.00" x2="580.00" y2="225.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="572.0,221.0 580.0,225.0 572.0,229.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="500.00" y="219.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">3. validate(credentials)</text>
+<line x1="580.00" y1="275.00" x2="620.00" y2="275.00" stroke="#333333" stroke-width="1.5"/>
+<line x1="620.00" y1="275.00" x2="620.00" y2="305.00" stroke="#333333" stroke-width="1.5"/>
+<line x1="620.00" y1="305.00" x2="580.00" y2="305.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="588.0,301.0 580.0,305.0 588.0,309.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="600.00" y="269.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">4. generateChallenge()</text>
+<line x1="580.00" y1="325.00" x2="620.00" y2="325.00" stroke="#333333" stroke-width="1.5"/>
+<line x1="620.00" y1="325.00" x2="620.00" y2="355.00" stroke="#333333" stroke-width="1.5"/>
+<line x1="620.00" y1="355.00" x2="580.00" y2="355.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="588.0,351.0 580.0,355.0 588.0,359.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="600.00" y="319.00" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">5. challenge</text>
+<line x1="580.00" y1="375.00" x2="740.00" y2="375.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="732.0,371.0 740.0,375.0 732.0,379.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="660.00" y="369.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">6. SELECT user WHERE email=?</text>
+<line x1="740.00" y1="425.00" x2="580.00" y2="425.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="588.0,421.0 580.0,425.0 588.0,429.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="660.00" y="419.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">7. user record</text>
+<line x1="580.00" y1="475.00" x2="420.00" y2="475.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="428.0,471.0 420.0,475.0 428.0,479.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="500.00" y="469.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">8. 401 Unauthorized</text>
+<line x1="420.00" y1="525.00" x2="260.00" y2="525.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="268.0,521.0 260.0,525.0 268.0,529.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="340.00" y="519.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">9. 401 error</text>
+<line x1="260.00" y1="575.00" x2="100.00" y2="575.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="108.0,571.0 100.0,575.0 108.0,579.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="180.00" y="569.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">10. Show error message</text>
+<line x1="580.00" y1="625.00" x2="420.00" y2="625.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="428.0,621.0 420.0,625.0 428.0,629.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="500.00" y="619.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">11. JWT token</text>
+<line x1="420.00" y1="675.00" x2="900.00" y2="675.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="892.0,671.0 900.0,675.0 892.0,679.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="660.00" y="669.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">12. Send login alert (async)</text>
+<line x1="420.00" y1="725.00" x2="260.00" y2="725.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="268.0,721.0 260.0,725.0 268.0,729.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="340.00" y="719.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">13. 200 + Set-Cookie</text>
+<line x1="100.00" y1="775.00" x2="260.00" y2="775.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="252.0,771.0 260.0,775.0 252.0,779.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="180.00" y="769.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">14. Navigate to dashboard</text>
+<line x1="260.00" y1="825.00" x2="420.00" y2="825.00" stroke="#333333" stroke-width="1.5"/>
+<polygon points="412.0,821.0 420.0,825.0 412.0,829.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="340.00" y="819.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">15. GET /notifications</text>
+<line x1="420.00" y1="875.00" x2="260.00" y2="875.00" stroke="#333333" stroke-width="1.5" stroke-dasharray="5,3"/>
+<polygon points="268.0,871.0 260.0,875.0 268.0,879.0" fill="#333333" stroke="#333333" stroke-width="1.0"/>
+<text x="340.00" y="869.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">16. []</text>
+</svg>

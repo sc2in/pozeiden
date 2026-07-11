@@ -19,8 +19,10 @@ jobs:
         include:
           - os: ubuntu-latest
             system: x86_64-linux
-          # - os: ubuntu-24.04-arm
-          #   system: aarch64-linux
+          - os: ubuntu-24.04-arm
+            system: aarch64-linux
+          # macOS (x86_64/aarch64-darwin) is declared in flake.nix supportedSystems
+          # but not built/tested here; add macos runners before advertising it.
 
     runs-on: ${{ matrix.os }}
     permissions:

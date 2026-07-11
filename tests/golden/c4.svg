@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="770" height="1272" viewBox="0 0 770 1272">
+<rect x="0.00" y="0.00" width="770.00" height="1272.00" rx="0.00" fill="#ffffff" stroke="#ffffff" stroke-width="0.0"/>
+<text x="385.00" y="60.00" fill="#333333" font-size="18" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Container Diagram — Multi-Tenant SaaS Platform</text>
+<rect x="24.00" y="256.00" width="722.00" height="518.00" rx="6.00" fill="#f5f5f5" stroke="#333333" stroke-width="2.5"/>
+<line x1="24.00" y1="256.00" x2="746.00" y2="256.00" stroke="#333333" stroke-width="2.5" stroke-dasharray="8,4"/>
+<line x1="24.00" y1="256.00" x2="24.00" y2="774.00" stroke="#333333" stroke-width="2.5" stroke-dasharray="8,4"/>
+<line x1="746.00" y1="256.00" x2="746.00" y2="774.00" stroke="#333333" stroke-width="2.5" stroke-dasharray="8,4"/>
+<line x1="24.00" y1="774.00" x2="746.00" y2="774.00" stroke="#333333" stroke-width="2.5" stroke-dasharray="8,4"/>
+<text x="40.00" y="250.00" fill="#333333" font-size="12" text-anchor="start" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">SaaS Platform</text>
+<path d="M 125.0 182.0 C 125.0 227.0 125.0 227.0 125.0 272.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="130.0,263.0 125.0,272.0 120.0,263.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="78.75" y="211.00" width="92.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="221.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Manages apps</text>
+<rect x="88.00" y="227.00" width="74.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="235.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">views logs&quot;</text>
+<path d="M 385.0 182.0 C 385.0 227.0 385.0 227.0 385.0 272.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="390.0,263.0 385.0,272.0 380.0,263.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="325.75" y="211.00" width="118.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="221.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Calls tenant APIs</text>
+<rect x="366.00" y="227.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="235.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<path d="M 645.0 182.0 C 645.0 227.0 125.0 611.0 125.0 656.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="130.0,647.0 125.0,656.0 120.0,647.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="329.00" y="403.00" width="112.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="413.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Views dashboards</text>
+<rect x="366.00" y="419.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="427.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<path d="M 210.0 323.0 C 240.0 373.0 270.0 373.0 300.0 323.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="291.1,328.1 300.0,323.0 299.7,333.3" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="221.75" y="344.50" width="66.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="255.00" y="354.50" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">API calls</text>
+<rect x="221.00" y="360.50" width="68.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="255.00" y="368.50" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS/JSON</text>
+<path d="M 470.0 323.0 C 500.0 373.0 530.0 373.0 560.0 323.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="551.1,328.1 560.0,323.0 559.7,333.3" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="459.00" y="344.50" width="112.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="354.50" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Validates tokens</text>
+<rect x="499.00" y="360.50" width="32.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="368.50" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">gRPC</text>
+<path d="M 385.0 374.0 C 385.0 419.0 385.0 419.0 385.0 464.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="390.0,455.0 385.0,464.0 380.0,455.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="322.50" y="403.00" width="125.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="413.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Routes app traffic</text>
+<rect x="369.00" y="419.00" width="32.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="427.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTP</text>
+<path d="M 645.0 374.0 C 645.0 419.0 385.0 611.0 385.0 656.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="390.0,647.0 385.0,656.0 380.0,647.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="433.00" y="499.00" width="164.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="509.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Reads/writes tenant data</text>
+<rect x="502.00" y="515.00" width="26.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="523.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">SQL</text>
+<path d="M 125.0 566.0 C 125.0 611.0 125.0 803.0 125.0 848.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="130.0,839.0 125.0,848.0 120.0,839.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="59.25" y="691.00" width="131.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="701.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Clones repo on push</text>
+<rect x="106.00" y="707.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="715.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<path d="M 125.0 566.0 C 125.0 611.0 645.0 611.0 645.0 656.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="650.0,647.0 645.0,656.0 640.0,647.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="338.75" y="595.00" width="92.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="605.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Stores images</text>
+<rect x="363.00" y="611.00" width="44.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="619.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">S3 API</text>
+<path d="M 125.0 566.0 C 125.0 611.0 125.0 995.0 125.0 1040.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="130.0,1031.0 125.0,1040.0 120.0,1031.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="56.00" y="787.00" width="138.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="797.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Pushes Docker images</text>
+<rect x="106.00" y="803.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="125.00" y="811.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<path d="M 385.0 566.0 C 385.0 611.0 645.0 611.0 645.0 656.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="650.0,647.0 645.0,656.0 640.0,647.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="462.25" y="595.00" width="105.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="605.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Reads manifests</text>
+<rect x="493.00" y="611.00" width="44.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="515.00" y="619.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">S3 API</text>
+<path d="M 125.0 758.0 C 125.0 803.0 645.0 803.0 645.0 848.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="650.0,839.0 645.0,848.0 640.0,839.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="342.00" y="787.00" width="86.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="797.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Fires alerts</text>
+<rect x="366.00" y="803.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="811.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<path d="M 125.0 374.0 C 125.0 419.0 385.0 803.0 385.0 848.0" fill="none" stroke="#666666" stroke-width="1.5" stroke-dasharray="6,3"/>
+<polygon points="390.0,839.0 385.0,848.0 380.0,839.0" fill="none" stroke="#666666" stroke-width="1.5"/>
+<rect x="182.75" y="595.00" width="144.50" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="255.00" y="605.00" fill="#333333" font-size="12" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Manages subscriptions</text>
+<rect x="236.00" y="611.00" width="38.00" height="14.00" rx="2.00" fill="#ffffff" stroke="none" stroke-width="0.0"/>
+<text x="255.00" y="619.00" fill="#666666" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HTTPS</text>
+<rect x="40.00" y="80.00" width="170.00" height="102.00" rx="4.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<circle cx="125.00" cy="68.00" r="12.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<text x="125.00" y="96.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Person]</text>
+<text x="125.00" y="110.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Developer</text>
+<line x1="40.00" y1="128.00" x2="210.00" y2="128.00" stroke="#052e56" stroke-width="0.5"/>
+<text x="125.00" y="144.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Builds and deploys</text>
+<text x="125.00" y="160.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">applications via the</text>
+<text x="125.00" y="176.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">platform</text>
+<rect x="300.00" y="80.00" width="170.00" height="102.00" rx="4.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<circle cx="385.00" cy="68.00" r="12.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<text x="385.00" y="96.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Person]</text>
+<text x="385.00" y="110.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">End User</text>
+<line x1="300.00" y1="128.00" x2="470.00" y2="128.00" stroke="#052e56" stroke-width="0.5"/>
+<text x="385.00" y="144.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Uses applications</text>
+<text x="385.00" y="160.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">deployed on the platform</text>
+<rect x="560.00" y="80.00" width="170.00" height="102.00" rx="4.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<circle cx="645.00" cy="68.00" r="12.00" fill="#08427b" stroke="#052e56" stroke-width="1.5"/>
+<text x="645.00" y="96.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Person]</text>
+<text x="645.00" y="110.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Platform Operator</text>
+<line x1="560.00" y1="128.00" x2="730.00" y2="128.00" stroke="#052e56" stroke-width="0.5"/>
+<text x="645.00" y="144.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Monitors and manages the</text>
+<text x="645.00" y="160.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">platform</text>
+<rect x="40.00" y="272.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="125.00" y="288.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="125.00" y="302.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Developer Portal</text>
+<text x="125.00" y="316.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[React SPA]</text>
+<line x1="40.00" y1="334.00" x2="210.00" y2="334.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="125.00" y="350.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Self-service UI for app</text>
+<text x="125.00" y="366.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">management</text>
+<rect x="300.00" y="272.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="385.00" y="288.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="385.00" y="302.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">API Gateway</text>
+<text x="385.00" y="316.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Kong / Envoy]</text>
+<line x1="300.00" y1="334.00" x2="470.00" y2="334.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="385.00" y="350.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Routes requests</text>
+<rect x="560.00" y="272.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="645.00" y="288.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="645.00" y="302.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Identity Service</text>
+<text x="645.00" y="316.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Go + gRPC]</text>
+<line x1="560.00" y1="334.00" x2="730.00" y2="334.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="645.00" y="350.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;OAuth2/OIDC</text>
+<rect x="40.00" y="464.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="125.00" y="480.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="125.00" y="494.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Build Service</text>
+<text x="125.00" y="508.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Go]</text>
+<line x1="40.00" y1="526.00" x2="210.00" y2="526.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="125.00" y="542.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Pulls source</text>
+<rect x="300.00" y="464.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="385.00" y="480.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="385.00" y="494.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Deploy Service</text>
+<text x="385.00" y="508.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Go + Kubernetes client]</text>
+<line x1="300.00" y1="526.00" x2="470.00" y2="526.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="385.00" y="542.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Manages Kubernetes</text>
+<text x="385.00" y="558.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">workloads per tenant</text>
+<rect x="560.00" y="464.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="645.00" y="480.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="645.00" y="494.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Logging Service</text>
+<text x="645.00" y="508.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Vector + Loki]</text>
+<line x1="560.00" y1="526.00" x2="730.00" y2="526.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="645.00" y="542.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Aggregates and queries</text>
+<text x="645.00" y="558.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">structured logs</text>
+<rect x="40.00" y="656.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<text x="125.00" y="672.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container]</text>
+<text x="125.00" y="686.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Metrics Service</text>
+<text x="125.00" y="700.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Prometheus + Thanos]</text>
+<line x1="40.00" y1="718.00" x2="210.00" y2="718.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="125.00" y="734.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Collects and stores</text>
+<text x="125.00" y="750.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">long-term metrics</text>
+<rect x="300.00" y="656.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<rect x="300.00" y="656.00" width="170.00" height="10.00" rx="4.00" fill="#2e6295" stroke="#2e6295" stroke-width="0.0"/>
+<rect x="301.00" y="661.00" width="168.00" height="5.00" rx="0.00" fill="#438dd5" stroke="none" stroke-width="0.0"/>
+<text x="385.00" y="672.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container: DB]</text>
+<text x="385.00" y="686.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Tenant Database</text>
+<text x="385.00" y="700.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[PostgreSQL (RDS)]</text>
+<line x1="300.00" y1="718.00" x2="470.00" y2="718.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="385.00" y="734.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Tenant metadata</text>
+<rect x="560.00" y="656.00" width="170.00" height="102.00" rx="4.00" fill="#438dd5" stroke="#2e6295" stroke-width="1.5"/>
+<rect x="560.00" y="656.00" width="170.00" height="10.00" rx="4.00" fill="#2e6295" stroke="#2e6295" stroke-width="0.0"/>
+<rect x="561.00" y="661.00" width="168.00" height="5.00" rx="0.00" fill="#438dd5" stroke="none" stroke-width="0.0"/>
+<text x="645.00" y="672.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Container: DB]</text>
+<text x="645.00" y="686.00" fill="#ffffff" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Artifact Store</text>
+<text x="645.00" y="700.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[S3]</text>
+<line x1="560.00" y1="718.00" x2="730.00" y2="718.00" stroke="#2e6295" stroke-width="0.5"/>
+<text x="645.00" y="734.00" fill="#ffffff" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">&quot;Docker images</text>
+<rect x="40.0" y="848.0" width="170.0" height="102.0" rx="4" fill="#999999" stroke="#666666" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="125.00" y="864.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Software System]</text>
+<text x="125.00" y="878.00" fill="#333333" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">GitHub / GitLab</text>
+<line x1="40.00" y1="896.00" x2="210.00" y2="896.00" stroke="#666666" stroke-width="0.5"/>
+<text x="125.00" y="912.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Source code hosting and</text>
+<text x="125.00" y="928.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">webhooks</text>
+<rect x="300.0" y="848.0" width="170.0" height="102.0" rx="4" fill="#999999" stroke="#666666" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="385.00" y="864.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Software System]</text>
+<text x="385.00" y="878.00" fill="#333333" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Stripe</text>
+<line x1="300.00" y1="896.00" x2="470.00" y2="896.00" stroke="#666666" stroke-width="0.5"/>
+<text x="385.00" y="912.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Subscription billing and</text>
+<text x="385.00" y="928.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">invoicing</text>
+<rect x="560.0" y="848.0" width="170.0" height="102.0" rx="4" fill="#999999" stroke="#666666" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="645.00" y="864.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Software System]</text>
+<text x="645.00" y="878.00" fill="#333333" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">PagerDuty</text>
+<line x1="560.00" y1="896.00" x2="730.00" y2="896.00" stroke="#666666" stroke-width="0.5"/>
+<text x="645.00" y="912.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">On-call alerting and</text>
+<text x="645.00" y="928.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">incident management</text>
+<rect x="40.0" y="1040.0" width="170.0" height="102.0" rx="4" fill="#999999" stroke="#666666" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="125.00" y="1056.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">[Software System]</text>
+<text x="125.00" y="1070.00" fill="#333333" font-size="13" text-anchor="middle" font-weight="bold" font-family="trebuchet ms, verdana, arial, sans-serif">Container Registry</text>
+<line x1="40.00" y1="1088.00" x2="210.00" y2="1088.00" stroke="#666666" stroke-width="0.5"/>
+<text x="125.00" y="1104.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">GHCR / ECR — stores</text>
+<text x="125.00" y="1120.00" fill="#333333" font-size="11" text-anchor="middle" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">tenant images</text>
+</svg>
