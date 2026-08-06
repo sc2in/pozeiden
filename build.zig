@@ -197,8 +197,13 @@ pub fn build(b: *std.Build) void {
         b.path("playground/index.html"),
         "playground/index.html",
     );
+    const install_shim = b.addInstallFile(
+        b.path("playground/wasi-shim.js"),
+        "playground/wasi-shim.js",
+    );
     playground_step.dependOn(&install_wasm.step);
     playground_step.dependOn(&install_html.step);
+    playground_step.dependOn(&install_shim.step);
 
     // Copy .mmd example files into zig-out/playground/examples/ so the
     // playground can fetch them at runtime without hardcoding their content.
@@ -232,6 +237,9 @@ pub fn build(b: *std.Build) void {
 
     const site_html = b.addInstallFile(b.path("playground/index.html"), "site/index.html");
     site_step.dependOn(&site_html.step);
+
+    const site_shim = b.addInstallFile(b.path("playground/wasi-shim.js"), "site/wasi-shim.js");
+    site_step.dependOn(&site_shim.step);
 
     for (example_names_pg) |name| {
         const install_mmd = b.addInstallFile(

@@ -110,6 +110,24 @@
         installPhase = "touch $out";
         meta = (old.meta or {}) // {description = "Smoke-run the fuzz targets";};
       });
+      # Build the wasm32-wasi playground module AND instantiate it. A build-only
+      # check is not enough: issue #48 shipped a module that compiled fine but
+      # failed WebAssembly.instantiate with a LinkError (an unshimmed WASI
+      # import). The Node smoke test loads the module with the real playground
+      # shim and renders a diagram, so import-set and ABI drift fail every PR
+      # instead of surfacing after a deploy.
+      wasm = self.packages.${system}.default.overrideAttrs (old: {
+        pname = "pozeiden-wasm-check";
+        nativeBuildInputs =
+          (old.nativeBuildInputs or [])
+          ++ [nixpkgs.legacyPackages.${system}.nodejs];
+        buildPhase = ''
+          zig build playground
+          node tests/wasm_smoke.mjs
+        '';
+        installPhase = "install -Dm644 zig-out/playground/pozeiden.wasm $out/pozeiden.wasm";
+        meta = (old.meta or {}) // {description = "Build + instantiate the WASM playground module";};
+      });
     });
 
     devShells = forAllSystems (
@@ -229,6 +247,41 @@
         in {
           type = "app";
           program = "${benchApp}/bin/pozeiden-bench";
+        };
+
+        # `nix run .#check-release -- <tag>` — release-tag guards (CHANGELOG
+        # updated since the previous tag; version stamp matches the tag). Run
+        # by CI on tag pushes before anything is built or published.
+        check-release = let
+          app = pkgs.writeShellApplication {
+            name = "pozeiden-check-release";
+            runtimeInputs = [pkgs.git pkgs.gnugrep];
+            text = ''
+              cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+              exec bash tools/check-release.sh "$@"
+            '';
+          };
+        in {
+          type = "app";
+          program = "${app}/bin/pozeiden-check-release";
+          meta.description = "Verify CHANGELOG + version stamp for a release tag";
+        };
+
+        # `nix run .#sbom > sbom.cdx.json` — CycloneDX SBOM of the Zig deps
+        # compiled into the shipped binary. Attached to GitHub releases by CI.
+        sbom = let
+          app = pkgs.writeShellApplication {
+            name = "pozeiden-sbom";
+            runtimeInputs = [pkgs.git pkgs.jq];
+            text = ''
+              cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+              exec bash tools/sbom.sh "$@"
+            '';
+          };
+        in {
+          type = "app";
+          program = "${app}/bin/pozeiden-sbom";
+          meta.description = "Generate a CycloneDX SBOM of compiled-in Zig dependencies";
         };
 
         # `nix run .` — render a diagram from stdin
