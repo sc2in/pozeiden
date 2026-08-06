@@ -16,6 +16,8 @@ Deprecated section of 0.4.0).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-06
+
 ### Fixed
 
 - **YAML front matter corrupted rendered output.** Front matter was stripped
