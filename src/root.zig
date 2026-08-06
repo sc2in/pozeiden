@@ -17,6 +17,7 @@ const detect = @import("detect.zig");
 /// Re-exported from `detect.zig` for library consumers.
 pub const DiagramType = detect.DiagramType;
 const Value = @import("diagram/value.zig").Value;
+const parse_util = @import("parse_util.zig");
 
 const langium_ast = @import("langium/ast.zig");
 const langium_parser = @import("langium/parser.zig");
@@ -176,10 +177,118 @@ fn renderImpl(allocator: std.mem.Allocator, mermaid_text: []const u8, input_limi
     // A limit of 0 disables the check (renderWithOptions opt-in only).
     if (input_limit != 0 and mermaid_text.len > input_limit) return error.InputTooLarge;
 
-    // Strip a leading YAML front-matter block once, before dispatch, so its
-    // body lines (`title:`, `config:` …) never reach a parser — the parsers
-    // would otherwise treat them as diagram content (e.g. flowchart nodes).
-    const body = detect.stripFrontmatter(mermaid_text);
+    var pre = try preprocess(allocator, mermaid_text);
+    defer pre.deinit(allocator);
+    return renderPreprocessed(allocator, &pre);
+}
+
+/// Diagram source with front matter and accessibility directives factored
+/// out before dispatch: parsers would otherwise treat `title:`/`accTitle:`
+/// lines as diagram content (e.g. flowchart nodes).
+const Preprocessed = struct {
+    /// Diagram text with front matter and acc lines removed.  Points into the
+    /// original input unless acc-line removal forced `owned_body`.
+    body: []const u8,
+    owned_body: ?[]u8 = null,
+    /// Front-matter `title:` value (owned).
+    title: ?[]u8 = null,
+    /// `accTitle:` value (owned).
+    acc_title: ?[]u8 = null,
+    /// `accDescr:` / `accDescr { … }` value (owned).
+    acc_descr: ?[]u8 = null,
+
+    fn deinit(self: *const Preprocessed, allocator: std.mem.Allocator) void {
+        if (self.owned_body) |b| allocator.free(b);
+        if (self.title) |t| allocator.free(t);
+        if (self.acc_title) |t| allocator.free(t);
+        if (self.acc_descr) |d| allocator.free(d);
+    }
+};
+
+fn preprocess(allocator: std.mem.Allocator, text: []const u8) !Preprocessed {
+    const fm = detect.splitFrontmatter(text);
+    var result = Preprocessed{ .body = fm.body };
+    errdefer result.deinit(allocator);
+
+    // Front-matter `title:` — the first one wins, quotes stripped.
+    var fm_lines = std.mem.splitScalar(u8, fm.block, '\n');
+    while (fm_lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (!std.mem.startsWith(u8, line, "title:")) continue;
+        const v = parse_util.stripQuotes(line["title:".len..]);
+        if (v.len > 0) result.title = try allocator.dupe(u8, v);
+        break;
+    }
+
+    // Fast path: no accessibility directives anywhere → zero-copy body.
+    if (std.mem.indexOf(u8, fm.body, "accTitle") == null and
+        std.mem.indexOf(u8, fm.body, "accDescr") == null)
+        return result;
+
+    // Slow path: rebuild the body without the acc lines, capturing their
+    // values.  Later directives overwrite earlier ones (mermaid semantics).
+    var cleaned: std.ArrayList(u8) = .empty;
+    errdefer cleaned.deinit(allocator);
+    var descr_buf: std.ArrayList(u8) = .empty;
+    defer descr_buf.deinit(allocator);
+
+    var in_descr_block = false;
+    var it = std.mem.splitScalar(u8, fm.body, '\n');
+    var first_line = true;
+    while (it.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        if (in_descr_block) {
+            if (std.mem.eql(u8, line, "}")) {
+                in_descr_block = false;
+                if (result.acc_descr) |d| allocator.free(d);
+                result.acc_descr = try allocator.dupe(u8, std.mem.trim(u8, descr_buf.items, " "));
+            } else if (line.len > 0) {
+                if (descr_buf.items.len > 0) try descr_buf.append(allocator, ' ');
+                try descr_buf.appendSlice(allocator, line);
+            }
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "accTitle:")) {
+            const v = std.mem.trim(u8, line["accTitle:".len..], " \t");
+            if (result.acc_title) |t| allocator.free(t);
+            result.acc_title = try allocator.dupe(u8, v);
+            continue;
+        }
+        if (std.mem.startsWith(u8, line, "accDescr")) {
+            const rest = std.mem.trimStart(u8, line["accDescr".len..], " \t");
+            if (rest.len > 0 and rest[0] == ':') {
+                const v = std.mem.trim(u8, rest[1..], " \t");
+                if (result.acc_descr) |d| allocator.free(d);
+                result.acc_descr = try allocator.dupe(u8, v);
+                continue;
+            }
+            if (rest.len > 0 and rest[0] == '{') {
+                const inner = std.mem.trim(u8, rest[1..], " \t");
+                if (std.mem.indexOfScalar(u8, inner, '}')) |close| {
+                    // Single-line block form: accDescr { … }
+                    if (result.acc_descr) |d| allocator.free(d);
+                    result.acc_descr = try allocator.dupe(u8, std.mem.trim(u8, inner[0..close], " \t"));
+                } else {
+                    in_descr_block = true;
+                    descr_buf.clearRetainingCapacity();
+                    try descr_buf.appendSlice(allocator, inner);
+                }
+                continue;
+            }
+            // "accDescr" with neither ':' nor '{' — not a directive; keep it.
+        }
+        if (!first_line) try cleaned.append(allocator, '\n');
+        try cleaned.appendSlice(allocator, raw);
+        first_line = false;
+    }
+
+    result.owned_body = try cleaned.toOwnedSlice(allocator);
+    result.body = result.owned_body.?;
+    return result;
+}
+
+fn renderPreprocessed(allocator: std.mem.Allocator, pre: *const Preprocessed) ![]const u8 {
+    const body = pre.body;
 
     // Apply %%{init: {...}}%% directive overrides for this render call.
     const applied_init = applyInitDirective(body);
@@ -187,29 +296,71 @@ fn renderImpl(allocator: std.mem.Allocator, mermaid_text: []const u8, input_limi
 
     const diagram_type = detect.detect(body);
 
-    switch (diagram_type) {
-        .pie => return renderLangium(allocator, body, try getPieCache(), pie_renderer.render),
-        .gitgraph => return renderLangium(allocator, body, try getGitCache(), gitgraph_renderer.render),
-        .flowchart => return flowchart_parser.render(allocator, body),
-        .sequence => return sequence_parser.render(allocator, body),
-        .class => return class_parser.render(allocator, body),
-        .state => return state_parser.render(allocator, body),
-        .er => return er_parser.render(allocator, body),
-        .gantt => return gantt_parser.render(allocator, body),
-        .timeline => return timeline_parser.render(allocator, body),
-        .xychart => return xychart_parser.render(allocator, body),
-        .quadrant => return quadrant_parser.render(allocator, body),
-        .mindmap => return mindmap_parser.render(allocator, body),
-        .sankey => return sankey_parser.render(allocator, body),
-        .c4 => return c4_parser.render(allocator, body),
-        .block => return block_parser.render(allocator, body),
-        .requirement => return requirement_parser.render(allocator, body),
-        .kanban => return kanban_parser.render(allocator, body),
-        .unknown => {
-            // Emit a simple fallback SVG for unrecognised diagram types
-            return renderUnknown(allocator, body);
-        },
+    const svg = switch (diagram_type) {
+        .pie => try renderLangium(allocator, body, try getPieCache(), pie_renderer.render),
+        .gitgraph => try renderLangium(allocator, body, try getGitCache(), gitgraph_renderer.render),
+        .flowchart => try flowchart_parser.render(allocator, body),
+        .sequence => try sequence_parser.render(allocator, body),
+        .class => try class_parser.render(allocator, body),
+        .state => try state_parser.render(allocator, body),
+        .er => try er_parser.render(allocator, body),
+        .gantt => try gantt_parser.render(allocator, body),
+        .timeline => try timeline_parser.render(allocator, body),
+        .xychart => try xychart_parser.render(allocator, body),
+        .quadrant => try quadrant_parser.render(allocator, body),
+        .mindmap => try mindmap_parser.render(allocator, body),
+        .sankey => try sankey_parser.render(allocator, body),
+        .c4 => try c4_parser.render(allocator, body),
+        .block => try block_parser.render(allocator, body),
+        .requirement => try requirement_parser.render(allocator, body),
+        .kanban => try kanban_parser.render(allocator, body),
+        // Emit a simple fallback SVG for unrecognised diagram types.
+        .unknown => try renderUnknown(allocator, body),
+    };
+
+    // Accessibility metadata is injected only when the input declared some,
+    // so plain renders stay byte-identical.
+    const title = pre.acc_title orelse pre.title;
+    if (title == null and pre.acc_descr == null) return svg;
+    defer allocator.free(svg);
+    return injectAccessibility(allocator, svg, title, pre.acc_descr);
+}
+
+/// Rewrite the root `<svg …>` opening tag to carry `role="img"` +
+/// `aria-labelledby`, and insert `<title>`/`<desc>` children right after it,
+/// sourcing mermaid `accTitle:`/`accDescr:` directives and the front-matter
+/// `title:`.  Screen readers announce these; consumers embedding the SVG
+/// (e.g. PolicyPress) no longer need to hardcode a generic label.
+fn injectAccessibility(
+    allocator: std.mem.Allocator,
+    svg: []const u8,
+    title: ?[]const u8,
+    descr: ?[]const u8,
+) ![]const u8 {
+    const writer_mod = @import("svg/writer.zig");
+    const tag_start = std.mem.indexOf(u8, svg, "<svg ") orelse return allocator.dupe(u8, svg);
+    const tag_end = std.mem.indexOfScalarPos(u8, svg, tag_start, '>') orelse return allocator.dupe(u8, svg);
+
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+    try out.appendSlice(allocator, svg[0..tag_end]);
+    try out.appendSlice(allocator, " role=\"img\" aria-labelledby=\"");
+    if (title != null) try out.appendSlice(allocator, "pz-title");
+    if (title != null and descr != null) try out.append(allocator, ' ');
+    if (descr != null) try out.appendSlice(allocator, "pz-desc");
+    try out.appendSlice(allocator, "\">");
+    if (title) |t| {
+        try out.appendSlice(allocator, "<title id=\"pz-title\">");
+        try writer_mod.xmlEscape(&out, allocator, t);
+        try out.appendSlice(allocator, "</title>");
     }
+    if (descr) |d| {
+        try out.appendSlice(allocator, "<desc id=\"pz-desc\">");
+        try writer_mod.xmlEscape(&out, allocator, d);
+        try out.appendSlice(allocator, "</desc>");
+    }
+    try out.appendSlice(allocator, svg[tag_end + 1 ..]);
+    return out.toOwnedSlice(allocator);
 }
 
 /// Options for `renderWithOptions`.
@@ -264,6 +415,74 @@ pub fn renderWithOptions(
     const scaled = scaleSvg(allocator, svg, options) catch return svg;
     allocator.free(svg);
     return scaled;
+}
+
+/// Result of `renderWithMetadata`.  Free with `deinit`.
+pub const RenderResult = struct {
+    /// The rendered SVG (identical to what `renderWithOptions` returns,
+    /// including the embedded `<title>`/`<desc>` when metadata is present).
+    svg: []const u8,
+    /// The detected diagram type.
+    diagram_type: DiagramType,
+    /// Accessible title: `accTitle:` if declared, else the front-matter
+    /// `title:`.  Useful as `alt`/`aria-label` text where the SVG's embedded
+    /// `<title>` is unreachable (e.g. `<img>` or PDF embedding).
+    title: ?[]const u8,
+    /// Accessible description from `accDescr:` / `accDescr { … }`.
+    descr: ?[]const u8,
+
+    pub fn deinit(self: *const RenderResult, allocator: std.mem.Allocator) void {
+        allocator.free(self.svg);
+        if (self.title) |t| allocator.free(t);
+        if (self.descr) |d| allocator.free(d);
+    }
+};
+
+/// Like `renderWithOptions`, but also returns the detected diagram type and
+/// the diagram's accessibility metadata as separate strings, for consumers
+/// that embed the SVG somewhere its own `<title>`/`<desc>` cannot be read
+/// (raster conversion, `<img>` tags, PDF figures).
+pub fn renderWithMetadata(
+    allocator: std.mem.Allocator,
+    mermaid_text: []const u8,
+    options: RenderOptions,
+) !RenderResult {
+    if (options.strict and detect.detect(mermaid_text) == .unknown)
+        return error.UnknownDiagramType;
+    theme.applyOverride(options.theme_override);
+    defer theme.resetToDefaults();
+
+    if (options.max_input_bytes != 0 and mermaid_text.len > options.max_input_bytes)
+        return error.InputTooLarge;
+
+    var pre = try preprocess(allocator, mermaid_text);
+    var pre_owns_metadata = true;
+    defer if (pre_owns_metadata) pre.deinit(allocator) else {
+        if (pre.owned_body) |b| allocator.free(b);
+    };
+
+    var svg = try renderPreprocessed(allocator, &pre);
+    const needs_scale = options.max_width != 0 or options.max_height != 0 or options.scale != 1.0;
+    if (needs_scale) {
+        if (scaleSvg(allocator, svg, options)) |scaled| {
+            allocator.free(svg);
+            svg = scaled;
+        } else |_| {}
+    }
+
+    // Transfer metadata ownership to the result: the preferred title moves
+    // out; whichever strings are not returned are freed here.
+    const title: ?[]const u8 = pre.acc_title orelse pre.title;
+    if (pre.acc_title != null and pre.title != null) allocator.free(pre.title.?);
+    const descr: ?[]const u8 = pre.acc_descr;
+    pre_owns_metadata = false;
+
+    return .{
+        .svg = svg,
+        .diagram_type = detect.detect(pre.body),
+        .title = title,
+        .descr = descr,
+    };
 }
 
 /// Parse the `width` and `height` attributes from the root `<svg ...>` element

@@ -14,17 +14,23 @@ const DiagramType = pozeiden.DiagramType;
 const parseSvgDimAttr = pozeiden.parseSvgDimAttr;
 
 test "front matter is stripped before rendering" {
-    // The stripped render must be byte-identical to the same diagram without
-    // front matter — previously `title: My Chart` and `graph TD` leaked into
-    // the flowchart parser and became nodes.
+    // A titleless front-matter render must be byte-identical to the same
+    // diagram without front matter — previously the block leaked into the
+    // flowchart parser and its lines became nodes.
     const bare = "graph TD\n  A[Start] --> B[End]\n";
-    const with_fm = "---\ntitle: My Chart\nconfig:\n  layout: dagre\n---\n" ++ bare;
+    const with_fm = "---\nconfig:\n  layout: dagre\n---\n" ++ bare;
     const expected = try render(std.testing.allocator, bare);
     defer std.testing.allocator.free(expected);
     const actual = try render(std.testing.allocator, with_fm);
     defer std.testing.allocator.free(actual);
     try std.testing.expectEqualStrings(expected, actual);
-    try std.testing.expect(std.mem.indexOf(u8, actual, "My Chart") == null);
+
+    // With a front-matter title, the title text appears only as SVG metadata
+    // (<title>), never as a diagram node (<text>).
+    const titled = try render(std.testing.allocator, "---\ntitle: My Chart\n---\n" ++ bare);
+    defer std.testing.allocator.free(titled);
+    try std.testing.expect(std.mem.indexOf(u8, titled, "<title id=\"pz-title\">My Chart</title>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, titled, ">My Chart</text>") == null);
 }
 
 test "front matter followed by init directive still applies the directive" {
@@ -47,10 +53,81 @@ test "unterminated front matter is still treated as ordinary content" {
 test "front-matter-only input falls back to the unknown renderer" {
     const svg = try render(std.testing.allocator, "---\ntitle: nothing else\n---\n");
     defer std.testing.allocator.free(svg);
-    // The unknown fallback is a fixed 400x120 placeholder, and the stripped
-    // body is empty, so no front-matter text may leak into it.
+    // The unknown fallback is a fixed 400x120 placeholder; the front-matter
+    // title may appear only as SVG metadata, never as rendered diagram text.
     try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
-    try std.testing.expect(std.mem.indexOf(u8, svg, "nothing else") == null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, ">nothing else</text>") == null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<title id=\"pz-title\">nothing else</title>") != null);
+}
+
+test "accTitle/accDescr become SVG title/desc with aria wiring" {
+    const gpa = std.testing.allocator;
+    const input = "graph TD\naccTitle: Deploy pipeline\naccDescr: Build, test and ship\nA-->B\n";
+    const svg = try render(gpa, input);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "role=\"img\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "aria-labelledby=\"pz-title pz-desc\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<title id=\"pz-title\">Deploy pipeline</title>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<desc id=\"pz-desc\">Build, test and ship</desc>") != null);
+    // The directives must not leak into the diagram as nodes.
+    try std.testing.expect(std.mem.indexOf(u8, svg, "accTitle") == null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "accDescr") == null);
+}
+
+test "accDescr block form is captured and removed" {
+    const gpa = std.testing.allocator;
+    const input = "graph TD\naccDescr {\n  spans multiple\n  lines\n}\nA-->B\n";
+    const svg = try render(gpa, input);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<desc id=\"pz-desc\">spans multiple lines</desc>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "aria-labelledby=\"pz-desc\"") != null);
+}
+
+test "front-matter title becomes the SVG title" {
+    const gpa = std.testing.allocator;
+    const input = "---\ntitle: \"Quarterly Plan\"\n---\ngraph TD\nA-->B\n";
+    const svg = try render(gpa, input);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<title id=\"pz-title\">Quarterly Plan</title>") != null);
+}
+
+test "accessibility metadata is escaped in the SVG" {
+    const gpa = std.testing.allocator;
+    const input = "graph TD\naccTitle: </title><script>alert(1)</script>\nA-->B\n";
+    const svg = try render(gpa, input);
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<script>") == null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "&lt;script&gt;") != null);
+}
+
+test "no accessibility metadata leaves the output untouched" {
+    const gpa = std.testing.allocator;
+    const svg = try render(gpa, "graph TD\nA-->B\n");
+    defer gpa.free(svg);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "role=\"img\"") == null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<title") == null);
+}
+
+test "renderWithMetadata returns type, title and description" {
+    const gpa = std.testing.allocator;
+    const input = "---\ntitle: FM Title\n---\ngraph TD\naccDescr: what it shows\nA-->B\n";
+    const result = try pozeiden.renderWithMetadata(gpa, input, .{});
+    defer result.deinit(gpa);
+    try std.testing.expectEqual(DiagramType.flowchart, result.diagram_type);
+    // No accTitle declared, so the front-matter title is the accessible name.
+    try std.testing.expectEqualStrings("FM Title", result.title.?);
+    try std.testing.expectEqualStrings("what it shows", result.descr.?);
+    try std.testing.expect(std.mem.startsWith(u8, result.svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, result.svg, "<title id=\"pz-title\">FM Title</title>") != null);
+}
+
+test "renderWithMetadata prefers accTitle over front-matter title" {
+    const gpa = std.testing.allocator;
+    const input = "---\ntitle: FM Title\n---\ngraph TD\naccTitle: Acc Title\nA-->B\n";
+    const result = try pozeiden.renderWithMetadata(gpa, input, .{});
+    defer result.deinit(gpa);
+    try std.testing.expectEqualStrings("Acc Title", result.title.?);
+    try std.testing.expect(result.descr == null);
 }
 
 test "detect and render pie" {
