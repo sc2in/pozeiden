@@ -136,13 +136,19 @@ pub const RenderError = error{
     /// A grammar file embedded in the binary failed to parse (should not occur
     /// with an unmodified build).
     ParseError,
-    /// The input exceeded `max_input_bytes`.  Guards against resource-exhaustion
+    /// The input exceeded `max_input_bytes` (or the per-call
+    /// `RenderOptions.max_input_bytes`).  Guards against resource-exhaustion
     /// from untrusted input on the library and C-API paths (which are otherwise
     /// unbounded — the CLI/WASM wrappers impose their own byte limits).
     InputTooLarge,
-    /// The diagram declared more nodes/edges than a renderer will lay out (see
-    /// `svg/layout.zig` limits).  Guards against super-linear layout cost.
+    /// The diagram declared more nodes/edges/subgraphs than a renderer will
+    /// lay out (see `svg/layout.zig` limits).  Guards against excessive
+    /// memory and output size.
     DiagramTooLarge,
+    /// A recursive structure (mindmap children) nested deeper than
+    /// `renderers/mindmap.zig`'s `max_nesting_depth`.  Guards against stack
+    /// exhaustion from untrusted input, particularly on WASM's fixed stack.
+    NestingTooDeep,
     /// Memory allocation failed.
     OutOfMemory,
 };
@@ -161,9 +167,14 @@ pub const max_input_bytes: usize = 4 * 1024 * 1024;
 ///
 /// The caller owns the returned slice and must free it with `allocator`.
 pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u8 {
+    return renderImpl(allocator, mermaid_text, max_input_bytes);
+}
+
+fn renderImpl(allocator: std.mem.Allocator, mermaid_text: []const u8, input_limit: usize) ![]const u8 {
     // Bound untrusted input up front so every entry point (library, C API,
     // renderWithOptions) is protected, not just the CLI/WASM wrappers.
-    if (mermaid_text.len > max_input_bytes) return error.InputTooLarge;
+    // A limit of 0 disables the check (renderWithOptions opt-in only).
+    if (input_limit != 0 and mermaid_text.len > input_limit) return error.InputTooLarge;
 
     // Strip a leading YAML front-matter block once, before dispatch, so its
     // body lines (`title:`, `config:` …) never reach a parser — the parsers
@@ -224,6 +235,12 @@ pub const RenderOptions = struct {
     /// Uniform scale factor applied to the SVG `viewBox` (e.g. `0.5` = 50%).
     /// Ignored when `max_width` or `max_height` are non-zero.
     scale: f32 = 1.0,
+
+    /// Maximum accepted input size in bytes for this call.  Defaults to the
+    /// module-level `max_input_bytes` (4 MiB).  Embedders rendering untrusted
+    /// input can tighten it per call site; `0` disables the limit entirely —
+    /// only do that for input you generated yourself.
+    max_input_bytes: usize = max_input_bytes,
 };
 
 /// Like `render`, but accepts a `RenderOptions` to customise the output.
@@ -238,7 +255,7 @@ pub fn renderWithOptions(
         return error.UnknownDiagramType;
     theme.applyOverride(options.theme_override);
     defer theme.resetToDefaults();
-    const svg = try render(allocator, mermaid_text);
+    const svg = try renderImpl(allocator, mermaid_text, options.max_input_bytes);
 
     const needs_scale = options.max_width != 0 or options.max_height != 0 or options.scale != 1.0;
     if (!needs_scale) return svg;

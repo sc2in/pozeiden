@@ -148,6 +148,82 @@ test "render accepts input at the max_input_bytes boundary" {
     try std.testing.expect(std.mem.indexOf(u8, svg, "<svg") != null);
 }
 
+test "render rejects a deeply nested mindmap with NestingTooDeep" {
+    const gpa = std.testing.allocator;
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    try buf.appendSlice(gpa, "mindmap\nroot((r))\n");
+    // 150 levels of two-space indent (> mindmap max_nesting_depth = 100):
+    // the radial layout recurses once per level, so unbounded depth is a
+    // stack-exhaustion vector (especially on WASM's fixed stack).
+    var depth: usize = 1;
+    while (depth <= 150) : (depth += 1) {
+        for (0..depth) |_| try buf.appendSlice(gpa, "  ");
+        try buf.print(gpa, "n{d}\n", .{depth});
+    }
+    try std.testing.expectError(error.NestingTooDeep, render(gpa, buf.items));
+}
+
+test "render rejects a flowchart subgraph bomb with DiagramTooLarge" {
+    const gpa = std.testing.allocator;
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    try buf.appendSlice(gpa, "graph TD\n");
+    // 600 nested subgraphs (> flowchart max_subgraphs = 500). Every node
+    // records membership in all enclosing subgraphs, so unbounded nesting
+    // lets a small input demand quadratic storage and rendering work.
+    var i: usize = 0;
+    while (i < 600) : (i += 1) try buf.print(gpa, "subgraph s{d}\n", .{i});
+    try std.testing.expectError(error.DiagramTooLarge, render(gpa, buf.items));
+}
+
+test "renderWithOptions max_input_bytes tightens and loosens the limit" {
+    const gpa = std.testing.allocator;
+    const input = "graph TD\nA-->B\n";
+    // Tightened per-call limit rejects input the default would accept …
+    try std.testing.expectError(
+        error.InputTooLarge,
+        renderWithOptions(gpa, input, .{ .max_input_bytes = 4 }),
+    );
+    // … an explicit larger/disabled limit accepts it, and the boundary is
+    // inclusive.
+    const at_boundary = try renderWithOptions(gpa, input, .{ .max_input_bytes = input.len });
+    defer gpa.free(at_boundary);
+    try std.testing.expect(std.mem.startsWith(u8, at_boundary, "<svg"));
+    const unlimited = try renderWithOptions(gpa, input, .{ .max_input_bytes = 0 });
+    defer gpa.free(unlimited);
+    try std.testing.expectEqualStrings(at_boundary, unlimited);
+}
+
+test "control bytes in labels are dropped from the SVG output" {
+    const gpa = std.testing.allocator;
+    const svg = try render(gpa, "graph TD\nA[\x01bad\x1flabel\x7f] --> B\n");
+    defer gpa.free(svg);
+    // XML 1.0 cannot represent bytes < 0x20 (other than \t \n \r) even as
+    // character references; they must not reach the output.
+    for (svg) |c| {
+        try std.testing.expect(c == '\t' or c == '\n' or c == '\r' or c >= 0x20);
+    }
+    try std.testing.expect(std.mem.indexOf(u8, svg, "badlabel") != null);
+}
+
+test "block-beta negative or huge columns/width values are clamped" {
+    const gpa = std.testing.allocator;
+    // Negative / NaN / oversized floats previously flowed into
+    // @intFromFloat(usize) in the renderer — UB in unchecked builds.
+    const cases = [_][]const u8{
+        "block-beta\ncolumns -5\nA B C\n",
+        "block-beta\ncolumns nan\nA B C\n",
+        "block-beta\ncolumns 1e30\nA B C\n",
+        "block-beta\ncolumns 3\nA:-7 B C\n",
+    };
+    for (cases) |input| {
+        const svg = try render(gpa, input);
+        defer gpa.free(svg);
+        try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    }
+}
+
 test "render rejects an oversized flowchart with DiagramTooLarge" {
     const gpa = std.testing.allocator;
     var buf: std.ArrayList(u8) = .empty;

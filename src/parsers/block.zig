@@ -36,6 +36,11 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
         // columns N
         if (std.mem.startsWith(u8, line, "columns ")) {
             n_cols = std.fmt.parseFloat(f64, std.mem.trim(u8, line[8..], " \t")) catch 3.0;
+            // Clamp at the parse boundary: the renderer converts this to a
+            // usize, and a negative / NaN / huge value from hostile input
+            // would be undefined behaviour there in unchecked builds. The
+            // negated comparison rejects NaN too.
+            if (!(n_cols >= 1.0 and n_cols <= 1000.0)) n_cols = 3.0;
             continue;
         }
 
@@ -119,7 +124,10 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
             } else id;
             if (!is_space and seen_ids.get(id) != null) continue;
             if (!is_space) try seen_ids.put(id, {});
-            const width = std.fmt.parseFloat(f64, width_str) catch 1.0;
+            var width = std.fmt.parseFloat(f64, width_str) catch 1.0;
+            // Same parse-boundary clamp as `columns`: the renderer converts
+            // the span to a usize.
+            if (!(width >= 1.0 and width <= 1000.0)) width = 1.0;
             var bn = Value.Node{ .type_name = "block", .fields = .{} };
             try bn.fields.put(a, "id", Value{ .string = effective_id });
             try bn.fields.put(a, "label", Value{ .string = if (is_space) "" else lbl });

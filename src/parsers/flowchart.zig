@@ -12,6 +12,10 @@ const stripQuotes = parse_util.stripQuotes;
 const Value = @import("../diagram/value.zig").Value;
 const flowchart_renderer = @import("../renderers/flowchart.zig");
 
+/// Maximum number of subgraphs a flowchart may declare; more yields
+/// `error.DiagramTooLarge` (see the check at the `subgraph` keyword).
+pub const max_subgraphs: usize = 500;
+
 /// Extract a CSS-style property value from a comma-separated style string.
 /// e.g. flowchartParseProp("fill:#f9f,stroke:#333", "fill") → "#f9f"
 fn flowchartParseProp(style: []const u8, prop: []const u8) ?[]const u8 {
@@ -293,6 +297,11 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
                 break :blk .{ lbl, lbl };
             };
             const sg_idx = subgraphs.items.len;
+            // Cap the subgraph count: every node records membership in all
+            // of its enclosing subgraphs, so unbounded nesting lets a small
+            // input demand quadratic membership storage and rendering work.
+            // 500 is far beyond any legible flowchart.
+            if (sg_idx >= max_subgraphs) return error.DiagramTooLarge;
             try subgraphs.append(a, .{ .id = sg_id, .label = label, .members = .empty });
             try subgraph_stack.append(a, sg_idx);
             continue;

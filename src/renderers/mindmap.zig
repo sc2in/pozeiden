@@ -17,6 +17,12 @@ const NODE_W: f32 = 88;
 const NODE_H: f32 = 28;
 const MARGIN: f32 = 60;
 
+/// Maximum mindmap tree depth.  `flattenNode`/`layoutChildren` recurse once
+/// per level, so unbounded depth risks call-stack exhaustion — especially on
+/// WASM's fixed stack.  Real mindmaps are under 10 levels deep; deeper input
+/// yields `error.NestingTooDeep`.
+pub const max_nesting_depth: usize = 100;
+
 const MmShape = enum { circle, rect, rounded, hexagon, ellipse, cloud, bang };
 
 const MmNode = struct {
@@ -138,6 +144,7 @@ fn flattenNode(
     parent_idx: usize,
     depth: usize,
 ) !void {
+    if (depth > max_nesting_depth) return error.NestingTooDeep;
     const n = value.asNode() orelse return;
     const label = n.getString("label") orelse "";
     const shape_str = n.getString("shape") orelse "ellipse";

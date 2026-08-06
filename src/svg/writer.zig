@@ -431,7 +431,13 @@ pub fn xmlEscape(buf: *std.ArrayList(u8), allocator: std.mem.Allocator, s: []con
             '>' => try buf.appendSlice(allocator, "&gt;"),
             '"' => try buf.appendSlice(allocator, "&quot;"),
             '\'' => try buf.appendSlice(allocator, "&#39;"),
-            else => try buf.append(allocator, c),
+            else => {
+                // Drop control bytes (except \t \n \r): XML 1.0 cannot
+                // represent them even as character references, so passing
+                // them through would make the emitted SVG unparseable.
+                if (c < 0x20 and c != '\t' and c != '\n' and c != '\r') continue;
+                try buf.append(allocator, c);
+            },
         }
     }
 }
