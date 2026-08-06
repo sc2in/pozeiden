@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Timeline diagram SVG renderer.
 //! Expects a Value.node with `title` (string) and `sections` (list of nodes with
 //! `label` and `events` (list of plain strings)). Sections are evenly spaced

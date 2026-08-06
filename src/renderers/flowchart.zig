@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Flowchart SVG renderer.
 //! Builds a Graph from the parsed Value AST, runs layout, and emits SVG.
 //! Expects a Value.node with `nodes` (id, label, shape), `edges` (from, to, label,
@@ -167,6 +170,21 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
+    // Node id → index into graph.nodes, built once after layout (which is the
+    // last thing to move node structs; the sub-layout above only writes x/y
+    // through pointers). Replaces the per-lookup linear findNode scan that
+    // made edge rendering O(E·V) (issue #42).
+    var node_idx = std.StringHashMap(usize).init(allocator);
+    defer node_idx.deinit();
+    try node_idx.ensureTotalCapacity(@intCast(graph.nodes.len));
+    for (graph.nodes, 0..) |n, i| node_idx.putAssumeCapacity(n.id, i);
+    const lookupNode = struct {
+        fn get(map: *const std.StringHashMap(usize), nodes: []layout.GraphNode, id: []const u8) ?*layout.GraphNode {
+            const i = map.get(id) orelse return null;
+            return &nodes[i];
+        }
+    }.get;
+
     // Build subgraph-index → direction map for subgraphs that override the parent direction.
     // This lets edge rendering use each subgraph's own direction for edges that are
     // wholly contained within that subgraph.
@@ -189,8 +207,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     var extra_w: u32 = 0;
     var extra_h: u32 = 0;
     for (graph.edges) |e| {
-        const fn2 = findNode(graph.nodes, e.from) orelse continue;
-        const tn2 = findNode(graph.nodes, e.to) orelse continue;
+        const fn2 = lookupNode(&node_idx, graph.nodes, e.from) orelse continue;
+        const tn2 = lookupNode(&node_idx, graph.nodes, e.to) orelse continue;
         const pad_from_sg = node_subgraph.get(e.from) orelse std.math.maxInt(usize);
         const pad_to_sg = node_subgraph.get(e.to) orelse std.math.maxInt(usize);
         const pad_dir: layout.Direction = blk: {
@@ -271,85 +289,80 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         }
     }
 
-    // Compute per-subgraph bboxes bottom-up.
-    // sg_bbox[i] = {min_x, min_y, max_x, max_y} or null if no nodes
+    // Nesting depth per subgraph (root = 0, child = 1, grandchild = 2 …) via a
+    // parent-chain walk, capped at n_sg steps so a malformed membership cycle
+    // cannot loop. Replaces the old O(n_sg²) all-pairs relaxation.
+    var sg_depth = try allocator.alloc(usize, n_sg);
+    defer allocator.free(sg_depth);
+    for (0..n_sg) |si| {
+        var d: usize = 0;
+        var cur = sg_parent[si];
+        while (cur != std.math.maxInt(usize) and d < n_sg) : (d += 1) {
+            cur = sg_parent[cur];
+        }
+        sg_depth[si] = d;
+    }
+
+    // Compute per-subgraph bboxes children-first: processing in descending
+    // depth order guarantees every child bbox is final before its parent
+    // reads it, so the old run-until-stable fixpoint (O(n_sg²) passes) is a
+    // single pass.
     const BBox = struct { min_x: f32, min_y: f32, max_x: f32, max_y: f32 };
     var sg_bbox = try allocator.alloc(?BBox, n_sg);
     defer allocator.free(sg_bbox);
     for (sg_bbox) |*b| b.* = null;
 
-    // Process in multiple passes until no changes (topological order from leaves)
-    var changed = true;
-    var pass: usize = 0;
-    while (changed and pass < n_sg + 1) : (pass += 1) {
-        changed = false;
-        for (subgraphs_val, 0..) |sgv, si| {
-            const sgn = sgv.asNode() orelse continue;
-            var min_x: f32 = std.math.floatMax(f32);
-            var min_y: f32 = std.math.floatMax(f32);
-            var max_x: f32 = -std.math.floatMax(f32);
-            var max_y: f32 = -std.math.floatMax(f32);
-            // Expand bbox to include member nodes
-            for (sgn.getList("members")) |mv| {
-                const mid = mv.asString() orelse continue;
-                // Is this member another subgraph? Use its bbox.
-                if (sg_id_to_idx.get(mid)) |child_si| {
-                    if (sg_bbox[child_si]) |cb| {
-                        if (cb.min_x < min_x) min_x = cb.min_x;
-                        if (cb.min_y < min_y) min_y = cb.min_y;
-                        if (cb.max_x > max_x) max_x = cb.max_x;
-                        if (cb.max_y > max_y) max_y = cb.max_y;
-                    }
-                    continue;
+    const sg_bbox_order = try allocator.alloc(usize, n_sg);
+    defer allocator.free(sg_bbox_order);
+    for (sg_bbox_order, 0..) |*r, i| r.* = i;
+    std.mem.sort(usize, sg_bbox_order, sg_depth, struct {
+        fn deeperFirst(depth: []const usize, x: usize, y: usize) bool {
+            return depth[x] > depth[y];
+        }
+    }.deeperFirst);
+
+    for (sg_bbox_order) |si| {
+        const sgn = subgraphs_val[si].asNode() orelse continue;
+        var min_x: f32 = std.math.floatMax(f32);
+        var min_y: f32 = std.math.floatMax(f32);
+        var max_x: f32 = -std.math.floatMax(f32);
+        var max_y: f32 = -std.math.floatMax(f32);
+        // Expand bbox to include member nodes
+        for (sgn.getList("members")) |mv| {
+            const mid = mv.asString() orelse continue;
+            // Is this member another subgraph? Use its bbox.
+            if (sg_id_to_idx.get(mid)) |child_si| {
+                if (sg_bbox[child_si]) |cb| {
+                    if (cb.min_x < min_x) min_x = cb.min_x;
+                    if (cb.min_y < min_y) min_y = cb.min_y;
+                    if (cb.max_x > max_x) max_x = cb.max_x;
+                    if (cb.max_y > max_y) max_y = cb.max_y;
                 }
-                // Regular node
-                const mn = findNode(graph.nodes, mid) orelse continue;
-                if (mn.x < min_x) min_x = mn.x;
-                if (mn.y < min_y) min_y = mn.y;
-                if (mn.x + mn.w > max_x) max_x = mn.x + mn.w;
-                if (mn.y + mn.h > max_y) max_y = mn.y + mn.h;
+                continue;
             }
-            if (min_x < max_x) {
-                const new_bb = BBox{ .min_x = min_x, .min_y = min_y, .max_x = max_x, .max_y = max_y };
-                if (sg_bbox[si] == null or
-                    sg_bbox[si].?.min_x != new_bb.min_x or sg_bbox[si].?.max_x != new_bb.max_x or
-                    sg_bbox[si].?.min_y != new_bb.min_y or sg_bbox[si].?.max_y != new_bb.max_y)
-                {
-                    sg_bbox[si] = new_bb;
-                    changed = true;
-                }
-            }
+            // Regular node
+            const mn = lookupNode(&node_idx, graph.nodes, mid) orelse continue;
+            if (mn.x < min_x) min_x = mn.x;
+            if (mn.y < min_y) min_y = mn.y;
+            if (mn.x + mn.w > max_x) max_x = mn.x + mn.w;
+            if (mn.y + mn.h > max_y) max_y = mn.y + mn.h;
+        }
+        if (min_x < max_x) {
+            sg_bbox[si] = .{ .min_x = min_x, .min_y = min_y, .max_x = max_x, .max_y = max_y };
         }
     }
 
-    // Render: outermost (largest depth from root) subgraphs first so children paint on top.
-    // Compute render depth (root = 0, child = 1, grandchild = 2 …)
-    var sg_depth = try allocator.alloc(usize, n_sg);
-    defer allocator.free(sg_depth);
-    for (sg_depth) |*d| d.* = 0;
-    for (0..n_sg) |_| {
-        for (0..n_sg) |si| {
-            if (sg_parent[si] != std.math.maxInt(usize))
-                sg_depth[si] = sg_depth[sg_parent[si]] + 1;
-        }
-    }
-    // Sort: render highest depth first so outermost are drawn last (on top would
-    // block nodes).  Actually we want outermost (depth 0) drawn first (bottom layer)
-    // and inner drawn later — std order (depth 0 first, then 1, 2…) is correct.
-    // Use a simple selection-sort style: render in order of ascending depth.
-    var sg_render_order = try allocator.alloc(usize, n_sg);
+    // Render in ascending depth order: outermost (depth 0) drawn first
+    // (bottom layer), inner subgraphs later so they paint on top. Stable sort
+    // keeps declaration order within a depth, like the old bubble sort.
+    const sg_render_order = try allocator.alloc(usize, n_sg);
     defer allocator.free(sg_render_order);
     for (sg_render_order, 0..) |*r, i| r.* = i;
-    // Bubble sort by sg_depth ascending
-    for (0..n_sg) |i| {
-        for (0..n_sg - i - 1) |j| {
-            if (sg_depth[sg_render_order[j]] > sg_depth[sg_render_order[j + 1]]) {
-                const tmp = sg_render_order[j];
-                sg_render_order[j] = sg_render_order[j + 1];
-                sg_render_order[j + 1] = tmp;
-            }
+    std.mem.sort(usize, sg_render_order, sg_depth, struct {
+        fn shallowerFirst(depth: []const usize, x: usize, y: usize) bool {
+            return depth[x] < depth[y];
         }
-    }
+    }.shallowerFirst);
 
     const pad: f32 = 16;
     for (sg_render_order) |si| {
@@ -372,8 +385,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     defer edge_labels.deinit(allocator);
 
     for (graph.edges) |e| {
-        const from_node = findNode(graph.nodes, e.from) orelse continue;
-        const to_node = findNode(graph.nodes, e.to) orelse continue;
+        const from_node = lookupNode(&node_idx, graph.nodes, e.from) orelse continue;
+        const to_node = lookupNode(&node_idx, graph.nodes, e.to) orelse continue;
         const stroke = e.color orelse theme.edge_color;
         const sw = theme.edge_stroke_width;
 
@@ -808,12 +821,6 @@ fn renderFallback(allocator: std.mem.Allocator, msg: []const u8) ![]const u8 {
     return svg.toOwnedSlice();
 }
 
-fn findNode(nodes: []layout.GraphNode, id: []const u8) ?*layout.GraphNode {
-    for (nodes) |*n| {
-        if (std.mem.eql(u8, n.id, id)) return n;
-    }
-    return null;
-}
 
 fn parseShape(s: []const u8) layout.NodeShape {
     if (std.mem.eql(u8, s, "diamond")) return .diamond;

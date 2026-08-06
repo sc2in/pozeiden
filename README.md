@@ -2,31 +2,31 @@
 
 [![CI](https://github.com/sc2in/pozeiden/actions/workflows/ci.yml/badge.svg)](https://github.com/sc2in/pozeiden/actions/workflows/ci.yml)
 
-A pure-Zig drop-in replacement for [mermaid.js](https://mermaid.js.org). Parses mermaid diagram text and produces self-contained SVG — no JavaScript runtime, no npm, no external processes. Compiles to a \~295 KB WebAssembly module (vs mermaid.js's \~1 MB+) and runs at sub-millisecond speeds.
+A pure-Zig drop-in replacement for [mermaid.js](https://mermaid.js.org). Parses mermaid diagram text and produces self-contained SVG — no JavaScript runtime, no npm, no external processes. Compiles to a \~500 KB WebAssembly module (vs mermaid.js's \~1 MB+) and runs at sub-millisecond speeds.
 
 Supported interfaces: Zig library, C shared library, WebAssembly (wasm32-wasi), CLI.
 
 ## Supported diagram types
 
-| Type                | Keyword                                                                    |
-| ------------------- | -------------------------------------------------------------------------- |
-| Pie chart           | `pie`                                                                      |
-| Flowchart           | `graph` / `flowchart`                                                      |
-| Sequence diagram    | `sequenceDiagram`                                                          |
-| Git graph           | `gitGraph`                                                                 |
-| Class diagram       | `classDiagram`                                                             |
-| State diagram       | `stateDiagram-v2`                                                          |
-| ER diagram          | `erDiagram`                                                                |
-| Gantt chart         | `gantt`                                                                    |
-| Timeline            | `timeline`                                                                 |
-| XY chart            | `xychart-beta`                                                             |
-| Quadrant chart      | `quadrantChart`                                                            |
-| Mindmap             | `mindmap`                                                                  |
-| Sankey diagram      | `sankey-beta`                                                              |
-| C4 architecture     | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` |
-| Block diagram       | `block-beta`                                                               |
-| Requirement diagram | `requirementDiagram`                                                       |
-| Kanban board        | `kanban`                                                                   |
+| Type | Keyword |
+|---|---|
+| Pie chart | `pie` |
+| Flowchart | `graph` / `flowchart` |
+| Sequence diagram | `sequenceDiagram` |
+| Git graph | `gitGraph` |
+| Class diagram | `classDiagram` |
+| State diagram | `stateDiagram-v2` |
+| ER diagram | `erDiagram` |
+| Gantt chart | `gantt` |
+| Timeline | `timeline` |
+| XY chart | `xychart-beta` |
+| Quadrant chart | `quadrantChart` |
+| Mindmap | `mindmap` |
+| Sankey diagram | `sankey-beta` |
+| C4 architecture | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` |
+| Block diagram | `block-beta` |
+| Requirement diagram | `requirementDiagram` |
+| Kanban board | `kanban` |
 
 ## Limitations
 
@@ -45,14 +45,25 @@ current release:
   presets and the `themeVariables` keys `primaryColor`, `primaryTextColor`,
   `primaryBorderColor`, `lineColor`, `background`, `mainBkg`, and `fontFamily`
   are honoured. Other init keys are ignored.
-- **YAML front matter is skipped, not applied.** A leading `--- … ---` block is
-  ignored for detection but its `title`/`config` settings are not consumed.
+- **YAML front matter: `title` only.** A leading `--- … ---` block is stripped
+  before parsing; its `title:` becomes the SVG's accessible `<title>` (see
+  below), but `config:` settings are not consumed.
 - **`click … call` callbacks are not supported** (only `click … href` links,
   which are scheme-validated and escaped). This is intentional for the
   embed-SVG-in-HTML use case.
-- **Resource limits.** Input above 4 MiB (`pozeiden.max_input_bytes`) yields
-  `error.InputTooLarge`; flowcharts above 1000 nodes / 2000 edges yield
-  `error.DiagramTooLarge`.
+- **Resource limits.** Input above 4 MiB yields `error.InputTooLarge`
+  (per-call override: `RenderOptions.max_input_bytes`); flowcharts above
+  10 000 nodes / 20 000 edges / 500 subgraphs yield `error.DiagramTooLarge`;
+  mindmaps nested deeper than 100 levels yield `error.NestingTooDeep`.
+
+### Accessibility
+
+Mermaid's `accTitle:` / `accDescr:` directives (and the front-matter `title:`)
+are parsed out of the diagram and embedded as `<title>`/`<desc>` children with
+`role="img"` + `aria-labelledby` on the root `<svg>`, so screen readers
+announce a meaningful label. For consumers that embed the SVG where its own
+`<title>` is unreachable (raster conversion, `<img>`, PDF figures),
+`renderWithMetadata` additionally returns the title/description as strings.
 
 ### Rendering untrusted input
 
@@ -64,15 +75,42 @@ block) instead of silently emitting a fallback SVG.
 
 ### Fonts
 
-The default font family is `"trebuchet ms, verdana, arial, sans-serif"`. On
-headless/Nix hosts the leading faces are usually absent; the SVG still renders
-via the generic `sans-serif` fallback, but to match a specific environment set
-`RenderOptions.theme_override.font_family` (or `%%{init: {'themeVariables':
-{'fontFamily': '…'}}}%%`).
+The default font family is `"trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif"` — mermaid-parity faces first for browsers, then the
+two metric-compatible faces shipped by virtually every Linux distribution so
+that headless SVG consumers (Typst, resvg, PDF pipelines) can resolve real
+fonts. To match a specific environment set
+`RenderOptions.theme_override.font_family` (or `%%{init: {'themeVariables': {'fontFamily': '…'}}}%%`).
+
+### Thread safety
+
+`render`, `renderWithOptions`, `renderWithMetadata`, `renderToWriter`, and
+`pozeiden_render` are safe to call concurrently from multiple threads: theme
+overrides are thread-local, and the lazily-built grammar caches initialise
+under a lock (verified by a multi-threaded stress test in the suite). On WASM
+the atomics lower to plain loads/stores.
+
+### Output stability
+
+SVG output is deterministic for a given (input, options, version). Byte-exact
+stability is guaranteed only within a patch series: minor releases may change
+output bytes (layout, spacing, theming) and call it out in the changelog under
+**Behaviour change** bullets; patch releases change bytes only to fix
+rendering or security bugs. Downstream golden baselines that embed pozeiden
+SVG byte-for-byte should expect to regenerate on minor bumps.
 
 ## Requirements
 
 - Zig **0.16.0** or later
+
+## Supported platforms
+
+| Tier | Platforms |
+|---|---|
+| Tier 1 (CI-tested) | x86\_64-linux, aarch64-linux, aarch64-darwin, wasm32-wasi |
+| Tier 2 (best effort) | x86\_64-darwin |
+
+Release binaries ship for Linux; darwin consumers build via Nix/FlakeHub or
+`zig build`.
 
 ## Installation
 
@@ -81,7 +119,7 @@ Add pozeiden as a dependency in your `build.zig.zon`:
 ```zig
 .dependencies = .{
     .pozeiden = .{
-        .url = "https://github.com/sc2in/pozeiden/archive/refs/tags/v0.2.0.tar.gz",
+        .url = "https://github.com/sc2in/pozeiden/archive/refs/tags/v0.4.0.tar.gz",
         .hash = "...",  // run: zig fetch --save <url>
     },
 },
@@ -175,17 +213,25 @@ Build:
 
 ```sh
 zig build playground
-# zig-out/playground/pozeiden.wasm  (~295 KB)
+# zig-out/playground/pozeiden.wasm  (~500 KB)
 # zig-out/playground/index.html
+# zig-out/playground/wasi-shim.js
 ```
 
-JavaScript interface:
+JavaScript interface — the module imports a handful of WASI functions
+transitively from the Zig std library, so instantiate it with the bundled
+shim (`wasi-shim.js`, also exercised by CI's Node smoke test):
 
 ```js
+import { makeWasiShim } from "./wasi-shim.js";
+
+let wasm = null;
+const shim = makeWasiShim(() => wasm.memory.buffer);
 const { instance } = await WebAssembly.instantiateStreaming(
   fetch("pozeiden.wasm"),
+  shim,
 );
-const wasm = instance.exports;
+wasm = instance.exports;
 
 // Write mermaid source into the 1 MB input buffer
 const encoder = new TextEncoder();
@@ -245,19 +291,21 @@ All 17 diagram types are available as presets in the example dropdown.
 
 ## Build steps
 
-| Step                | Command                 | Output                                                      |
-| ------------------- | ----------------------- | ----------------------------------------------------------- |
-| CLI binary          | `zig build`             | `zig-out/bin/pozeiden`                                      |
-| Unit tests          | `zig build test`        | —                                                           |
-| Semantic check      | `zig build check`       | —                                                           |
-| C shared library    | `zig build lib`         | `zig-out/lib/libpozeiden.so` + `zig-out/include/pozeiden.h` |
-| WASM playground     | `zig build playground`  | `zig-out/playground/`                                       |
-| Example SVGs        | `zig build examples`    | `zig-out/examples/*.svg`                                    |
-| Fuzz (smoke)        | `zig build fuzz`        | —                                                           |
-| Fuzz (coverage)     | `zig build fuzz --fuzz` | —                                                           |
-| Benchmark           | `zig build bench`       | timing output to stdout                                     |
-| Update README bench | `nix run .#bench`       | rewrites the Performance section                            |
-| API docs            | `zig build docs`        | `zig-out/docs/`                                             |
+| Step | Command | Output |
+|---|---|---|
+| CLI binary | `zig build` | `zig-out/bin/pozeiden` |
+| Unit tests | `zig build test` | — |
+| Semantic check | `zig build check` | — |
+| C shared library | `zig build lib` | `zig-out/lib/libpozeiden.so` + `zig-out/include/pozeiden.h` |
+| WASM playground | `zig build playground` | `zig-out/playground/` |
+| Example SVGs | `zig build examples` | `zig-out/examples/*.svg` |
+| Fuzz (smoke) | `zig build fuzz` | — |
+| Fuzz (coverage) | `zig build fuzz --fuzz` | — (currently broken upstream in Zig 0.16's fuzz runner) |
+| Benchmark | `zig build bench` | timing output to stdout |
+| Update README bench | `nix run .#bench` | rewrites the Performance section |
+| Update goldens | `zig build update-golden` | regenerates `tests/golden/*.svg` from `examples/` |
+| API docs | `zig build docs` | `zig-out/docs/` |
+| Static site | `zig build site` | `zig-out/site/` (playground + docs) |
 
 ## Examples
 
@@ -279,51 +327,51 @@ Run `nix run .#bench` to regenerate (requires Linux with mermaid-cli available v
 
 <!-- bench-start -->
 
-\_Last updated: 2026-04-20 - run: nix run .\#bench
+\_Last updated: 2026-08-06 - run: nix run .\#bench
 
 ### Render time
 
-| diagram     | iters | min_µs | mean_µs | max_µs |
-| ----------- | ----- | ------ | ------- | ------ |
-| pie         | 1000  | 205.4  | 300.7   | 3432.9 |
-| flowchart   | 1000  | 267.3  | 369.0   | 1785.5 |
-| sequence    | 1000  | 156.5  | 192.7   | 1137.3 |
-| gitgraph    | 1000  | 724.5  | 808.4   | 1341.5 |
-| class       | 1000  | 96.1   | 114.3   | 617.1  |
-| state       | 1000  | 140.4  | 163.4   | 792.5  |
-| er          | 1000  | 109.5  | 141.8   | 925.1  |
-| gantt       | 1000  | 65.1   | 93.2    | 771.8  |
-| timeline    | 1000  | 44.2   | 75.9    | 528.3  |
-| xychart     | 1000  | 26.9   | 42.2    | 573.7  |
-| quadrant    | 1000  | 29.3   | 38.3    | 752.6  |
-| mindmap     | 1000  | 152.7  | 206.0   | 845.1  |
-| sankey      | 1000  | 100.4  | 111.4   | 472.3  |
-| c4          | 1000  | 136.4  | 158.3   | 608.5  |
-| block       | 1000  | 60.9   | 72.2    | 1001.2 |
-| requirement | 1000  | 77.6   | 95.8    | 605.9  |
-| kanban      | 1000  | 53.4   | 87.0    | 723.5  |
+| diagram | iters | min\_µs | mean\_µs | max\_µs |
+|---|---|---|---|---|
+| pie | 1000 | 211.0 | 225.4 | 405.3 |
+| flowchart | 1000 | 486.8 | 581.5 | 1596.8 |
+| sequence | 1000 | 169.5 | 199.9 | 605.4 |
+| gitgraph | 1000 | 764.8 | 799.6 | 1389.6 |
+| class | 1000 | 111.1 | 123.8 | 312.4 |
+| state | 1000 | 146.2 | 187.3 | 548.9 |
+| er | 1000 | 109.5 | 128.4 | 326.4 |
+| gantt | 1000 | 73.7 | 83.5 | 316.5 |
+| timeline | 1000 | 55.6 | 65.6 | 296.0 |
+| xychart | 1000 | 28.7 | 33.6 | 385.5 |
+| quadrant | 1000 | 35.7 | 40.3 | 259.2 |
+| mindmap | 1000 | 167.5 | 182.3 | 393.9 |
+| sankey | 1000 | 115.0 | 139.7 | 415.9 |
+| c4 | 1000 | 163.4 | 178.8 | 406.2 |
+| block | 1000 | 58.3 | 118.7 | 4940.8 |
+| requirement | 1000 | 99.7 | 199.8 | 2355.1 |
+| kanban | 1000 | 59.9 | 84.1 | 242.0 |
 
 ### vs mermaid-cli (3 iterations each)
 
-| diagram     | poz_µs | mmdc_µs   | speedup  |
-| ----------- | ------ | --------- | -------- |
-| pie         | 279.6  | 2376285.4 | 8499.8x  |
-| flowchart   | 600.1  | 2638367.3 | 4396.9x  |
-| sequence    | 212.7  | 2144423.0 | 10081.4x |
-| gitgraph    | 1582.1 | 2506957.1 | 1584.6x  |
-| class       | 117.1  | 2312115.2 | 19740.6x |
-| state       | 190.1  | 2755229.2 | 14491.2x |
-| er          | 119.2  | 2455002.7 | 20600.5x |
-| gantt       | 169.0  | 2300938.5 | 13611.2x |
-| timeline    | 62.3   | 3198155.0 | 51339.7x |
-| xychart     | 74.5   | 2270786.0 | 30473.0x |
-| quadrant    | 40.1   | 2073034.2 | 51679.9x |
-| mindmap     | 191.3  | 3386923.6 | 17700.4x |
-| sankey      | 119.5  | 2085439.2 | 17450.8x |
-| c4          | 360.9  | 1973762.7 | 5468.7x  |
-| block       | 76.6   | 2197381.3 | 28679.7x |
-| requirement | 96.1   | 2170166.8 | 22589.0x |
-| kanban      | 65.7   | 2577871.5 | 39219.1x |
+| diagram | poz\_µs | mmdc\_µs | speedup |
+|---|---|---|---|
+| pie | 225.6 | 2149899.2 | 9528.1x |
+| flowchart | 551.6 | 2190009.5 | 3970.4x |
+| sequence | 363.9 | 1984607.5 | 5454.4x |
+| gitgraph | 893.1 | 2167946.1 | 2427.6x |
+| class | 130.8 | 2294778.6 | 17546.3x |
+| state | 172.7 | 2314158.0 | 13402.3x |
+| er | 220.8 | 2471392.7 | 11191.0x |
+| gantt | 116.5 | 2245483.1 | 19267.6x |
+| timeline | 75.2 | 2160721.2 | 28734.9x |
+| xychart | 39.5 | 2101654.3 | 53222.6x |
+| quadrant | 50.4 | 2186819.5 | 43363.5x |
+| mindmap | 196.2 | 2401877.2 | 12241.2x |
+| sankey | 140.4 | 2025918.1 | 14433.8x |
+| c4 | 204.5 | 2155159.0 | 10539.3x |
+| block | 126.1 | 2023757.2 | 16051.9x |
+| requirement | 197.1 | 1925335.9 | 9769.9x |
+| kanban | 124.1 | 2054981.8 | 16559.7x |
 
 <!-- bench-end -->
 
@@ -331,50 +379,48 @@ Run `nix run .#bench` to regenerate (requires Linux with mermaid-cli available v
 
 ```text
 src/
-  root.zig              Public API: detect type, parse, dispatch to renderer
-  detect.zig            First-line diagram type detection
+  root.zig              Public API: detection, dispatch, options, theme plumbing
+  detect.zig            First-line diagram type detection + front-matter handling
+  parse_util.zig        Shared line-parser helpers (LineIter, splitFirst, …)
   main.zig              CLI entry point
   wasm.zig              WebAssembly entry point (get_input_ptr / render / get_output_ptr)
   capi.zig              C ABI exports (pozeiden_render, pozeiden_free, ...)
+  fuzz.zig              Fuzz targets (no-crash + well-formedness oracle)
+  bench.zig             Benchmark harness (optionally vs mermaid-cli)
+  render_test.zig       End-to-end tests of the public API
+  security_test.zig     Security regression suite (one test per hardening fix)
   diagram/
     value.zig           Generic AST value (string | number | bool | node | list)
   svg/
     writer.zig          Low-level SVG string builder
     theme.zig           Mermaid default theme constants
     layout.zig          DAG layout (simplified Sugiyama) for flowcharts
-  renderers/
-    pie.zig             Pie chart
-    flowchart.zig       Flowchart / graph (shapes, edge labels, dashed/thick edges)
-    sequence.zig        Sequence diagram (activation bars, notes, autonumber)
-    gitgraph.zig        Git graph
-    class.zig           Class diagram (stereotypes, generics, visibility)
-    state.zig           State diagram (fork/join bars, choice diamonds)
-    er.zig              Entity-relationship diagram
-    gantt.zig           Gantt chart (today marker, section backgrounds)
-    timeline.zig        Timeline
-    xychart.zig         XY chart (bar + line)
-    quadrant.zig        Quadrant chart
-    mindmap.zig         Mindmap (radial tree)
-    sankey.zig          Sankey diagram
-    c4.zig              C4 architecture diagrams (ext dashed borders, enterprise boundaries)
-    block.zig           Block diagram (grid layout)
-    requirement.zig     Requirement diagram (two-section boxes)
-    kanban.zig          Kanban board (column + card layout)
+    wellformed.zig      Minimal XML well-formedness checker (test/fuzz oracle)
+  parsers/              Hand-written line-oriented parser per diagram type
+    flowchart.zig sequence.zig class.zig state.zig er.zig gantt.zig
+    timeline.zig xychart.zig quadrant.zig mindmap.zig sankey.zig c4.zig
+    block.zig requirement.zig kanban.zig
+  renderers/            Value-AST → SVG renderer per diagram type
+    pie.zig flowchart.zig sequence.zig gitgraph.zig class.zig state.zig
+    er.zig gantt.zig timeline.zig xychart.zig quadrant.zig mindmap.zig
+    sankey.zig c4.zig block.zig requirement.zig kanban.zig
   langium/              Parser for .langium grammar files
-  jison/                Parser for .jison grammar files
-grammars/               Embedded .langium and .jison grammar definitions
+grammars/               Embedded .langium grammar definitions (pie, gitGraph)
 examples/               Source .mmd files for each diagram type
+tests/                  Golden SVG baselines + WASM instantiation smoke test
+tools/                  Release guards (check-release.sh) + SBOM generator
 playground/             HTML + JS source for the live browser playground
 include/                C API header (pozeiden.h)
 ```
 
-Two grammar backends are used:
+Two parsing backends are used:
 
 - **Langium backend**: for diagram types with a formal `.langium` grammar
   (pie, gitGraph). Parses the grammar file at compile time via `@embedFile`,
   then tokenises and interprets diagram text at runtime.
 - **Direct parsers**: all other diagram types use hand-written line-oriented
-  parsers in `root.zig`, which are simpler and faster for the formats mermaid uses.
+  parsers in `src/parsers/`, which are simpler and faster for the formats
+  mermaid uses.
 
 ## Nix
 

@@ -1,6 +1,119 @@
 # Changelog
 
+All notable changes to pozeiden are documented here.
+
+Versions track the rendering contract, not Zig. SVG output is deterministic
+for a given (input, options, version), but byte-exact SVG stability is only
+guaranteed within a patch series: minor releases may change output bytes
+(layout, spacing, theming) and call it out under **Behaviour change** bullets;
+patch releases change bytes only to fix rendering or security bugs. Downstream
+golden baselines (e.g. PolicyPress's Typst goldens) should expect to
+regenerate on minor bumps.
+
+pozeiden 1.0.0 will be a soak-then-promote release: the only breaking change
+reserved for it is flipping strict rendering to the default (see the
+Deprecated section of 0.4.0).
+
 ## [Unreleased]
+
+## [0.4.0] - 2026-08-06
+
+### Fixed
+
+- **YAML front matter corrupted rendered output.** Front matter was stripped
+  only in detection (#45), so parsers received the raw text: `---` was
+  consumed as the keyword line and lines like `title: My Chart` became
+  flowchart nodes. `render` now strips the block once before dispatch.
+- **Flowchart layouts deeper than 64 layers or wider than 128 nodes were
+  silently corrupted.** Fixed-size scratch arrays in the layout engine
+  aliased layer counters (`% 64` — a 70-node chain rendered 320 px wide
+  instead of one column) and skipped barycenter ordering for nodes past the
+  first 128 in a layer. Both died in the #42 rewrite; same-pattern `% 64`
+  aliasing fixed in the block-beta elbow router.
+- **Undefined behaviour on hostile block-beta sizes.** `columns -5`,
+  `columns nan`, `columns 1e30`, and negative `id:N` spans flowed into
+  `@intFromFloat(usize)` in the renderer — UB in unchecked builds. Values are
+  clamped at the parse boundary.
+- **Control bytes in labels made the SVG unparseable.** `xmlEscape` now drops
+  bytes below 0x20 (except tab/LF/CR), which XML 1.0 cannot represent at all.
+- Committed the corrected `build.zig.zon2json-lock` (mvzr ref pin, stale
+  mecha entry); the pre-push hook now peels annotated release tags correctly.
+- README/docs truth pass: WASM size, install URL, architecture tree (the
+  removed jison backend), diagram count, build-steps table, refreshed
+  benchmark tables.
+
+### Added
+
+- **Accessibility metadata.** Mermaid `accTitle:`/`accDescr:` directives
+  (line and `{ block }` forms) and the front-matter `title:` are parsed out
+  of the diagram and embedded as `<title>`/`<desc>` with `role="img"` +
+  `aria-labelledby` on the root `<svg>`. New `renderWithMetadata` returns
+  `{ svg, diagram_type, title, descr }` for consumers that embed the SVG
+  where its own `<title>` is unreachable (raster, `<img>`, PDF figures).
+- **`renderToWriter(allocator, text, options, *std.Io.Writer)`** completes
+  the render / renderWithOptions / renderToWriter triad.
+- **`RenderOptions.max_input_bytes`**: the 4 MiB input cap becomes a per-call
+  knob (0 disables it).
+- **Recursion and nesting guards**: mindmaps deeper than 100 levels return
+  the new `error.NestingTooDeep`; flowcharts with more than 500 subgraphs
+  return `error.DiagramTooLarge`.
+- **SVG well-formedness oracle** (`fuzz_render_wellformed` + a golden-suite
+  gate): any successful render must parse as XML, catching graceful wrong
+  answers the no-crash fuzz targets swallow.
+- **CI**: WASM build + Node *instantiation* smoke test on every PR (a
+  build-only check cannot catch the #48 LinkError class); benchmark
+  regression gate against the last release binary (fail at mean + 2σ);
+  aarch64-darwin test leg; `ci-gate` aggregator as the single required
+  check; all workflow actions pinned to commit SHAs.
+- **Release safety**: publishing now happens inside the CI workflow behind
+  `ci-gate` — a tag whose tests fail cannot release; `tools/check-release.sh`
+  (also `nix run .#check-release`) verifies the CHANGELOG and the
+  `build.zig.zon` version stamp against the tag; GitHub releases use a
+  draft-then-undraft flow and ship SHA256SUMS plus a CycloneDX SBOM
+  (`nix run .#sbom`); FlakeHub publishing re-enabled with a manual
+  republish escape hatch.
+- **Governance**: branch-protection rulesets as code (+ sync workflow),
+  CODEOWNERS, CODE_OF_CONDUCT.md, LICENSING.md, per-file SPDX headers.
+- Documented API contracts: thread safety of all render entry points, the
+  `render` ownership contract (zigmark's `MermaidRendererFn` ABI), and the
+  output-stability policy (header of this file).
+
+### Changed
+
+- **Flowchart layout rewritten from O(N²) to O(passes·(V+E))** (#42): every
+  phase now walks per-node adjacency lists filled in global edge order, so
+  output is byte-identical for previously-correct inputs (all 17 golden
+  baselines unchanged). A 1000-node graph went from 1.39 s to ~12 ms;
+  `max_nodes`/`max_edges` raised 10× to 10 000/20 000 (10 000 nodes lay out
+  in ~66 ms).
+- **`root.zig` de-monolithed** (#39): the 15 hand-written parsers moved to
+  `src/parsers/` with a shared `LineIter`; root.zig shrank from ~4100 to
+  ~550 lines of detection, dispatch, and theme plumbing. Pure refactor —
+  goldens unchanged.
+- **Behaviour change:** the default font stack gains `Liberation Sans` and
+  `DejaVu Sans` before the generic fallback so headless SVG consumers
+  (Typst, resvg, PDF pipelines) resolve real fonts. Every `<text>` element's
+  `font-family` changes; golden baselines regenerated.
+- Security regression tests moved to `src/security_test.zig` (one test per
+  hardening fix, on `std.testing.allocator` so error-path leaks fail) and
+  end-to-end tests to `src/render_test.zig`.
+
+### Deprecated
+
+- **Lenient rendering as the default.** Today an unrecognised diagram type
+  silently renders a minimal fallback SVG — which can ship in a published
+  document looking like a real diagram. In **1.0.0** the default flips to
+  strict (`error.UnknownDiagramType`); pass an explicit `.strict = false` to
+  keep the fallback. No API is removed — only the default changes.
+
+### Known limitations
+
+- Coverage-guided fuzzing (`zig build fuzz --fuzz`) is currently broken
+  upstream in Zig 0.16's fuzz-mode test runner (a `StackTrace` type mismatch
+  in `compiler/test_runner.zig`). Smoke mode still runs every target on each
+  CI run; releases additionally get multi-seed sweeps.
+- `x86_64-darwin` is declared but untested (no viable CI runner); documented
+  as Tier 2 / best effort.
 
 ## [0.3.0] - 2026-07-11
 

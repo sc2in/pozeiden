@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Diagram type detection from the opening keyword of a mermaid source file.
 //!
 //! Mermaid files start with a keyword that identifies the diagram type
@@ -47,14 +50,24 @@ pub const DiagramType = enum {
     unknown,
 };
 
+/// Result of `splitFrontmatter`: the front-matter block (between the `---`
+/// delimiters, empty when there is none) and the diagram body after it.
+pub const FrontmatterSplit = struct { block: []const u8, body: []const u8 };
+
 /// If `text` opens with a complete YAML front-matter block — a line that is
 /// exactly `---` (after any leading blank lines) followed later by another line
-/// that is exactly `---` — return the slice after the closing delimiter.
-/// Otherwise (no opener, or an unterminated one) return `text` unchanged, so a
-/// stray `---` is still handled leniently by the caller.
-fn stripFrontmatter(text: []const u8) []const u8 {
+/// that is exactly `---` — return the block's contents and the slice after the
+/// closing delimiter. Otherwise (no opener, or an unterminated one) return an
+/// empty block and `text` unchanged, so a stray `---` is still handled
+/// leniently by the caller.
+///
+/// Exposed for `render`, which must strip the same block before dispatching so
+/// front-matter lines are never parsed as diagram content, and which reads the
+/// block's `title:` as accessibility metadata.
+pub fn splitFrontmatter(text: []const u8) FrontmatterSplit {
     var pos: usize = 0;
     var opened = false;
+    var block_start: usize = 0;
     while (pos < text.len) {
         const nl = std.mem.indexOfScalarPos(u8, text, pos, '\n') orelse text.len;
         const line = std.mem.trim(u8, text[pos..nl], " \t\r");
@@ -63,16 +76,23 @@ fn stripFrontmatter(text: []const u8) []const u8 {
             if (!opened) {
                 if (std.mem.eql(u8, line, "---")) {
                     opened = true;
+                    block_start = next;
                 } else {
-                    return text; // first content line isn't a delimiter
+                    return .{ .block = "", .body = text }; // first content line isn't a delimiter
                 }
             } else if (std.mem.eql(u8, line, "---")) {
-                return text[next..]; // closing delimiter — body follows
+                // Closing delimiter — body follows.
+                return .{ .block = text[block_start..pos], .body = text[next..] };
             }
         }
         pos = next;
     }
-    return text; // opener never closed → treat as ordinary content
+    return .{ .block = "", .body = text }; // opener never closed → ordinary content
+}
+
+/// `splitFrontmatter`, body only.
+pub fn stripFrontmatter(text: []const u8) []const u8 {
+    return splitFrontmatter(text).body;
 }
 
 /// Return the diagram type by inspecting the first non-blank, non-comment line

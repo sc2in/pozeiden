@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Golden-file regression tests.
 //!
 //! Each case renders an `examples/*.mmd` diagram and asserts the output is
@@ -52,4 +55,17 @@ test "golden: example diagrams render to their committed baselines" {
 
 test "golden: every example diagram type has a baseline" {
     try std.testing.expectEqual(@as(usize, 17), cases.len);
+}
+
+test "golden: every baseline is well-formed XML" {
+    // Golden bytes pin what we emit, not that it parses (the lesson from
+    // zigmark 0.7.2, where every emitted document failed the real consumer).
+    // Run the emitter's well-formedness oracle over each baseline so all 17
+    // renderers get deterministic parse coverage on every test run.
+    for (cases) |c| {
+        pozeiden.wellformed.check(c.golden) catch |err| {
+            std.debug.print("\ngolden '{s}' is not well-formed XML: {t}\n", .{ c.name, err });
+            return err;
+        };
+    }
 }

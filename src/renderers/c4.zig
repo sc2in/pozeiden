@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! C4 architecture diagram SVG renderer.
 //! Supports C4Context, C4Container, C4Component, C4Dynamic, C4Deployment.
 //! Expects a Value.node with `title`, `elements` (alias, label, tech, desc, kind),

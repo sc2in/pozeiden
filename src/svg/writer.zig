@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Low-level SVG string builder used by all renderers.
 //!
 //! `SvgWriter` accumulates SVG markup in an internal `ArrayList(u8)`.
@@ -428,7 +431,13 @@ pub fn xmlEscape(buf: *std.ArrayList(u8), allocator: std.mem.Allocator, s: []con
             '>' => try buf.appendSlice(allocator, "&gt;"),
             '"' => try buf.appendSlice(allocator, "&quot;"),
             '\'' => try buf.appendSlice(allocator, "&#39;"),
-            else => try buf.append(allocator, c),
+            else => {
+                // Drop control bytes (except \t \n \r): XML 1.0 cannot
+                // represent them even as character references, so passing
+                // them through would make the emitted SVG unparseable.
+                if (c < 0x20 and c != '\t' and c != '\n' and c != '\r') continue;
+                try buf.append(allocator, c);
+            },
         }
     }
 }

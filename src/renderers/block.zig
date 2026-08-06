@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Block diagram SVG renderer (block-beta).
 //! Expects a Value.node with `cols` (number of grid columns), `blocks` (list of nodes
 //! with `id`, `label`, and optional `width` in grid units), and `edges` (list of nodes
@@ -187,12 +190,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     }.lt);
 
     // track_end_x[gap_row][track] = horiz_max of last segment assigned to that track.
+    // Sized to the actual gap-row range: the old fixed [64] arrays indexed by
+    // `gap_row % 64` aliased distinct gaps in diagrams taller than 64 rows.
     const MAX_TRACKS = 7;
-    var track_end_x = std.mem.zeroes([64][MAX_TRACKS]f32);
-    var track_count = std.mem.zeroes([64]usize);
+    var max_gap_row: usize = 0;
+    for (elbow_routes.items) |r| {
+        if (r.gap_row > max_gap_row) max_gap_row = r.gap_row;
+    }
+    const track_end_x = try a.alloc([MAX_TRACKS]f32, max_gap_row + 1);
+    const track_count = try a.alloc(usize, max_gap_row + 1);
+    @memset(track_end_x, .{0} ** MAX_TRACKS);
+    @memset(track_count, 0);
 
     for (elbow_routes.items) |*r| {
-        const gr = r.gap_row % 64;
+        const gr = r.gap_row;
         var assigned = false;
         for (0..track_count[gr]) |t| {
             if (track_end_x[gr][t] <= r.horiz_min) {
@@ -212,7 +223,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
     // Space tracks evenly within the gap, centred on base_gap_y.
     for (elbow_routes.items) |*r| {
-        const gr = r.gap_row % 64;
+        const gr = r.gap_row;
         const n: f32 = @floatFromInt(track_count[gr]);
         const t: f32 = @floatFromInt(r.track);
         const pitch = if (n > 1) GAP / (n + 1.0) else 0.0;

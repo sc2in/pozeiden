@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Shared helpers for the hand-written line-oriented diagram parsers in
 //! `root.zig`.  Centralising these removes the copy of each that used to be
 //! inlined across the `render*Direct` functions.
@@ -9,6 +12,29 @@ const std = @import("std");
 pub fn isSkippable(line: []const u8) bool {
     return line.len == 0 or std.mem.startsWith(u8, line, "%%");
 }
+
+/// Iterator over the lines of a diagram source: yields each line trimmed of
+/// surrounding ` \t\r`, skipping blank lines and `%%` comments/directives —
+/// the loop header shared by most of the line-oriented parsers. Parsers whose
+/// grammar makes indentation or comments significant (mindmap, kanban, and
+/// sequence's multi-line `ref` blocks) keep their own raw-line loops.
+pub const LineIter = struct {
+    inner: std.mem.SplitIterator(u8, .scalar),
+
+    pub fn init(text: []const u8) LineIter {
+        return .{ .inner = std.mem.splitScalar(u8, text, '\n') };
+    }
+
+    /// Next non-blank, non-comment line, trimmed; `null` at end of input.
+    pub fn next(self: *LineIter) ?[]const u8 {
+        while (self.inner.next()) |raw| {
+            const line = std.mem.trim(u8, raw, " \t\r");
+            if (isSkippable(line)) continue;
+            return line;
+        }
+        return null;
+    }
+};
 
 /// Split `s` at the first occurrence of `delim`, returning `.{ before, after }`
 /// with `after` trimmed of spaces/tabs.  If `delim` is absent, returns

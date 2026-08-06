@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Class diagram SVG renderer.
 //! Expects a Value.node with `classes` (list of nodes with `name` and `members` string list)
 //! and `relations` (list of nodes with `from`, `to`, `kind`, and optional `label`).

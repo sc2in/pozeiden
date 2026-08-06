@@ -1,0 +1,30 @@
+name: "Publish tags to FlakeHub"
+# Automatic tag publishing happens in ci.yml's `release-publish` job, which
+# runs only after ci-gate passes — so a broken tag no longer publishes to
+# FlakeHub. This workflow is kept as a manual escape hatch for (re)publishing
+# an existing tag out of band.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The existing tag to publish to FlakeHub"
+        type: "string"
+        required: true
+jobs:
+  flakehub-publish:
+    runs-on: "ubuntu-latest"
+    permissions:
+      id-token: "write"
+      contents: "read"
+    steps:
+      - uses: "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" # v4.4.0
+        with:
+          persist-credentials: false
+          ref: "${{ (inputs.tag != null) && format('refs/tags/{0}', inputs.tag) || '' }}"
+      - uses: "DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837" # v3
+      - uses: "DeterminateSystems/flakehub-push@71f57208810a5d299fc6545350981de98fdbc860" # v6
+        with:
+          visibility: "public"
+          name: "sc2in/Pozeiden"
+          tag: "${{ inputs.tag }}"
+          include-output-paths: false

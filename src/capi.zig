@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! C ABI entry points for libpozeiden.
 //!
 //! Link against libpozeiden.so (or .a) and include <pozeiden.h>.

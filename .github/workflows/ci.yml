@@ -3,13 +3,32 @@ name: CI
 on:
   push:
     branches: ["main"]
+    tags: ["v?[0-9]+.[0-9]+.[0-9]+*"]
   pull_request:
+  # Manual dispatch exists for release rehearsal: run on a tag ref with
+  # dry_run=true and release-publish stops at the draft release (inspect,
+  # then delete) without publishing to FlakeHub.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Stop before undrafting the release / publishing to FlakeHub"
+        type: boolean
+        default: false
+
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    # Explicit name so the rendered check context is stable
+    # ("build (x86_64-linux)") regardless of matrix key order — rulesets and
+    # the ci-gate comment below reference job results, not these contexts,
+    # but a stable name keeps the Checks UI legible.
+    name: build (${{ matrix.system }})
     strategy:
       fail-fast: false
       matrix:
@@ -23,16 +42,28 @@ jobs:
       id-token: "write"
       contents: "read"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history + tags so the release-tag guards can diff against the
+          # previous tag.
+          fetch-depth: 0
+
+      # Authoritative backstop for the local pre-push hook (.githooks/pre-push):
+      # a release tag must include a CHANGELOG.md change since the previous tag
+      # and the build.zig.zon version stamp must match the tag. Runs before the
+      # Nix install so a mis-cut tag fails in seconds, not minutes.
+      - name: Release-tag guards (CHANGELOG + version stamp)
+        if: ${{ github.ref_type == 'tag' }}
+        run: bash tools/check-release.sh "${{ github.ref_name }}"
 
       - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@main
+        uses: DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837 # v3
         with:
           extra-conf: |
             sandbox = false
 
       - name: Setup Nix cache
-        uses: DeterminateSystems/flakehub-cache-action@main
+        uses: DeterminateSystems/flakehub-cache-action@9926dde74484ccb2224835b80531de64ed4336ef # v3.21.2
         with:
           use-gha-cache: "enabled"
           flakehub-flake-name: "sc2in/Pozeiden"
@@ -41,6 +72,10 @@ jobs:
         run: nix --accept-flake-config profile add nixpkgs#omnix
 
       - name: Configure permissions
+        # Enable unprivileged user namespaces, required by bubblewrap: zig2nix's
+        # zig-hook runs the compiler inside bwrap, so from-source builds of
+        # zig2nix tooling fail without this on Ubuntu 24.04 runners
+        # ("bwrap: setting up uid map: Permission denied").
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
       - name: Run CI
@@ -52,8 +87,295 @@ jobs:
 
       - name: Upload artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pozeiden-${{ matrix.system }}
           path: pozeiden-release/
           retention-days: 7
+
+      # On tag pushes this same leg packages the release tarball — the release
+      # targets are exactly the CI systems, so there is no separate
+      # release-build matrix to drift from what CI tested.
+      - name: Package release tarball
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          ARCHIVE="pozeiden-${{ github.ref_name }}-${{ matrix.system }}.tar.gz"
+          tar czf "$ARCHIVE" --dereference \
+            -C pozeiden-release \
+            bin \
+            lib \
+            include
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Upload release tarball
+        if: ${{ github.ref_type == 'tag' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-${{ matrix.system }}
+          path: ${{ env.ARCHIVE }}
+          retention-days: 1
+
+  build-darwin:
+    # aarch64-darwin is a Tier-1 (CI-tested) platform; release binaries stay
+    # linux-only and darwin consumers build via nix/FlakeHub. Uses just the
+    # flake-pinned Zig rather than the full devShell/om path: zig2nix's
+    # source-built inputs pull glibc into the aarch64-darwin closure, which
+    # nix refuses to evaluate (same constraint policypress documents).
+    name: build (aarch64-darwin)
+    runs-on: macos-latest
+    permissions:
+      id-token: "write"
+      contents: "read"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837 # v3
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/flakehub-cache-action@9926dde74484ccb2224835b80531de64ed4336ef # v3.21.2
+        with:
+          use-gha-cache: "enabled"
+          flakehub-flake-name: "sc2in/Pozeiden"
+
+      - name: Run tests
+        run: |
+          nix shell --inputs-from . nixpkgs#zig --command zig build test
+          nix shell --inputs-from . nixpkgs#zig --command zig build examples
+
+  # ── WASM build + instantiation ───────────────────────────────────────────
+  # Separate job so "CI / wasm" appears as a distinct check in the Checks UI.
+  # The nix check (flake#checks.wasm) also runs under `om ci run` in `build`,
+  # but bundled under the matrix job name it is not independently addressable.
+  # The check builds the wasm32-wasi module AND instantiates it under Node
+  # with the real playground shim — a build-only check cannot catch the #48
+  # failure class (LinkError from an unshimmed WASI import).
+  wasm:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837 # v3
+        with:
+          extra-conf: |
+            sandbox = false
+      - name: Configure permissions
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Setup Nix cache
+        uses: DeterminateSystems/flakehub-cache-action@9926dde74484ccb2224835b80531de64ed4336ef # v3.21.2
+        with:
+          use-gha-cache: "enabled"
+          flakehub-flake-name: "sc2in/Pozeiden"
+      - name: Build + instantiate WASM module
+        run: nix build .#checks.x86_64-linux.wasm
+
+  # ── Benchmark regression ───────────────────────────────────────────────────
+  # Downloads the last tagged release binary and compares it against the
+  # current build on the same machine (cancels runner variance).
+  # Fails if current_mean > baseline_mean + 2 * baseline_stddev.
+  # Skipped automatically when no prior release exists. A hyperfine-level
+  # flake resolves on re-run (same policy as zigmark).
+  bench-regression:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837 # v3
+        with:
+          extra-conf: |
+            sandbox = false
+      - name: Configure permissions
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Setup Nix cache
+        uses: DeterminateSystems/flakehub-cache-action@9926dde74484ccb2224835b80531de64ed4336ef # v3.21.2
+        with:
+          use-gha-cache: "enabled"
+          flakehub-flake-name: "sc2in/Pozeiden"
+
+      - name: Build current binary (ReleaseFast)
+        run: nix build .#pozeiden-fast -o pozeiden-current
+
+      - name: Download last release baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LAST_TAG=$(gh release list -L 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          if [ -z "$LAST_TAG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No prior release found — skipping regression check."
+            exit 0
+          fi
+          mkdir -p baseline
+          if ! gh release download "$LAST_TAG" \
+               -p "pozeiden-*-x86_64-linux.tar.gz" -D baseline/ 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release asset not found for $LAST_TAG — skipping."
+            exit 0
+          fi
+          tar xzf baseline/*.tar.gz -C baseline/
+          echo "skip=false"  >> "$GITHUB_OUTPUT"
+          echo "tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Run hyperfine comparison
+        if: steps.baseline.outputs.skip == 'false'
+        run: |
+          nix profile add nixpkgs#hyperfine
+          hyperfine \
+            --warmup 100 -m 300 \
+            --export-json bench-results.json \
+            --command-name current \
+              "./pozeiden-current/bin/pozeiden -i examples/flowchart.mmd > /dev/null" \
+            --command-name "baseline (${{ steps.baseline.outputs.tag }})" \
+              "./baseline/bin/pozeiden -i examples/flowchart.mmd > /dev/null"
+
+      - name: Check for regression
+        if: steps.baseline.outputs.skip == 'false'
+        run: |
+          python3 - <<'PYEOF'
+          import json, sys
+
+          with open("bench-results.json") as f:
+              results = json.load(f)["results"]
+
+          current  = next(r for r in results if r["command"] == "current")
+          baseline = next(r for r in results if "baseline" in r["command"])
+
+          c_mean = current["mean"]
+          b_mean = baseline["mean"]
+          b_std  = baseline["stddev"]
+          threshold = b_mean + 2 * b_std
+          ratio = c_mean / b_mean if b_mean > 0 else 1.0
+
+          print(f"Current:   {c_mean*1000:.3f} ms")
+          print(f"Baseline:  {b_mean*1000:.3f} ms  (σ = {b_std*1000:.3f} ms)")
+          print(f"Threshold: {threshold*1000:.3f} ms  (baseline + 2σ)")
+          print(f"Ratio:     {ratio:.3f}×")
+
+          if c_mean > threshold:
+              print(f"\n❌  Regression: {c_mean*1000:.3f} ms > {threshold*1000:.3f} ms")
+              sys.exit(1)
+
+          print(f"\n✅  No regression: {c_mean*1000:.3f} ms ≤ {threshold*1000:.3f} ms")
+          PYEOF
+
+      - name: Upload benchmark results
+        if: steps.baseline.outputs.skip == 'false'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bench-results
+          path: bench-results.json
+          retention-days: 30
+
+  # Branch protection requires exactly one context: this job. Requiring the
+  # per-leg contexts instead deadlocks the moment the matrix shrinks or a job
+  # gains a skip condition — GitHub treats a required context that was never
+  # created as "expected" forever, blocking the merge despite every check that
+  # did run passing (that is what happened to policypress #194). This job is
+  # always created, so it always reports; the matrix stays free to change
+  # without touching branch protection. A leg that is skipped does not relax
+  # the gate — every result must be `success` outright.
+  ci-gate:
+    needs: [build, build-darwin, wasm, bench-regression]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have succeeded
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DARWIN_RESULT: ${{ needs.build-darwin.result }}
+          WASM_RESULT: ${{ needs.wasm.result }}
+          BENCH_RESULT: ${{ needs.bench-regression.result }}
+        run: |
+          echo "build=${BUILD_RESULT} darwin=${DARWIN_RESULT} wasm=${WASM_RESULT} bench=${BENCH_RESULT}"
+          for r in "${BUILD_RESULT}" "${DARWIN_RESULT}" "${WASM_RESULT}" "${BENCH_RESULT}"; do
+            if [ "$r" != success ]; then
+              echo "::error::CI did not pass (build=${BUILD_RESULT}, darwin=${DARWIN_RESULT}, wasm=${WASM_RESULT}, bench=${BENCH_RESULT})."
+              exit 1
+            fi
+          done
+
+  # Publishing sits behind ci-gate inside the same tag-triggered run, so a
+  # failing test/wasm/bench leg on the tagged commit blocks the release — the
+  # old standalone release.yml could cut a release without CI ever passing.
+  # This is the only job in the repo holding `contents: write`.
+  release-publish:
+    needs: [ci-gate]
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: "write"
+      contents: "write"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Download release tarballs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@c70cb8ae92d68c66953db28a26a63db1665bc837 # v3
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/flakehub-cache-action@9926dde74484ccb2224835b80531de64ed4336ef # v3.21.2
+        with:
+          use-gha-cache: "enabled"
+          flakehub-flake-name: "sc2in/Pozeiden"
+
+      - name: Assemble release assets
+        run: |
+          set -euo pipefail
+          nix run .#sbom > dist/sbom.cdx.json
+          cd dist
+          sha256sum pozeiden-*.tar.gz > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Draft-then-undraft (from zigmark): immutable releases reject asset
+      # uploads to a published release, so create/flip to draft, upload with
+      # --clobber, then publish. Survives re-publishing an existing tag.
+      - name: Create / update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$REPO" --draft=true
+          else
+            gh release create "$TAG" --repo "$REPO" --draft --generate-notes $PRERELEASE
+          fi
+
+          gh release upload "$TAG" --repo "$REPO" \
+            dist/pozeiden-*.tar.gz dist/SHA256SUMS.txt dist/sbom.cdx.json --clobber
+
+      - name: Publish release
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft=false
+
+      - name: Publish to FlakeHub
+        # Fork-safety: never attempt to publish from a fork's tag run.
+        if: ${{ github.repository == 'sc2in/pozeiden' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        uses: DeterminateSystems/flakehub-push@71f57208810a5d299fc6545350981de98fdbc860 # v6
+        with:
+          visibility: "public"
+          name: "sc2in/Pozeiden"
+          tag: "${{ github.ref_name }}"
+          include-output-paths: false

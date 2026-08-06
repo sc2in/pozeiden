@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Kanban board SVG renderer.
 //! Expects a Value.node with `columns` (list of nodes with `label` and `items`, where
 //! each item is a node with `id` and `label`). Columns are rendered side-by-side with

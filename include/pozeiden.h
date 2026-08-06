@@ -1,4 +1,7 @@
 /*
+ * Copyright © 2026 Star City Security Consulting, LLC (SC2) — https://sc2.in
+ * SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+ *
  * pozeiden.h — C API for libpozeiden (Mermaid diagram renderer)
  *
  * Link with: -lpozeiden
@@ -32,6 +35,9 @@ extern "C" {
  *
  * On failure, `*out_svg` is set to NULL, `*out_len` is set to 0, and -1 is
  * returned.  Call pozeiden_last_error() for a description of the failure.
+ *
+ * Thread safety: safe to call concurrently from multiple threads; the error
+ * message returned by pozeiden_last_error() is per-thread.
  */
 int pozeiden_render(const char *input, size_t input_len,
                     char **out_svg, size_t *out_len);

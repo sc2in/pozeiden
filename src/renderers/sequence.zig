@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Sequence diagram SVG renderer.
 //! Expects a Value.node with `participants` (list of actor names or nodes with
 //! `actor`) and `signals` (list of typed message nodes with `from`, `to`, `msg`,
