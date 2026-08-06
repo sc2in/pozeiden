@@ -153,9 +153,9 @@ test "render rejects an oversized flowchart with DiagramTooLarge" {
     var buf: std.ArrayList(u8) = .empty;
     defer buf.deinit(gpa);
     try buf.appendSlice(gpa, "graph TD\n");
-    // 1500 distinct nodes (> layout.max_nodes = 1000), well under the byte cap.
+    // 10_500 distinct nodes (> layout.max_nodes = 10_000), under the byte cap.
     var i: usize = 0;
-    while (i < 1500) : (i += 1) try buf.print(gpa, "n{d}\n", .{i});
+    while (i < 10_500) : (i += 1) try buf.print(gpa, "n{d}\n", .{i});
     try std.testing.expectError(error.DiagramTooLarge, render(gpa, buf.items));
 }
 

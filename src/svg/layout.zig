@@ -3,10 +3,17 @@
 //!
 //! DAG layout engine used by the flowchart renderer.
 //!
-//! Implements a simplified three-phase Sugiyama algorithm:
+//! Implements a simplified Sugiyama algorithm:
+//! 0. Cycle breaking: iterative DFS marks back edges as logically reversed.
 //! 1. Layer assignment: longest-path BFS from source nodes.
-//! 2. Node ordering: stable sort by id within each layer.
+//! 2. Node ordering: alphabetical seed, then a barycenter heuristic
+//!    (3 down + 3 up sweeps) plus a subgraph-clustering pass.
 //! 3. Coordinate assignment: evenly-spaced grid positions.
+//!
+//! Every phase walks per-node adjacency lists built once per `layout` call
+//! (O(passes·(V+E)) overall, issue #42); the lists are filled in global edge
+//! order so traversal order — and therefore the emitted SVG — is identical to
+//! the earlier implementation that re-scanned the whole edge slice per node.
 //!
 //! The `H_GAP` and `V_GAP` constants are exported so that the flowchart
 //! renderer can derive Bezier control-point offsets that match the layout.
@@ -91,29 +98,93 @@ pub const Graph = struct {
 /// Assign `(x, y)` coordinates to every node in `graph` using a three-phase
 /// Sugiyama algorithm: cycle-breaking → layer assignment → barycenter ordering
 /// → coordinates. Modifies `graph.nodes` and `graph.edges` in place.
-/// Node ordering is currently super-linear in node/edge count, so cap the
-/// graph size to keep worst-case layout time bounded for untrusted input.
-/// These limits are far beyond any legible flowchart; larger graphs yield
-/// `error.DiagramTooLarge`.
-pub const max_nodes: usize = 1000;
-pub const max_edges: usize = 2000;
+/// Layout is O(passes·(V+E)), but a cap still bounds the memory and SVG size
+/// an untrusted input can demand. These limits are far beyond any legible
+/// flowchart; larger graphs yield `error.DiagramTooLarge`.
+///
+/// Measured basis (issue #42): the pre-rewrite O(N²) ordering took 1.39 s at
+/// N=1000 (ReleaseFast, the old cap); after the adjacency rewrite a mixed
+/// chain/fan graph renders end-to-end in ~12 ms at N=1000 and ~66 ms at
+/// N=10000, so the caps were raised 10×.
+pub const max_nodes: usize = 10_000;
+pub const max_edges: usize = 20_000;
+
+/// A `graph.edges` entry with both endpoint ids resolved to `graph.nodes`
+/// indices; edges naming unknown ids resolve to null and are skipped by the
+/// graph phases (they still render as dangling edges downstream).
+const ResolvedEdge = struct { from: usize, to: usize };
+
+/// Compressed sparse row adjacency: `row(u)` is the payload list for node
+/// `u`. Rows are filled in global edge order, so per-node iteration matches
+/// the edge-scan order of the previous whole-slice implementation — keeping
+/// DFS traversal, BFS relaxation, and barycenter float accumulation (and
+/// therefore the emitted SVG) byte-identical.
+const Csr = struct {
+    offsets: []usize,
+    data: []usize,
+
+    /// `keys[i]` is the node index owning `payloads[i]`; both are consumed in
+    /// order.
+    fn init(allocator: std.mem.Allocator, n: usize, keys: []const usize, payloads: []const usize) !Csr {
+        const offsets = try allocator.alloc(usize, n + 1);
+        errdefer allocator.free(offsets);
+        @memset(offsets, 0);
+        for (keys) |k| offsets[k + 1] += 1;
+        for (1..n + 1) |i| offsets[i] += offsets[i - 1];
+        const data = try allocator.alloc(usize, keys.len);
+        errdefer allocator.free(data);
+        const cursor = try allocator.alloc(usize, n);
+        defer allocator.free(cursor);
+        @memcpy(cursor, offsets[0..n]);
+        for (keys, payloads) |k, p| {
+            data[cursor[k]] = p;
+            cursor[k] += 1;
+        }
+        return .{ .offsets = offsets, .data = data };
+    }
+
+    fn deinit(self: *Csr, allocator: std.mem.Allocator) void {
+        allocator.free(self.offsets);
+        allocator.free(self.data);
+    }
+
+    fn row(self: *const Csr, u: usize) []const usize {
+        return self.data[self.offsets[u]..self.offsets[u + 1]];
+    }
+};
 
 pub fn layout(allocator: std.mem.Allocator, graph: *Graph) !void {
     if (graph.nodes.len == 0) return;
     if (graph.nodes.len > max_nodes or graph.edges.len > max_edges)
         return error.DiagramTooLarge;
 
+    // Shared id → index map and per-edge resolved endpoints, built once.
+    // Valid through phases 0–1; `orderNodes` reorders node structs within
+    // their array positions and rebuilds its own view.
+    var idx_map = std.StringHashMap(usize).init(allocator);
+    defer idx_map.deinit();
+    for (graph.nodes, 0..) |n, i| try idx_map.put(n.id, i);
+
+    const resolved = try allocator.alloc(?ResolvedEdge, graph.edges.len);
+    defer allocator.free(resolved);
+    for (graph.edges, 0..) |e, ei| {
+        resolved[ei] = if (idx_map.get(e.from)) |f|
+            if (idx_map.get(e.to)) |t| .{ .from = f, .to = t } else null
+        else
+            null;
+    }
+
     // 0. Break cycles: mark back edges as reversed so BFS layer assignment works
-    try breakCycles(allocator, graph);
+    try breakCycles(allocator, graph, resolved);
 
     // 1. Assign layers using longest path from sources (respects reversed edges)
-    try assignLayers(allocator, graph);
+    try assignLayers(allocator, graph, &idx_map, resolved);
 
     // 2. Order nodes with barycenter heuristic to reduce edge crossings
     try orderNodes(allocator, graph);
 
     // 3. Assign coordinates
-    assignCoordinates(graph);
+    try assignCoordinates(allocator, graph);
 }
 
 const NODE_W: f32 = 140;
@@ -122,28 +193,41 @@ pub const H_GAP: f32 = 60;
 pub const V_GAP: f32 = 80;
 const MARGIN: f32 = 40;
 
-fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
-    // Build adjacency: for each node, track which nodes point INTO it (in-edges)
+fn assignLayers(
+    allocator: std.mem.Allocator,
+    graph: *Graph,
+    idx_map: *const std.StringHashMap(usize),
+    resolved: []const ?ResolvedEdge,
+) !void {
     var in_degree = try allocator.alloc(usize, graph.nodes.len);
     defer allocator.free(in_degree);
     @memset(in_degree, 0);
 
-    // Map node id -> index
-    var idx_map = std.StringHashMap(usize).init(allocator);
-    defer idx_map.deinit();
-    for (graph.nodes, 0..) |n, i| {
-        try idx_map.put(n.id, i);
-    }
-
+    // Reversed edges contribute in-degree to the *from* node (logical target).
+    // An edge whose source id is unknown still counts toward its target's
+    // in-degree — such edges are never traversed, so that in-degree is never
+    // consumed and the target only unlocks through its other in-edges.
     for (graph.edges) |e| {
-        // Reversed edges contribute in-degree to the *from* node (logical target).
         const target = if (e.reversed) e.from else e.to;
         const to_idx = idx_map.get(target) orelse continue;
         in_degree[to_idx] += 1;
     }
 
+    // Logical out-adjacency (reversed edges traversed to→from), payload =
+    // logical target index.
+    var keys: std.ArrayList(usize) = .empty;
+    defer keys.deinit(allocator);
+    var payloads: std.ArrayList(usize) = .empty;
+    defer payloads.deinit(allocator);
+    for (graph.edges, 0..) |e, ei| {
+        const r = resolved[ei] orelse continue;
+        try keys.append(allocator, if (e.reversed) r.to else r.from);
+        try payloads.append(allocator, if (e.reversed) r.from else r.to);
+    }
+    var out = try Csr.init(allocator, graph.nodes.len, keys.items, payloads.items);
+    defer out.deinit(allocator);
+
     // Layer assignment: BFS from sources (in_degree == 0)
-    var max_layer: usize = 0;
     var layers = try allocator.alloc(usize, graph.nodes.len);
     defer allocator.free(layers);
     @memset(layers, 0);
@@ -160,18 +244,10 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
         const cur = queue.items[head];
         head += 1;
         const cur_layer = layers[cur];
-        if (cur_layer > max_layer) max_layer = cur_layer;
 
-        for (graph.edges) |e| {
-            // For reversed edges treat the direction as to→from.
-            const logical_from = if (e.reversed) e.to else e.from;
-            const logical_to   = if (e.reversed) e.from else e.to;
-            const from_idx = idx_map.get(logical_from) orelse continue;
-            if (from_idx != cur) continue;
-            const to_idx = idx_map.get(logical_to) orelse continue;
+        for (out.row(cur)) |to_idx| {
             if (layers[to_idx] < cur_layer + 1) {
                 layers[to_idx] = cur_layer + 1;
-                if (layers[to_idx] > max_layer) max_layer = layers[to_idx];
             }
             in_degree[to_idx] -= 1;
             if (in_degree[to_idx] == 0) try queue.append(allocator, to_idx);
@@ -187,13 +263,23 @@ fn assignLayers(allocator: std.mem.Allocator, graph: *Graph) !void {
 
 /// DFS-based cycle-breaking: marks back edges with `reversed = true` so that
 /// `assignLayers` can treat them as forward edges and produce correct depths.
-fn breakCycles(allocator: std.mem.Allocator, graph: *Graph) !void {
+fn breakCycles(allocator: std.mem.Allocator, graph: *Graph, resolved: []const ?ResolvedEdge) !void {
     const n = graph.nodes.len;
     if (n == 0) return;
 
-    var idx_map = std.StringHashMap(usize).init(allocator);
-    defer idx_map.deinit();
-    for (graph.nodes, 0..) |nd, i| try idx_map.put(nd.id, i);
+    // Out-adjacency in physical edge direction, payload = edge index (so back
+    // edges can be flagged on the real `graph.edges` entry).
+    var keys: std.ArrayList(usize) = .empty;
+    defer keys.deinit(allocator);
+    var payloads: std.ArrayList(usize) = .empty;
+    defer payloads.deinit(allocator);
+    for (resolved, 0..) |r_opt, ei| {
+        const r = r_opt orelse continue;
+        try keys.append(allocator, r.from);
+        try payloads.append(allocator, ei);
+    }
+    var out = try Csr.init(allocator, n, keys.items, payloads.items);
+    defer out.deinit(allocator);
 
     // 3-colour DFS: 0 = white, 1 = gray (on stack), 2 = black (done)
     var color = try allocator.alloc(u8, n);
@@ -201,8 +287,8 @@ fn breakCycles(allocator: std.mem.Allocator, graph: *Graph) !void {
     @memset(color, 0);
 
     // Iterative DFS to avoid call-stack overflow on large graphs.
-    // Each frame stores the node index and our current scan position in the
-    // global edge slice (we scan all edges looking for outgoing from this node).
+    // Each frame stores the node index and the scan position in its
+    // out-adjacency row.
     const Frame = struct { u: usize, ei: usize };
     var stack: std.ArrayList(Frame) = .empty;
     defer stack.deinit(allocator);
@@ -216,17 +302,15 @@ fn breakCycles(allocator: std.mem.Allocator, graph: *Graph) !void {
             const top = stack.items.len - 1;
             const u = stack.items[top].u;
             var ei = stack.items[top].ei;
+            const out_edges = out.row(u);
 
-            while (ei < graph.edges.len) {
-                const e = &graph.edges[ei];
+            while (ei < out_edges.len) {
+                const edge_idx = out_edges[ei];
                 ei += 1;
-                // Only follow edges that are not already reversed.
-                const from_idx = idx_map.get(e.from) orelse continue;
-                if (from_idx != u) continue;
-                const to_idx = idx_map.get(e.to) orelse continue;
+                const to_idx = resolved[edge_idx].?.to;
 
                 if (color[to_idx] == 1) {
-                    e.reversed = true; // back edge
+                    graph.edges[edge_idx].reversed = true; // back edge
                 } else if (color[to_idx] == 0) {
                     // Tree edge — push and continue DFS from to_idx.
                     stack.items[top].ei = ei; // save scan position
@@ -246,38 +330,103 @@ fn breakCycles(allocator: std.mem.Allocator, graph: *Graph) !void {
 /// Order nodes within each layer using the barycenter heuristic (3 alternating
 /// down/up passes) to reduce edge crossings, initialised with a stable
 /// alphabetical sort so results are deterministic.
+///
+/// Node ids are unique (the flowchart parser dedups them), so the stable
+/// per-layer sorts here reproduce the old exchange-sort/insertion-sort
+/// orderings exactly.
 fn orderNodes(allocator: std.mem.Allocator, graph: *Graph) !void {
     const nodes = graph.nodes;
-
-    // Phase 1: initial alphabetical sort within each layer.
-    {
-        var i: usize = 0;
-        while (i < nodes.len) : (i += 1) {
-            var j: usize = i + 1;
-            while (j < nodes.len) : (j += 1) {
-                if (nodes[i].layer == nodes[j].layer and
-                    std.mem.order(u8, nodes[i].id, nodes[j].id) == .gt)
-                {
-                    const tmp = nodes[i];
-                    nodes[i] = nodes[j];
-                    nodes[j] = tmp;
-                }
-            }
-        }
-    }
-    var lc = std.mem.zeroes([64]usize);
-    for (nodes) |*nd| {
-        nd.order = lc[nd.layer % 64];
-        lc[nd.layer % 64] += 1;
-    }
+    if (nodes.len == 0) return;
 
     var max_layer: usize = 0;
-    for (nodes) |nd| if (nd.layer > max_layer) { max_layer = nd.layer; };
+    for (nodes) |nd| {
+        if (nd.layer > max_layer) max_layer = nd.layer;
+    }
+
+    // Per-layer lists of array positions, in array order. Replaces the old
+    // fixed scratch arrays whose `% 64` layer indexing corrupted orders past
+    // layer 63 and whose `[128]` length silently left nodes past the first
+    // 128 in a layer unordered.
+    var layer_pos = try allocator.alloc(std.ArrayList(usize), max_layer + 1);
+    defer {
+        for (layer_pos) |*l| l.deinit(allocator);
+        allocator.free(layer_pos);
+    }
+    for (layer_pos) |*l| l.* = .empty;
+    for (nodes, 0..) |nd, ni| try layer_pos[nd.layer].append(allocator, ni);
+
+    // Phase 1: initial alphabetical sort within each layer. Structs are
+    // gathered per layer, sorted by id, and scattered back into the same
+    // array positions — the layer → positions map of the global array (and
+    // therefore SVG paint order) is unchanged.
+    {
+        var scratch: std.ArrayList(GraphNode) = .empty;
+        defer scratch.deinit(allocator);
+        for (layer_pos) |*l| {
+            if (l.items.len <= 1) continue;
+            scratch.clearRetainingCapacity();
+            for (l.items) |ni| try scratch.append(allocator, nodes[ni]);
+            std.mem.sort(GraphNode, scratch.items, {}, struct {
+                fn lessThan(_: void, a: GraphNode, b: GraphNode) bool {
+                    return std.mem.order(u8, a.id, b.id) == .lt;
+                }
+            }.lessThan);
+            for (l.items, scratch.items) |ni, sorted_nd| nodes[ni] = sorted_nd;
+        }
+    }
+
+    // Initial order: rank within layer (array order == id order after Phase 1).
+    {
+        var lc = try allocator.alloc(usize, max_layer + 1);
+        defer allocator.free(lc);
+        @memset(lc, 0);
+        for (nodes) |*nd| {
+            nd.order = lc[nd.layer];
+            lc[nd.layer] += 1;
+        }
+    }
+
     if (max_layer == 0) return; // single layer — no crossings possible
+
+    // Incidence adjacency in logical direction (neighbour node indices),
+    // built after the Phase-1 struct moves and filled in global edge order so
+    // each node's barycenter sum accumulates in the old edge-scan order.
+    // Matching the old id-equality scan: an edge contributes one incidence to
+    // its logical source (neighbour = target) unless only the target matches
+    // (neighbour = source); a self-loop therefore contributes once.
+    var idx_map = std.StringHashMap(usize).init(allocator);
+    defer idx_map.deinit();
+    for (nodes, 0..) |nd, i| try idx_map.put(nd.id, i);
+
+    var inc = blk: {
+        var keys: std.ArrayList(usize) = .empty;
+        defer keys.deinit(allocator);
+        var payloads: std.ArrayList(usize) = .empty;
+        defer payloads.deinit(allocator);
+        for (graph.edges) |e| {
+            const fid = if (e.reversed) e.to else e.from;
+            const tid = if (e.reversed) e.from else e.to;
+            const fi = idx_map.get(fid);
+            const ti = idx_map.get(tid);
+            if (fi) |f| if (ti) |t| {
+                try keys.append(allocator, f);
+                try payloads.append(allocator, t);
+                if (f != t) {
+                    try keys.append(allocator, t);
+                    try payloads.append(allocator, f);
+                }
+            };
+        }
+        break :blk try Csr.init(allocator, nodes.len, keys.items, payloads.items);
+    };
+    defer inc.deinit(allocator);
 
     // Phase 2: barycenter heuristic — 3 down + 3 up alternating sweeps.
     var bary = try allocator.alloc(f32, nodes.len);
     defer allocator.free(bary);
+
+    var scratch_idx: std.ArrayList(usize) = .empty;
+    defer scratch_idx.deinit(allocator);
 
     for (0..6) |pass| {
         const down = (pass % 2 == 0);
@@ -288,128 +437,110 @@ fn orderNodes(allocator: std.mem.Allocator, graph: *Graph) !void {
             if (ref_signed < 0 or ref_signed > @as(i64, @intCast(max_layer))) continue;
             const ref_layer: usize = @intCast(ref_signed);
 
-            // Compute barycenter for each node in `layer`.
-            for (nodes, 0..) |*nd, ni| {
-                if (nd.layer != layer) { bary[ni] = -1; continue; }
+            // Compute barycenter for each node in `layer` (array order).
+            for (layer_pos[layer].items) |ni| {
                 var sum: f32 = 0;
                 var cnt: u32 = 0;
-                for (graph.edges) |e| {
-                    // Use logical direction (accounting for reversed edges).
-                    const fid = if (e.reversed) e.to else e.from;
-                    const tid = if (e.reversed) e.from else e.to;
-                    const nbr_id: []const u8 = if (std.mem.eql(u8, nd.id, fid))
-                        tid
-                    else if (std.mem.eql(u8, nd.id, tid))
-                        fid
-                    else
-                        continue;
-                    for (nodes) |nb| {
-                        if (nb.layer == ref_layer and std.mem.eql(u8, nb.id, nbr_id)) {
-                            sum += @floatFromInt(nb.order);
-                            cnt += 1;
-                            break;
-                        }
+                for (inc.row(ni)) |nbi| {
+                    if (nodes[nbi].layer == ref_layer) {
+                        sum += @floatFromInt(nodes[nbi].order);
+                        cnt += 1;
                     }
                 }
-                bary[ni] = if (cnt > 0) sum / @as(f32, @floatFromInt(cnt)) else @as(f32, @floatFromInt(nd.order));
+                bary[ni] = if (cnt > 0)
+                    sum / @as(f32, @floatFromInt(cnt))
+                else
+                    @as(f32, @floatFromInt(nodes[ni].order));
             }
 
-            // Collect indices of nodes in this layer, sort by bary, reassign order.
-            var idxs: [128]usize = undefined;
-            var ic: usize = 0;
-            for (nodes, 0..) |nd, ni| {
-                if (nd.layer == layer and ic < idxs.len) {
-                    idxs[ic] = ni;
-                    ic += 1;
+            // Stable-sort a copy of this layer's positions by bary (fresh
+            // array-order input each pass, like the old re-collected idxs),
+            // then reassign contiguous orders.
+            scratch_idx.clearRetainingCapacity();
+            try scratch_idx.appendSlice(allocator, layer_pos[layer].items);
+            std.mem.sort(usize, scratch_idx.items, bary, struct {
+                fn lessThan(b: []const f32, x: usize, y: usize) bool {
+                    return b[x] < b[y];
                 }
-            }
-            // Insertion sort on idxs by bary value.
-            var s: usize = 1;
-            while (s < ic) : (s += 1) {
-                const key_i = idxs[s];
-                const key_b = bary[key_i];
-                var t: usize = s;
-                while (t > 0 and bary[idxs[t - 1]] > key_b) : (t -= 1) {
-                    idxs[t] = idxs[t - 1];
-                }
-                idxs[t] = key_i;
-            }
-            for (idxs[0..ic], 0..) |ni, ord| {
+            }.lessThan);
+            for (scratch_idx.items, 0..) |ni, ord| {
                 nodes[ni].order = ord;
             }
         }
     }
 
     // Final pass: cluster subgraph members within each layer.
-    // For each layer, compute group centroid (mean order of members with same subgraph id),
-    // then sort by (group_centroid, member_order) so same-subgraph nodes are adjacent
-    // while the group sits at its barycenter-computed position.
+    // For each layer, compute group centroid (mean order of members with same
+    // subgraph id), then stable-sort by (group_centroid, member_order) so
+    // same-subgraph nodes are adjacent while the group sits at its
+    // barycenter-computed position.
     {
+        const Group = struct { sum: f32, cnt: usize };
+        var groups = std.AutoHashMap(usize, Group).init(allocator);
+        defer groups.deinit();
+
+        const Entry = struct { ni: usize, cent: f32, ord: usize };
+        var entries: std.ArrayList(Entry) = .empty;
+        defer entries.deinit(allocator);
+
         var layer: usize = 0;
         while (layer <= max_layer) : (layer += 1) {
-            // Collect node indices in this layer
-            var idxs: [128]usize = undefined;
-            var ic: usize = 0;
-            for (nodes, 0..) |nd, ni| {
-                if (nd.layer == layer and ic < idxs.len) { idxs[ic] = ni; ic += 1; }
-            }
-            if (ic <= 1) continue;
+            const items = layer_pos[layer].items;
+            if (items.len <= 1) continue;
 
-            // Compute group centroid per subgraph_id (within this layer)
-            // Use a simple map: scan all pairs (O(n²) is fine for small layers)
-            // centroid[i] = mean order of all nodes in same subgraph as idxs[i]
-            var centroids: [128]f32 = undefined;
-            for (idxs[0..ic], 0..) |ni, ii| {
+            // Group sums accumulate in layer order — the same order the old
+            // pairwise scan added members, so centroids are float-identical.
+            groups.clearRetainingCapacity();
+            for (items) |ni| {
                 const sg = nodes[ni].subgraph;
-                if (sg == std.math.maxInt(usize)) {
-                    centroids[ii] = @floatFromInt(nodes[ni].order);
-                    continue;
-                }
-                var sum: f32 = 0;
-                var cnt: usize = 0;
-                for (idxs[0..ic]) |nj| {
-                    if (nodes[nj].subgraph == sg) {
-                        sum += @floatFromInt(nodes[nj].order);
-                        cnt += 1;
-                    }
-                }
-                centroids[ii] = sum / @as(f32, @floatFromInt(cnt));
+                if (sg == std.math.maxInt(usize)) continue;
+                const g = try groups.getOrPut(sg);
+                if (!g.found_existing) g.value_ptr.* = .{ .sum = 0, .cnt = 0 };
+                g.value_ptr.sum += @floatFromInt(nodes[ni].order);
+                g.value_ptr.cnt += 1;
             }
 
-            // Insertion sort idxs by (centroid, order)
-            var s: usize = 1;
-            while (s < ic) : (s += 1) {
-                const key_i = idxs[s];
-                const key_c = centroids[s];
-                const key_o = nodes[key_i].order;
-                var t: usize = s;
-                while (t > 0) : (t -= 1) {
-                    const pc = centroids[t - 1];
-                    const po = nodes[idxs[t - 1]].order;
-                    if (pc < key_c or (pc == key_c and po <= key_o)) break;
-                    idxs[t] = idxs[t - 1];
-                    centroids[t] = centroids[t - 1];
-                }
-                idxs[t] = key_i;
-                centroids[t] = key_c;
+            entries.clearRetainingCapacity();
+            for (items) |ni| {
+                const sg = nodes[ni].subgraph;
+                const cent: f32 = if (sg == std.math.maxInt(usize))
+                    @floatFromInt(nodes[ni].order)
+                else blk: {
+                    const g = groups.get(sg).?;
+                    break :blk g.sum / @as(f32, @floatFromInt(g.cnt));
+                };
+                try entries.append(allocator, .{ .ni = ni, .cent = cent, .ord = nodes[ni].order });
             }
-            for (idxs[0..ic], 0..) |ni, ord| {
-                nodes[ni].order = ord;
+
+            std.mem.sort(Entry, entries.items, {}, struct {
+                fn lessThan(_: void, a: Entry, b: Entry) bool {
+                    if (a.cent != b.cent) return a.cent < b.cent;
+                    return a.ord < b.ord;
+                }
+            }.lessThan);
+            for (entries.items, 0..) |en, ord| {
+                nodes[en.ni].order = ord;
             }
         }
     }
 }
 
-fn assignCoordinates(graph: *Graph) void {
-    // Determine how many nodes per layer
-    var layer_counts = std.mem.zeroes([64]usize);
+fn assignCoordinates(allocator: std.mem.Allocator, graph: *Graph) !void {
+    // Determine how many nodes per layer.
+    var max_layer: usize = 0;
     for (graph.nodes) |n| {
-        layer_counts[n.layer % 64] += 1;
+        if (n.layer > max_layer) max_layer = n.layer;
+    }
+    var layer_counts = try allocator.alloc(usize, max_layer + 1);
+    defer allocator.free(layer_counts);
+    @memset(layer_counts, 0);
+    for (graph.nodes) |n| {
+        layer_counts[n.layer] += 1;
     }
 
     // Assign coordinates centered around origin; translateNodes shifts to MARGIN.
     for (graph.nodes) |*n| {
-        const per_layer = layer_counts[n.layer % 64];
+        const per_layer = layer_counts[n.layer];
         const total_w = @as(f32, @floatFromInt(per_layer)) * (NODE_W + H_GAP) - H_GAP;
 
         switch (graph.direction) {
@@ -697,7 +828,8 @@ test "breakCycles: back edge marked reversed" {
     var nodes = [_]GraphNode{ makeNode("A"), makeNode("B") };
     var edges = [_]GraphEdge{ makeEdge("A", "B"), makeEdge("B", "A") };
     var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
-    try breakCycles(testing.allocator, &g);
+    const resolved = [_]?ResolvedEdge{ .{ .from = 0, .to = 1 }, .{ .from = 1, .to = 0 } };
+    try breakCycles(testing.allocator, &g, &resolved);
     var any_reversed = false;
     for (edges) |e| if (e.reversed) { any_reversed = true; };
     try testing.expect(any_reversed);
@@ -711,6 +843,120 @@ test "assignLayers: disconnected component gets layer 0" {
     try layout(testing.allocator, &g);
     try testing.expectEqual(@as(usize, 0), nodes[0].layer);
     try testing.expectEqual(@as(usize, 0), nodes[1].layer);
+}
+
+test "layout deep chain: one node per layer, single column" {
+    // 70 layers exceeded the old fixed [64] layer-count arrays; the `% 64`
+    // wraparound aliased layer n onto layer n mod 64, giving nodes past layer
+    // 63 phantom siblings and shifting them sideways. Correct layout: every
+    // layer holds exactly one node, so orders are all zero and the whole chain
+    // is one column wide.
+    const n = 70;
+    var id_buf: [n][3]u8 = undefined;
+    var nodes: [n]GraphNode = undefined;
+    var edges: [n - 1]GraphEdge = undefined;
+    for (0..n) |i| {
+        id_buf[i] = .{ 'n', '0' + @as(u8, @intCast(i / 10)), '0' + @as(u8, @intCast(i % 10)) };
+        nodes[i] = makeNode(&id_buf[i]);
+    }
+    for (0..n - 1) |i| edges[i] = makeEdge(&id_buf[i], &id_buf[i + 1]);
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    for (nodes, 0..) |nd, i| {
+        try testing.expectEqual(i, nd.layer);
+        try testing.expectEqual(@as(usize, 0), nd.order);
+        try testing.expectEqual(nodes[0].x, nd.x);
+    }
+    // One column: MARGIN + NODE_W + MARGIN.
+    try testing.expectEqual(@as(u32, 220), svgWidth(&nodes));
+}
+
+test "layout wide layer: barycenter orders all 200 children" {
+    // The old barycenter/clustering passes used fixed [128] scratch arrays and
+    // silently skipped nodes past the first 128 in a layer. With two roots and
+    // 200 children alternating between them, a full barycenter pass must give
+    // each root's children one contiguous order block.
+    const kids = 200;
+    var id_buf: [kids][4]u8 = undefined;
+    var nodes: [kids + 2]GraphNode = undefined;
+    var edges: [kids]GraphEdge = undefined;
+    nodes[0] = makeNode("r1");
+    nodes[1] = makeNode("r2");
+    for (0..kids) |i| {
+        id_buf[i] = .{
+            'c',
+            '0' + @as(u8, @intCast(i / 100)),
+            '0' + @as(u8, @intCast((i / 10) % 10)),
+            '0' + @as(u8, @intCast(i % 10)),
+        };
+        nodes[i + 2] = makeNode(&id_buf[i]);
+        edges[i] = makeEdge(if (i % 2 == 0) "r1" else "r2", &id_buf[i]);
+    }
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    // Orders within the child layer must be a permutation of 0..199 …
+    var seen = [_]bool{false} ** kids;
+    for (nodes) |nd| {
+        if (nd.layer != 1) continue;
+        try testing.expect(nd.order < kids);
+        try testing.expect(!seen[nd.order]);
+        seen[nd.order] = true;
+    }
+    // … and every r1 child must sort before every r2 child (bary 0 vs 1).
+    var max_r1: usize = 0;
+    var min_r2: usize = std.math.maxInt(usize);
+    for (nodes, 0..) |nd, ni| {
+        if (ni < 2) continue;
+        const child_i = ni - 2;
+        _ = child_i;
+        // Recover the parent from the id parity encoded above.
+        const idx = (@as(usize, nd.id[1] - '0') * 100) +
+            (@as(usize, nd.id[2] - '0') * 10) + @as(usize, nd.id[3] - '0');
+        if (idx % 2 == 0) {
+            if (nd.order > max_r1) max_r1 = nd.order;
+        } else {
+            if (nd.order < min_r2) min_r2 = nd.order;
+        }
+    }
+    try testing.expect(max_r1 < min_r2);
+}
+
+test "layout coordinate snapshot: fork/join with back edge" {
+    // Exact coordinates recorded from the pre-rewrite O(N²) implementation —
+    // the adjacency-list rewrite must reproduce them byte-for-byte.
+    var nodes = [_]GraphNode{
+        makeNode("A"), makeNode("B"), makeNode("C"), makeNode("D"), makeNode("E"),
+        makeNode("F"), makeNode("G"), makeNode("H"), makeNode("I"), makeNode("J"),
+    };
+    var edges = [_]GraphEdge{
+        makeEdge("A", "B"), makeEdge("A", "C"), makeEdge("A", "D"),
+        makeEdge("B", "E"), makeEdge("C", "E"), makeEdge("D", "F"),
+        makeEdge("E", "G"), makeEdge("F", "G"), makeEdge("G", "H"),
+        makeEdge("H", "I"), makeEdge("I", "J"), makeEdge("J", "E"),
+    };
+    var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
+    try layout(testing.allocator, &g);
+    const expected = [_]struct { []const u8, usize, usize, f32, f32 }{
+        .{ "A", 0, 0, 240, 40 },
+        .{ "B", 1, 0, 40, 164 },
+        .{ "C", 1, 1, 240, 164 },
+        .{ "D", 1, 2, 440, 164 },
+        .{ "E", 2, 0, 140, 288 },
+        .{ "F", 2, 1, 340, 288 },
+        .{ "G", 3, 0, 240, 412 },
+        .{ "H", 4, 0, 240, 536 },
+        .{ "I", 5, 0, 240, 660 },
+        .{ "J", 6, 0, 240, 784 },
+    };
+    for (expected) |exp| {
+        for (nodes) |nd| {
+            if (!std.mem.eql(u8, nd.id, exp[0])) continue;
+            try testing.expectEqual(exp[1], nd.layer);
+            try testing.expectEqual(exp[2], nd.order);
+            try testing.expectEqual(exp[3], nd.x);
+            try testing.expectEqual(exp[4], nd.y);
+        }
+    }
 }
 
 test "translateNodes: minimum coordinate shifted to MARGIN" {
