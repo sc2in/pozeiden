@@ -17,7 +17,7 @@ pub threadlocal var font_size_small: u32 = 12;
 /// Override via `ThemeOverride.font_family` to ensure a font that is available
 /// in your target environment (important for PDF/Typst rendering where system
 /// fonts may not be present).
-pub threadlocal var font_family: []const u8 = "trebuchet ms, verdana, arial, sans-serif";
+pub threadlocal var font_family: []const u8 = "trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif";
 
 pub threadlocal var background: []const u8 = "#ffffff";
 pub threadlocal var text_color: []const u8 = "#333333";
@@ -116,7 +116,7 @@ pub fn applyOverride(ov: ThemeOverride) void {
 pub fn resetToDefaults() void {
     font_size        = 14;
     font_size_small  = 12;
-    font_family      = "trebuchet ms, verdana, arial, sans-serif";
+    font_family      = "trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif";
     background       = "#ffffff";
     text_color       = "#333333";
     line_color       = "#333333";

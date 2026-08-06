@@ -61,29 +61,29 @@
 <rect x="810.00" y="325.46" width="20.00" height="54.47" rx="2.00" fill="#339af0" stroke="none" stroke-width="0.0"/>
 <rect x="810.00" y="387.93" width="20.00" height="38.91" rx="2.00" fill="#20c997" stroke="none" stroke-width="0.0"/>
 <rect x="810.00" y="434.84" width="20.00" height="18.68" rx="2.00" fill="#12b886" stroke="none" stroke-width="0.0"/>
-<text x="84.00" y="294.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Primary Energy Sources</text>
-<text x="296.00" y="136.15" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Coal Power</text>
-<text x="296.00" y="258.54" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Natural Gas Power</text>
-<text x="296.00" y="345.14" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Nuclear Power</text>
-<text x="296.00" y="405.28" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Hydro Power</text>
-<text x="296.00" y="451.42" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Wind Power</text>
-<text x="296.00" y="486.65" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Solar Power</text>
-<text x="296.00" y="511.77" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Other Renewables</text>
-<text x="476.00" y="256.89" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Grid Electricity</text>
-<text x="476.00" y="463.03" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Heat Losses</text>
-<text x="476.00" y="500.13" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Losses</text>
-<text x="656.00" y="170.92" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Residential</text>
-<text x="656.00" y="254.40" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Commercial</text>
-<text x="656.00" y="351.90" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Industrial</text>
-<text x="656.00" y="426.05" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Transport</text>
-<text x="656.00" y="451.63" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Grid Losses</text>
-<text x="836.00" y="145.27" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Heating</text>
-<text x="836.00" y="176.61" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Cooling</text>
-<text x="836.00" y="204.85" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Appliances</text>
-<text x="836.00" y="241.64" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Lighting</text>
-<text x="836.00" y="282.33" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">HVAC</text>
-<text x="836.00" y="313.67" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Equipment</text>
-<text x="836.00" y="356.69" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Motors</text>
-<text x="836.00" y="411.39" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Process Heat</text>
-<text x="836.00" y="448.18" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, sans-serif">Other</text>
+<text x="84.00" y="294.00" fill="#333333" font-size="12" text-anchor="end" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Primary Energy Sources</text>
+<text x="296.00" y="136.15" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Coal Power</text>
+<text x="296.00" y="258.54" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Natural Gas Power</text>
+<text x="296.00" y="345.14" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Nuclear Power</text>
+<text x="296.00" y="405.28" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Hydro Power</text>
+<text x="296.00" y="451.42" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Wind Power</text>
+<text x="296.00" y="486.65" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Solar Power</text>
+<text x="296.00" y="511.77" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Other Renewables</text>
+<text x="476.00" y="256.89" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Grid Electricity</text>
+<text x="476.00" y="463.03" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Heat Losses</text>
+<text x="476.00" y="500.13" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Losses</text>
+<text x="656.00" y="170.92" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Residential</text>
+<text x="656.00" y="254.40" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Commercial</text>
+<text x="656.00" y="351.90" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Industrial</text>
+<text x="656.00" y="426.05" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Transport</text>
+<text x="656.00" y="451.63" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Grid Losses</text>
+<text x="836.00" y="145.27" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Heating</text>
+<text x="836.00" y="176.61" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Cooling</text>
+<text x="836.00" y="204.85" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Appliances</text>
+<text x="836.00" y="241.64" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Lighting</text>
+<text x="836.00" y="282.33" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">HVAC</text>
+<text x="836.00" y="313.67" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Equipment</text>
+<text x="836.00" y="356.69" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Motors</text>
+<text x="836.00" y="411.39" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Process Heat</text>
+<text x="836.00" y="448.18" fill="#333333" font-size="12" text-anchor="start" font-weight="normal" font-family="trebuchet ms, verdana, arial, Liberation Sans, DejaVu Sans, sans-serif">Other</text>
 </svg>
