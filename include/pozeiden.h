@@ -35,6 +35,9 @@ extern "C" {
  *
  * On failure, `*out_svg` is set to NULL, `*out_len` is set to 0, and -1 is
  * returned.  Call pozeiden_last_error() for a description of the failure.
+ *
+ * Thread safety: safe to call concurrently from multiple threads; the error
+ * message returned by pozeiden_last_error() is per-thread.
  */
 int pozeiden_render(const char *input, size_t input_len,
                     char **out_svg, size_t *out_len);

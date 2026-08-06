@@ -171,7 +171,13 @@ pub const max_input_bytes: usize = 4 * 1024 * 1024;
 /// non-comment line.  Seventeen diagram types are supported; unrecognised
 /// input produces a minimal fallback SVG rather than an error.
 ///
-/// The caller owns the returned slice and must free it with `allocator`.
+/// Ownership contract: the returned slice is always freshly allocated with
+/// the passed `allocator` (never static memory) and the caller frees it with
+/// that same allocator.
+///
+/// This two-argument signature is a stable ABI: it is zigmark's
+/// `MermaidRendererFn` plugin type, passed by address into its HTML/Typst
+/// renderers.  It is safe to call concurrently from multiple threads.
 pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u8 {
     return renderImpl(allocator, mermaid_text, max_input_bytes);
 }
