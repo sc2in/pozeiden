@@ -19,6 +19,11 @@ pub const DiagramType = detect.DiagramType;
 const Value = @import("diagram/value.zig").Value;
 const parse_util = @import("parse_util.zig");
 
+/// Internal XML well-formedness checker, `pub` only so the fuzz oracle and
+/// the golden-file suite can assert that every successful render parses.
+/// Not part of the public API.
+pub const wellformed = @import("svg/wellformed.zig");
+
 const langium_ast = @import("langium/ast.zig");
 const langium_parser = @import("langium/parser.zig");
 const langium_runtime = @import("langium/runtime.zig");
