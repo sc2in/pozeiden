@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Sankey diagram SVG renderer (simplified column layout with Bezier bands).
 //! Expects a Value.node with `flows` (list of nodes each carrying `from`, `to`,
 //! and numeric `value`). Node depths are inferred by iterative relaxation; columns

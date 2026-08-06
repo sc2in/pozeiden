@@ -1,0 +1,7 @@
+# Everything on the default branch is owned by the accountable maintainer.
+# With the current Default Ruleset (0 required approvals, no code-owner
+# review) this file is informational — it routes review requests to @sc2ben.
+# If the ruleset later adopts require_code_owner_review (policypress's
+# stricter variant), this file becomes the enforcement anchor without any
+# further change. See .github/rulesets/.
+* @sc2ben

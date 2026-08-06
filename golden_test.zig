@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Golden-file regression tests.
 //!
 //! Each case renders an `examples/*.mmd` diagram and asserts the output is

@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Requirement diagram SVG renderer.
 //! Expects a Value.node with `requirements` (list of nodes with `id`, `name`, `text`,
 //! `risk`, `verifyMethod`), `elements` (list of nodes with `name`, `type`, `docRef`),

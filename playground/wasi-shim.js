@@ -1,3 +1,6 @@
+// Copyright © 2026 Star City Security Consulting, LLC (SC2) — https://sc2.in
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
 // Minimal WASI (wasi_snapshot_preview1) shim shared by the browser playground
 // (index.html) and the Node instantiation smoke test (tests/wasm_smoke.mjs).
 // Keeping both consumers on one module means CI exercises the exact shim the

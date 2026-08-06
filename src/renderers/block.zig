@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Block diagram SVG renderer (block-beta).
 //! Expects a Value.node with `cols` (number of grid columns), `blocks` (list of nodes
 //! with `id`, `label`, and optional `width` in grid units), and `edges` (list of nodes

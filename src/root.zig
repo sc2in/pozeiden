@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! pozeiden: mermaid diagram renderer.
 //!
 //! The single public entry point is `render`, which accepts any mermaid diagram

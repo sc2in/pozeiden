@@ -1,0 +1,52 @@
+name: Sync Rulesets
+
+# Branch protection as code: .github/rulesets/*.json is the source of truth;
+# this workflow pushes it to the GitHub API whenever it changes on main.
+# Requires the RULESET_SYNC_TOKEN secret (fine-grained PAT with repository
+# Administration: read/write). Both rulesets land with "enforcement":
+# "evaluate" first — GitHub logs would-have-blocked events under Rule
+# Insights — and are flipped to "active" once ci-gate has run green on main.
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/rulesets/**"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Sync rulesets via API
+        env:
+          GH_TOKEN: ${{ secrets.RULESET_SYNC_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+
+          sync_ruleset() {
+            local file="$1"
+            local name
+            name=$(jq -r '.name' "$file")
+
+            existing_id=$(gh api "repos/$REPO/rulesets" \
+              --jq ".[] | select(.name == \"$name\") | .id" 2>/dev/null || true)
+
+            if [ -n "$existing_id" ]; then
+              echo "Updating ruleset '$name' (id=$existing_id)"
+              gh api "repos/$REPO/rulesets/$existing_id" \
+                --method PUT \
+                --input "$file"
+            else
+              echo "Creating ruleset '$name'"
+              gh api "repos/$REPO/rulesets" \
+                --method POST \
+                --input "$file"
+            fi
+          }
+
+          for f in .github/rulesets/*.json; do
+            sync_ruleset "$f"
+          done

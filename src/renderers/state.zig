@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! State diagram SVG renderer.
 //! Supports compound (nested) states with hierarchical two-pass layout so that
 //! member states are guaranteed to live inside their compound box, never

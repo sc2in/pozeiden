@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Mindmap SVG renderer (radial tree layout).
 //! Expects a Value.node with a `nodes` list; the first entry is the root node.
 //! Each node has `label`, `shape` (circle/rect/rounded/hexagon/ellipse), and a

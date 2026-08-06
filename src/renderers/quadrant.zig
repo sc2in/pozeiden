@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Quadrant chart SVG renderer.
 //! Expects a Value.node with axis label strings (`x_left`, `x_right`, `y_bottom`,
 //! `y_top`), quadrant label strings (`q1` to `q4`), optional `title`, and `points`

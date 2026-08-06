@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Langium grammar runtime: tokenise mermaid text with a parsed Grammar,
 //! then recursively interpret parser rules to produce a Value AST.
 const std = @import("std");

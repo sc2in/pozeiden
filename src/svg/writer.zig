@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Low-level SVG string builder used by all renderers.
 //!
 //! `SvgWriter` accumulates SVG markup in an internal `ArrayList(u8)`.

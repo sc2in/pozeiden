@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! XY chart (bar/line) SVG renderer.
 //! Expects a Value.node with `title`, `y_min`, `y_max`, `x_labels` (list of strings),
 //! and `series` (list of nodes with `kind` ("bar" or "line") and `values`, a list of

@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Parse .langium grammar definition files into a Grammar AST.
 //! Hand-rolled recursive descent; uses no external parser library.
 const std = @import("std");

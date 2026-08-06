@@ -1,3 +1,6 @@
+//! Copyright © 2026 [Star City Security Consulting, LLC (SC2)](https://sc2.in)
+//! SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//!
 //! Flowchart SVG renderer.
 //! Builds a Graph from the parsed Value AST, runs layout, and emits SVG.
 //! Expects a Value.node with `nodes` (id, label, shape), `edges` (from, to, label,
