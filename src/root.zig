@@ -161,33 +161,38 @@ pub fn render(allocator: std.mem.Allocator, mermaid_text: []const u8) ![]const u
     // renderWithOptions) is protected, not just the CLI/WASM wrappers.
     if (mermaid_text.len > max_input_bytes) return error.InputTooLarge;
 
+    // Strip a leading YAML front-matter block once, before dispatch, so its
+    // body lines (`title:`, `config:` …) never reach a parser — the parsers
+    // would otherwise treat them as diagram content (e.g. flowchart nodes).
+    const body = detect.stripFrontmatter(mermaid_text);
+
     // Apply %%{init: {...}}%% directive overrides for this render call.
-    const applied_init = applyInitDirective(mermaid_text);
+    const applied_init = applyInitDirective(body);
     defer if (applied_init) theme.resetToDefaults();
 
-    const diagram_type = detect.detect(mermaid_text);
+    const diagram_type = detect.detect(body);
 
     switch (diagram_type) {
-        .pie => return renderLangium(allocator, mermaid_text, try getPieCache(), pie_renderer.render),
-        .gitgraph => return renderLangium(allocator, mermaid_text, try getGitCache(), gitgraph_renderer.render),
-        .flowchart => return renderFlowchartDirect(allocator, mermaid_text),
-        .sequence => return renderSequenceDirect(allocator, mermaid_text),
-        .class => return renderClassDirect(allocator, mermaid_text),
-        .state => return renderStateDirect(allocator, mermaid_text),
-        .er => return renderErDirect(allocator, mermaid_text),
-        .gantt => return renderGanttDirect(allocator, mermaid_text),
-        .timeline => return renderTimelineDirect(allocator, mermaid_text),
-        .xychart => return renderXyChartDirect(allocator, mermaid_text),
-        .quadrant => return renderQuadrantDirect(allocator, mermaid_text),
-        .mindmap => return renderMindmapDirect(allocator, mermaid_text),
-        .sankey => return renderSankeyDirect(allocator, mermaid_text),
-        .c4 => return renderC4Direct(allocator, mermaid_text),
-        .block => return renderBlockDirect(allocator, mermaid_text),
-        .requirement => return renderRequirementDirect(allocator, mermaid_text),
-        .kanban => return renderKanbanDirect(allocator, mermaid_text),
+        .pie => return renderLangium(allocator, body, try getPieCache(), pie_renderer.render),
+        .gitgraph => return renderLangium(allocator, body, try getGitCache(), gitgraph_renderer.render),
+        .flowchart => return renderFlowchartDirect(allocator, body),
+        .sequence => return renderSequenceDirect(allocator, body),
+        .class => return renderClassDirect(allocator, body),
+        .state => return renderStateDirect(allocator, body),
+        .er => return renderErDirect(allocator, body),
+        .gantt => return renderGanttDirect(allocator, body),
+        .timeline => return renderTimelineDirect(allocator, body),
+        .xychart => return renderXyChartDirect(allocator, body),
+        .quadrant => return renderQuadrantDirect(allocator, body),
+        .mindmap => return renderMindmapDirect(allocator, body),
+        .sankey => return renderSankeyDirect(allocator, body),
+        .c4 => return renderC4Direct(allocator, body),
+        .block => return renderBlockDirect(allocator, body),
+        .requirement => return renderRequirementDirect(allocator, body),
+        .kanban => return renderKanbanDirect(allocator, body),
         .unknown => {
             // Emit a simple fallback SVG for unrecognised diagram types
-            return renderUnknown(allocator, mermaid_text);
+            return renderUnknown(allocator, body);
         },
     }
 }
@@ -2933,6 +2938,46 @@ fn renderUnknown(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     try svg.text(200, 60, preview, theme.text_color, theme.font_size, .middle, "normal");
     try svg.footer();
     return svg.toOwnedSlice();
+}
+
+test "front matter is stripped before rendering" {
+    // The stripped render must be byte-identical to the same diagram without
+    // front matter — previously `title: My Chart` and `graph TD` leaked into
+    // the flowchart parser and became nodes.
+    const bare = "graph TD\n  A[Start] --> B[End]\n";
+    const with_fm = "---\ntitle: My Chart\nconfig:\n  layout: dagre\n---\n" ++ bare;
+    const expected = try render(std.testing.allocator, bare);
+    defer std.testing.allocator.free(expected);
+    const actual = try render(std.testing.allocator, with_fm);
+    defer std.testing.allocator.free(actual);
+    try std.testing.expectEqualStrings(expected, actual);
+    try std.testing.expect(std.mem.indexOf(u8, actual, "My Chart") == null);
+}
+
+test "front matter followed by init directive still applies the directive" {
+    const input = "---\ntitle: t\n---\n%%{init: {'theme':'dark'}}%%\ngraph TD\nA-->B\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    // Dark theme's node fill replaces the default #ececff.
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#16213e") != null);
+    try std.testing.expect(std.mem.indexOf(u8, svg, "#ececff") == null);
+}
+
+test "unterminated front matter is still treated as ordinary content" {
+    const input = "---\ngraph TD\nA-->B\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "<rect") != null);
+}
+
+test "front-matter-only input falls back to the unknown renderer" {
+    const svg = try render(std.testing.allocator, "---\ntitle: nothing else\n---\n");
+    defer std.testing.allocator.free(svg);
+    // The unknown fallback is a fixed 400x120 placeholder, and the stripped
+    // body is empty, so no front-matter text may leak into it.
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg"));
+    try std.testing.expect(std.mem.indexOf(u8, svg, "nothing else") == null);
 }
 
 test "detect and render pie" {

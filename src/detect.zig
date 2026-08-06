@@ -52,7 +52,10 @@ pub const DiagramType = enum {
 /// that is exactly `---` — return the slice after the closing delimiter.
 /// Otherwise (no opener, or an unterminated one) return `text` unchanged, so a
 /// stray `---` is still handled leniently by the caller.
-fn stripFrontmatter(text: []const u8) []const u8 {
+///
+/// Exposed for `render`, which must strip the same block before dispatching so
+/// front-matter lines (`title:` …) are never parsed as diagram content.
+pub fn stripFrontmatter(text: []const u8) []const u8 {
     var pos: usize = 0;
     var opened = false;
     while (pos < text.len) {
