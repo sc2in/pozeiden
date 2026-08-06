@@ -25,9 +25,10 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
     while (lines.next()) |raw| {
+        // Only the right side is trimmed (leading indent is the tree depth),
+        // so the shared skip predicate gets a fully-trimmed copy.
         const trimmed_right = std.mem.trimEnd(u8, raw, " \t\r");
-        if (trimmed_right.len == 0 or
-            std.mem.startsWith(u8, std.mem.trim(u8, trimmed_right, " \t"), "%%")) continue;
+        if (isSkippable(std.mem.trim(u8, trimmed_right, " \t"))) continue;
         if (first) {
             first = false;
             continue;

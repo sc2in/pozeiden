@@ -195,13 +195,9 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
         }
     }.run;
 
-    var lines = std.mem.splitScalar(u8, text, '\n');
+    var lines = parse_util.LineIter.init(text);
     var first = true;
-    while (lines.next()) |raw| {
-        const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0) continue;
-        // Skip comments
-        if (std.mem.startsWith(u8, line, "%%")) continue;
+    while (lines.next()) |line| {
         // classDef myClass fill:#f9f,stroke:#333
         if (std.mem.startsWith(u8, line, "classDef ")) {
             const rest = line[9..];

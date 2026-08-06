@@ -35,10 +35,12 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var first = true;
+    // Manual loop rather than parse_util.LineIter: the `ref` block below
+    // consumes lines from the same iterator with different skip semantics
+    // (comments inside a ref block are part of its text).
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0) continue;
-        if (std.mem.startsWith(u8, line, "%%")) continue;
+        if (isSkippable(line)) continue;
 
         if (first) {
             first = false;

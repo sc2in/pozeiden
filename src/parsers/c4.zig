@@ -28,12 +28,12 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     const BStack = struct { alias: []const u8, label: []const u8, members: std.ArrayList([]const u8), is_enterprise: bool };
     var bstack: std.ArrayList(BStack) = .empty;
 
-    var lines = std.mem.splitScalar(u8, text, '\n');
+    var lines = parse_util.LineIter.init(text);
     var first = true;
-    while (lines.next()) |raw| {
-        const line = std.mem.trim(u8, raw, " \t\r");
-        if (line.len == 0 or std.mem.startsWith(u8, line, "%%") or
-            std.mem.startsWith(u8, line, "//") or
+    while (lines.next()) |line| {
+        // Beyond the shared blank/%% skip, C4 also supports `//` comments and
+        // ignores the Update* layout directives.
+        if (std.mem.startsWith(u8, line, "//") or
             std.mem.startsWith(u8, line, "UpdateRel") or
             std.mem.startsWith(u8, line, "UpdateElement") or
             std.mem.startsWith(u8, line, "UpdateLayout"))

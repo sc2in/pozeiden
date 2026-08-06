@@ -26,11 +26,9 @@ pub fn render(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     var show_today: bool = false;
     var excludes_weekends: bool = false;
 
-    var lines = std.mem.splitScalar(u8, text, '\n');
+    var lines = parse_util.LineIter.init(text);
     var first = true;
-    while (lines.next()) |raw| {
-        const line = std.mem.trim(u8, raw, " \t\r");
-        if (isSkippable(line)) continue;
+    while (lines.next()) |line| {
         if (first) {
             first = false;
             continue;
