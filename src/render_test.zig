@@ -130,6 +130,20 @@ test "renderWithMetadata prefers accTitle over front-matter title" {
     try std.testing.expect(result.descr == null);
 }
 
+test "renderToWriter writes the same bytes renderWithOptions returns" {
+    const gpa = std.testing.allocator;
+    const input = "graph TD\nA-->B\n";
+    const expected = try renderWithOptions(gpa, input, .{});
+    defer gpa.free(expected);
+
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(gpa);
+    var aw: std.Io.Writer.Allocating = .fromArrayList(gpa, &buf);
+    defer buf = aw.toArrayList();
+    try pozeiden.renderToWriter(gpa, input, .{}, &aw.writer);
+    try std.testing.expectEqualStrings(expected, aw.writer.buffered());
+}
+
 test "detect and render pie" {
     const input = "pie\n\"Dogs\" : 50\n\"Cats\" : 50\n";
     const svg = try render(std.testing.allocator, input);

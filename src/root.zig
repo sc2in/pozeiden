@@ -369,8 +369,13 @@ pub const RenderOptions = struct {
     theme_override: theme.ThemeOverride = .{},
 
     /// When `true`, return `error.UnknownDiagramType` for unrecognised input
-    /// instead of generating a fallback SVG.  Useful for pipeline callers that
-    /// need to distinguish a real render from a no-op.
+    /// instead of generating a fallback SVG.  Recommended for any pipeline
+    /// rendering third-party input: with the lenient default, an unsupported
+    /// diagram type (`journey`, `packet`, …) or a typo silently produces a
+    /// placeholder SVG that can ship looking like a rendered diagram.
+    ///
+    /// Deprecation notice: the default flips to `true` in pozeiden 1.0.0 —
+    /// the fallback becomes opt-in via an explicit `.strict = false`.
     strict: bool = false,
 
     /// If non-zero, scale the output SVG so its width does not exceed this
@@ -483,6 +488,24 @@ pub fn renderWithMetadata(
         .title = title,
         .descr = descr,
     };
+}
+
+/// Like `renderWithOptions`, but writes the SVG to `writer` instead of
+/// returning an allocated slice.  `allocator` is still used for the render
+/// pipeline's internal work.
+///
+/// The SVG is currently built in memory and then written out; this signature
+/// is the stable contract, and a future streaming implementation will not
+/// change it.
+pub fn renderToWriter(
+    allocator: std.mem.Allocator,
+    mermaid_text: []const u8,
+    options: RenderOptions,
+    writer: *std.Io.Writer,
+) !void {
+    const svg = try renderWithOptions(allocator, mermaid_text, options);
+    defer allocator.free(svg);
+    try writer.writeAll(svg);
 }
 
 /// Parse the `width` and `height` attributes from the root `<svg ...>` element
