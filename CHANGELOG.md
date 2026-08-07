@@ -16,6 +16,8 @@ Deprecated section of 0.4.0).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-07
+
 ### Fixed
 
 - **Direction-override subgraphs could swap node positions** (#49). The
