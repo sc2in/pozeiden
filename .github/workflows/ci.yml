@@ -38,6 +38,10 @@ jobs:
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    # Backstop: a stalled fixed-output fetch (e.g. a dead Zig mirror, which
+    # hung the v0.4.0 release run for 3 hours) otherwise idles until GitHub's
+    # 6-hour default kill. A healthy cold leg finishes well under this.
+    timeout-minutes: 60
     permissions:
       id-token: "write"
       contents: "read"
@@ -123,6 +127,7 @@ jobs:
     # nix refuses to evaluate (same constraint policypress documents).
     name: build (aarch64-darwin)
     runs-on: macos-latest
+    timeout-minutes: 30
     permissions:
       id-token: "write"
       contents: "read"
@@ -152,6 +157,7 @@ jobs:
   # failure class (LinkError from an unshimmed WASI import).
   wasm:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
@@ -180,6 +186,7 @@ jobs:
   # flake resolves on re-run (same policy as zigmark).
   bench-regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
@@ -285,6 +292,7 @@ jobs:
     needs: [build, build-darwin, wasm, bench-regression]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Require every job to have succeeded
         env:
@@ -309,6 +317,7 @@ jobs:
     needs: [ci-gate]
     if: ${{ github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       id-token: "write"
       contents: "write"
