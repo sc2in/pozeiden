@@ -160,12 +160,22 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 if (sn.y < new_min_y) new_min_y = sn.y;
             }
 
-            // Translate to align sub-layout top-left with the original top-left.
+            // Translate to align sub-layout top-left with the original
+            // top-left. Match the write-back by id: layout() scatters
+            // id-sorted node structs within each layer, so sub_nodes.items[i]
+            // may no longer be the node collected i-th — index pairing handed
+            // one node another node's coordinates (issue #49). Member counts
+            // are small, so the nested scan is fine.
             const dx = orig_min_x - new_min_x;
             const dy = orig_min_y - new_min_y;
-            for (sub_nodes.items, 0..) |sn, i| {
-                sub_node_ptrs.items[i].x = sn.x + dx;
-                sub_node_ptrs.items[i].y = sn.y + dy;
+            for (sub_nodes.items) |sn| {
+                for (sub_node_ptrs.items) |ptr| {
+                    if (std.mem.eql(u8, ptr.id, sn.id)) {
+                        ptr.x = sn.x + dx;
+                        ptr.y = sn.y + dy;
+                        break;
+                    }
+                }
             }
         }
     }

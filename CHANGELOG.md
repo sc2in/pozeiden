@@ -16,6 +16,16 @@ Deprecated section of 0.4.0).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Direction-override subgraphs could swap node positions** (#49). The
+  sub-layout's coordinates were written back to the real nodes by pre-sort
+  index, but layout reorders nodes within layers — so when a subgraph with
+  its own `direction` declared same-layer members out of alphabetical order,
+  nodes received each other's positions, defeating the crossing-reduction
+  ordering. The write-back now matches by node id. Output changes only for
+  affected diagrams (the committed baselines were not; goldens unchanged).
+
 ## [0.4.0] - 2026-08-06
 
 ### Fixed

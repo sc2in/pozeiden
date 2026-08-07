@@ -144,6 +144,38 @@ test "renderToWriter writes the same bytes renderWithOptions returns" {
     try std.testing.expectEqualStrings(expected, aw.writer.buffered());
 }
 
+test "direction-override subgraph keeps its computed node order (#49)" {
+    // Members are declared Z, B, A. The LR sub-layout puts B and A in one
+    // column and orders them alphabetically (A above B), but the old
+    // write-back paired coordinates with node pointers by pre-sort index —
+    // handing A's position to B and vice versa.
+    const input =
+        "flowchart TD\n" ++
+        "    subgraph S[Sub]\n" ++
+        "        direction LR\n" ++
+        "        Z --> B\n" ++
+        "        Z --> A\n" ++
+        "    end\n";
+    const svg = try render(std.testing.allocator, input);
+    defer std.testing.allocator.free(svg);
+    const a_y = textLabelY(svg, "A").?;
+    const b_y = textLabelY(svg, "B").?;
+    try std.testing.expect(a_y < b_y);
+}
+
+/// Find the `y` attribute of the `<text …>label</text>` element in `svg`.
+fn textLabelY(svg: []const u8, label: []const u8) ?f32 {
+    var needle_buf: [64]u8 = undefined;
+    const needle = std.fmt.bufPrint(&needle_buf, ">{s}</text>", .{label}) catch return null;
+    const close = std.mem.indexOf(u8, svg, needle) orelse return null;
+    const open = std.mem.lastIndexOf(u8, svg[0..close], "<text ") orelse return null;
+    const tag = svg[open..close];
+    const y_attr = std.mem.indexOf(u8, tag, " y=\"") orelse return null;
+    const start = y_attr + " y=\"".len;
+    const end = std.mem.indexOfScalarPos(u8, tag, start, '"') orelse return null;
+    return std.fmt.parseFloat(f32, tag[start..end]) catch null;
+}
+
 test "detect and render pie" {
     const input = "pie\n\"Dogs\" : 50\n\"Cats\" : 50\n";
     const svg = try render(std.testing.allocator, input);
