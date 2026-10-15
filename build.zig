@@ -57,11 +57,9 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);
+    run_cmd.addPassthruArgs();
     run_step.dependOn(&run_cmd.step);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
 
     const mod_tests = b.addTest(.{
         .name = "pozeiden",
@@ -211,10 +209,10 @@ pub fn build(b: *std.Build) void {
     // Copy .mmd example files into zig-out/playground/examples/ so the
     // playground can fetch them at runtime without hardcoding their content.
     const example_names_pg = [_][]const u8{
-        "pie", "flowchart", "sequence", "gitgraph", "class",
-        "state", "er", "gantt", "timeline", "xychart",
-        "quadrant", "mindmap", "sankey", "c4",
-        "block", "requirement", "kanban",
+        "pie",         "flowchart", "sequence", "gitgraph", "class",
+        "state",       "er",        "gantt",    "timeline", "xychart",
+        "quadrant",    "mindmap",   "sankey",   "c4",       "block",
+        "requirement", "kanban",
     };
     for (example_names_pg) |name| {
         const install_mmd = b.addInstallFile(
@@ -266,10 +264,10 @@ pub fn build(b: *std.Build) void {
     //   open zig-out/examples/pie.svg
 
     const example_names = [_][]const u8{
-        "pie", "flowchart", "sequence", "gitgraph", "class",
-        "state", "er", "gantt", "timeline", "xychart",
-        "quadrant", "mindmap", "sankey", "c4",
-        "block", "requirement", "kanban",
+        "pie",         "flowchart", "sequence", "gitgraph", "class",
+        "state",       "er",        "gantt",    "timeline", "xychart",
+        "quadrant",    "mindmap",   "sankey",   "c4",       "block",
+        "requirement", "kanban",
     };
 
     const examples_step = b.step("examples", "Render example SVGs to zig-out/examples/");

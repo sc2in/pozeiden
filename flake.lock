@@ -5,11 +5,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "lastModified": 1791914995,
+        "narHash": "sha256-Zf/xfQEAasnwnmEfHqW/4hjDE/s44yn2hD4RuVIZRjA=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "rev": "b7a79d3fea1e214f6d668d521cecec0c01e26544",
         "type": "github"
       },
       "original": {
@@ -38,42 +38,40 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1780358546,
-        "narHash": "sha256-zrI9N/kB9czvb7MB2WMwyvBT+qpXw7QdDdRIZvFp0aU=",
-        "owner": "NixOS",
+        "lastModified": 1792034174,
+        "narHash": "sha256-Wqty06OaHk9quzfq4m60/+aYeFIHuOvMXSlT6cqmk54=",
+        "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "e7713b176c927fdab81a18801682bd2606491b0a",
+        "rev": "2ebb5e07650b0d0cc7bcbe22f4fc4b561572b87f",
         "type": "github"
       },
       "original": {
-        "owner": "NixOS",
+        "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "e7713b176c927fdab81a18801682bd2606491b0a",
         "type": "github"
       }
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1780372719,
-        "narHash": "sha256-QmC052KtJvADWTuMx7YtMFKZf4bpeQ8smGLYSCi1c/I=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "3fdb0f82594bbee6ccaaeb1e0afb851215ed3bc9",
-        "type": "github"
+        "lastModified": 1791956154,
+        "narHash": "sha256-jBYGPi4udQ9uo4KQp9m2J0546nJVQitG15gvZSaVVAs=",
+        "rev": "55bfb4d7437bd4e09ab7cba58a43bd68eb310044",
+        "revCount": 1092090,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.1.1092090%2Brev-55bfb4d7437bd4e09ab7cba58a43bd68eb310044/01a13e8e-a023-7172-9d82-64cacaeab765/source.tar.gz"
       },
       "original": {
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://flakehub.com/f/NixOS/nixpkgs/0.1.%2A.tar.gz"
       }
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1780540212,
-        "narHash": "sha256-hqlJBt1MTYZ7LSm20DPb5ZVqYp6PGaXDmZWPBOXRF6A=",
+        "lastModified": 1783476344,
+        "narHash": "sha256-+gX8sBedQ3JSvFQ7CIV67+FyB/OlHb9HSoQDl/kM064=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "a03c17048bf84b1faaef309607168810bb9acb07",
+        "rev": "e920408605a19fda9b4e96e308b4d3f6592b32f6",
         "type": "github"
       },
       "original": {
@@ -84,7 +82,6 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
         "zig2nix": "zig2nix",
         "zigmark": "zigmark"
       }
@@ -122,19 +119,20 @@
     "zig2nix": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1780287822,
-        "narHash": "sha256-280h+8SjBvzs6+qaI9TA279Zbu3H+zHPybsxfGu1niI=",
-        "rev": "db357a64a6aa160152f917f2bcee6da4e572e742",
-        "revCount": 990,
-        "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/Cloudef/zig2nix/0.1.990%2Brev-db357a64a6aa160152f917f2bcee6da4e572e742/019e8697-0966-7582-848c-aca4895b83b2/source.tar.gz"
+        "lastModified": 1792036365,
+        "narHash": "sha256-sQXPW67G71JxYEeCQjcKhg2y5JX5xpaxODHbrhdtjCY=",
+        "owner": "Cloudef",
+        "repo": "zig2nix",
+        "rev": "0d4b03a416b189ad1f4ed213d31bcfacb2a10034",
+        "type": "github"
       },
       "original": {
-        "type": "tarball",
-        "url": "https://flakehub.com/f/Cloudef/zig2nix/0.1.990.tar.gz"
+        "owner": "Cloudef",
+        "repo": "zig2nix",
+        "type": "github"
       }
     },
     "zig2nix_2": {
@@ -143,31 +141,29 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1780460820,
-        "narHash": "sha256-1VrSHtqG+Mu9i7nerwfNlOSgHT1sCOx/Kx9Y1xeMHQw=",
-        "rev": "aff77c36c42dc84f81c2b48d6ac4a0457099e426",
-        "revCount": 992,
+        "lastModified": 1783395912,
+        "narHash": "sha256-khY1LUzeLm7QETVGsG+hRPkgjrHWSuXTMjKMJ1LcbPg=",
+        "rev": "db4696c32577d9d5213112d10a5762124f4a7fed",
+        "revCount": 1026,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/Cloudef/zig2nix/0.1.992%2Brev-aff77c36c42dc84f81c2b48d6ac4a0457099e426/019e90dd-0e0a-7463-97b3-eaa1b86f8c0c/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/Cloudef/zig2nix/0.1.1026%2Brev-db4696c32577d9d5213112d10a5762124f4a7fed/019f3fab-6e97-7521-8429-90a92b6107f3/source.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/Cloudef/zig2nix/0.1.990.tar.gz"
+        "url": "https://flakehub.com/f/Cloudef/zig2nix/0.1.%2A.tar.gz"
       }
     },
     "zigmark": {
       "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
+        "nixpkgs": "nixpkgs_2",
         "zig2nix": "zig2nix_2"
       },
       "locked": {
-        "lastModified": 1783109074,
-        "narHash": "sha256-CjutJnXmGpKXjz4ehK+kvi+iPJN/lmyyr2j7RBA93CA=",
+        "lastModified": 1786130935,
+        "narHash": "sha256-WUZUiWBUtH/zznaBv/fNPGGj1cYhre5HtJ3scMwb9w8=",
         "owner": "sc2in",
         "repo": "zigmark",
-        "rev": "b9bee4e018df06fdef412ab95d6ce4332befedc2",
+        "rev": "ceec7fb29b976005d53f8b5cb3e0abe931f2d0e8",
         "type": "github"
       },
       "original": {

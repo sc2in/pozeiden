@@ -7,9 +7,10 @@
 //! overlapping sibling top-level states.  Concurrent orthogonal regions
 //! (separated by `--`) are laid out side-by-side within the compound.
 const std = @import("std");
+
 const Value = @import("../diagram/value.zig").Value;
-const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 const theme = @import("../svg/theme.zig");
+const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 
 const STATE_W: f32 = 140;
 const STATE_H: f32 = 36;
@@ -114,7 +115,9 @@ fn localBfs(
     for (states) |s| {
         if (!s.is_member or s.region_idx != region_i) continue;
         if (s.compound_id == null) continue;
-        if (local_depth_map.get(s.id)) |d| { if (d > max_d) max_d = d; }
+        if (local_depth_map.get(s.id)) |d| {
+            if (d > max_d) max_d = d;
+        }
     }
     for (states) |*s| {
         if (!s.is_member or s.region_idx != region_i) continue;
@@ -123,7 +126,7 @@ fn localBfs(
     }
 
     // Assign local columns (within depth row, ordered by queue encounter order)
-    var col_count = [_]usize{0} ** 64;
+    var col_count: [64]usize = @splat(0);
     for (queue.items) |qid| {
         for (states) |*s| {
             if (!std.mem.eql(u8, s.id, qid)) continue;
@@ -281,7 +284,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     var global_max_depth: usize = 0;
     for (states.items) |s| {
         if (s.is_member) continue;
-        if (depth_map.get(s.id)) |d| { if (d > global_max_depth) global_max_depth = d; }
+        if (depth_map.get(s.id)) |d| {
+            if (d > global_max_depth) global_max_depth = d;
+        }
     }
     for (states.items) |*s| {
         if (s.is_member) continue;
@@ -346,7 +351,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                 try member_set.put(mid, {});
                 // Assign region_idx on state
                 for (states.items) |*s| {
-                    if (std.mem.eql(u8, s.id, mid)) { s.region_idx = ri; break; }
+                    if (std.mem.eql(u8, s.id, mid)) {
+                        s.region_idx = ri;
+                        break;
+                    }
                 }
             }
 
@@ -388,7 +396,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         var total_region_w: f32 = 0;
         var max_region_h: f32 = 0;
         for (region_widths.items) |rw| total_region_w += rw;
-        for (region_heights.items) |rh| { if (rh > max_region_h) max_region_h = rh; }
+        for (region_heights.items) |rh| {
+            if (rh > max_region_h) max_region_h = rh;
+        }
         // Add gaps between regions
         if (region_widths.items.len > 1) {
             total_region_w += @as(f32, @floatFromInt(region_widths.items.len - 1)) * (COL_GAP + REGION_GAP);
@@ -414,7 +424,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // states in the global grid.
 
     var max_global_col: usize = 0;
-    for (col_count) |c| { if (c > max_global_col) max_global_col = c; }
+    for (col_count) |c| {
+        if (c > max_global_col) max_global_col = c;
+    }
     const N_ROWS = global_max_depth + 2;
     const N_COLS = if (max_global_col > 0) max_global_col else 1;
 
@@ -477,7 +489,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             }
         }
         const box_left = comp_px - comp_box_w / 2;
-        const box_top  = comp_py - comp_box_h / 2;
+        const box_top = comp_py - comp_box_h / 2;
 
         // Collect region widths for x-offset calculation
         var region_x_offsets: std.ArrayList(f32) = .empty;
@@ -497,7 +509,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                     }
                 }
                 const rw = @as(f32, @floatFromInt(max_lc + 1)) * STATE_W +
-                           @as(f32, @floatFromInt(max_lc)) * COL_GAP;
+                    @as(f32, @floatFromInt(max_lc)) * COL_GAP;
                 x_cursor += rw + COL_GAP + REGION_GAP;
             }
         } else {
@@ -516,7 +528,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
             s.px = rx_off + @as(f32, @floatFromInt(s.local_col)) * (STATE_W + COL_GAP) + STATE_W / 2;
             s.py = box_top + COMP_LABEL_H + COMP_PAD +
-                   @as(f32, @floatFromInt(s.local_depth)) * (STATE_H + ROW_GAP) + STATE_H / 2;
+                @as(f32, @floatFromInt(s.local_depth)) * (STATE_H + ROW_GAP) + STATE_H / 2;
         }
     }
 
@@ -526,9 +538,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     var max_py: f32 = 0;
     for (states.items) |s| {
         const right = s.px + (if (s.is_compound) s.box_w / 2 else STATE_W / 2) + MARGIN;
-        const bot   = s.py + (if (s.is_compound) s.box_h / 2 else STATE_H / 2) + MARGIN;
+        const bot = s.py + (if (s.is_compound) s.box_h / 2 else STATE_H / 2) + MARGIN;
         if (right > max_px) max_px = right;
-        if (bot   > max_py) max_py = bot;
+        if (bot > max_py) max_py = bot;
     }
 
     // Back edges route to the right — ensure extra canvas width
@@ -565,7 +577,8 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         var comp_box_h: f32 = 0;
         for (states.items) |s| {
             if (std.mem.eql(u8, s.id, comp_id)) {
-                comp_px = s.px; comp_py = s.py;
+                comp_px = s.px;
+                comp_py = s.py;
                 comp_box_w = if (s.box_w > 0) s.box_w else STATE_W + 2 * COMP_PAD;
                 comp_box_h = if (s.box_h > 0) s.box_h else STATE_H + COMP_LABEL_H + 2 * COMP_PAD;
                 break;
@@ -579,7 +592,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.rect(bx, by, comp_box_w, comp_box_h, 6.0, theme.node_fill, theme.node_stroke, 1.5);
         // Label: compound state name at top of box
         const lbl = blk: {
-            for (states.items) |s| { if (std.mem.eql(u8, s.id, comp_id)) break :blk s.label; }
+            for (states.items) |s| {
+                if (std.mem.eql(u8, s.id, comp_id)) break :blk s.label;
+            }
             break :blk comp_id;
         };
         try svg.text(bx + 8, by + COMP_LABEL_H - 6, lbl, theme.text_color, theme.font_size_small, .start, "bold");
@@ -599,16 +614,15 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
                     }
                 }
                 const rw = @as(f32, @floatFromInt(max_lc + 1)) * STATE_W +
-                           @as(f32, @floatFromInt(max_lc)) * COL_GAP;
+                    @as(f32, @floatFromInt(max_lc)) * COL_GAP;
                 x_cursor += rw;
                 if (ri < regions_val.len - 1) {
                     // Draw dashed vertical divider
                     const div_x = x_cursor + (COL_GAP + REGION_GAP) / 2;
-                    const inner_top  = by + COMP_LABEL_H + COMP_PAD / 2;
-                    const inner_bot  = by + comp_box_h - COMP_PAD / 2;
+                    const inner_top = by + COMP_LABEL_H + COMP_PAD / 2;
+                    const inner_bot = by + comp_box_h - COMP_PAD / 2;
                     var div_buf: [128]u8 = undefined;
-                    const div_d = try std.fmt.bufPrint(&div_buf,
-                        "M {d:.1} {d:.1} L {d:.1} {d:.1}", .{ div_x, inner_top, div_x, inner_bot });
+                    const div_d = try std.fmt.bufPrint(&div_buf, "M {d:.1} {d:.1} L {d:.1} {d:.1}", .{ div_x, inner_top, div_x, inner_bot });
                     try svg.path(div_d, "none", theme.node_stroke, 1.0, "stroke-dasharray=\"5,3\"");
                     x_cursor += COL_GAP + REGION_GAP;
                 }
@@ -637,16 +651,12 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const y1 = fy - 14.0;
             const y2 = fy + 14.0;
             var loop_buf: [256]u8 = undefined;
-            const loop_d = try std.fmt.bufPrint(&loop_buf,
-                "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
-                .{ ex, y1, ex - lp, y1, ex - lp, y2, ex, y2 });
+            const loop_d = try std.fmt.bufPrint(&loop_buf, "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}", .{ ex, y1, ex - lp, y1, ex - lp, y2, ex, y2 });
             try svg.path(loop_d, "none", stroke, sw, "");
             const arr: f32 = 8.0;
             const half: f32 = 4.5;
             var pts_buf: [128]u8 = undefined;
-            const pts = try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ ex - arr, y2 - half, ex, y2, ex - arr, y2 + half });
+            const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}", .{ ex - arr, y2 - half, ex, y2, ex - arr, y2 + half });
             try svg.polygon(pts, stroke, stroke, 1.0);
             if (t.label.len > 0) {
                 try svg.text(ex - lp / 2.0, fy - 8.0, t.label, theme.text_color, theme.font_size_small, .middle, "normal");
@@ -668,42 +678,51 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         // Use actual depth values for non-member states; for member states use py.
         const same_depth = (fs.depth == ts.depth) and !fs.is_member and !ts.is_member;
         const is_forward = (pfy < pty - 4.0) or (same_depth and false);
-        const is_back    = !same_depth and (pfy > pty + 4.0);
+        const is_back = !same_depth and (pfy > pty + 4.0);
         _ = is_forward;
 
         if (same_depth) {
             const ctrl: f32 = COL_GAP * 0.8;
             if (tx >= fx) {
-                pfx = fx + STATE_W / 2.0; ptx = tx - STATE_W / 2.0;
-                cx1 = pfx + ctrl; cy1 = pfy;
-                cx2 = ptx - ctrl; cy2 = pty;
+                pfx = fx + STATE_W / 2.0;
+                ptx = tx - STATE_W / 2.0;
+                cx1 = pfx + ctrl;
+                cy1 = pfy;
+                cx2 = ptx - ctrl;
+                cy2 = pty;
             } else {
-                pfx = fx - STATE_W / 2.0; ptx = tx + STATE_W / 2.0;
-                cx1 = pfx - ctrl; cy1 = pfy;
-                cx2 = ptx + ctrl; cy2 = pty;
+                pfx = fx - STATE_W / 2.0;
+                ptx = tx + STATE_W / 2.0;
+                cx1 = pfx - ctrl;
+                cy1 = pfy;
+                cx2 = ptx + ctrl;
+                cy2 = pty;
             }
         } else if (is_back) {
             // Back edge: route around the right side
             const dy: f32 = @abs(fy - ty);
             const lateral: f32 = @max(COL_GAP * 2.0, dy * 0.4 + COL_GAP);
-            pfx = fx + STATE_W / 2.0; ptx = tx + STATE_W / 2.0;
-            cx1 = pfx + lateral; cy1 = pfy;
-            cx2 = ptx + lateral; cy2 = pty;
+            pfx = fx + STATE_W / 2.0;
+            ptx = tx + STATE_W / 2.0;
+            cx1 = pfx + lateral;
+            cy1 = pfy;
+            cx2 = ptx + lateral;
+            cy2 = pty;
         } else {
             // Forward edge: exit bottom, enter top
             const from_r: f32 = if (isInitial(fs)) START_R else if (fs.is_compound) fs.box_h / 2 else STATE_H / 2.0;
-            const to_r: f32   = if (isInitial(ts)) START_R else if (ts.is_compound) ts.box_h / 2 else STATE_H / 2.0;
+            const to_r: f32 = if (isInitial(ts)) START_R else if (ts.is_compound) ts.box_h / 2 else STATE_H / 2.0;
             pfy = fy + from_r;
             pty = ty - to_r;
             const ctrl: f32 = @max(ROW_GAP * 0.6, @abs(pty - pfy) * 0.4);
-            cx1 = pfx; cy1 = pfy + ctrl;
-            cx2 = ptx; cy2 = pty - ctrl;
+            cx1 = pfx;
+            cy1 = pfy + ctrl;
+            cx2 = ptx;
+            cy2 = pty - ctrl;
         }
 
         var path_buf: [256]u8 = undefined;
-        const path_d = try std.fmt.bufPrint(&path_buf,
-            "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}",
-            .{ pfx, pfy, cx1, cy1, cx2, cy2, ptx, pty });
+        const path_d = try std.fmt.bufPrint(&path_buf, "M {d:.1} {d:.1} C {d:.1} {d:.1} {d:.1} {d:.1} {d:.1} {d:.1}", .{ pfx, pfy, cx1, cy1, cx2, cy2, ptx, pty });
         try svg.path(path_d, "none", stroke, sw, "");
 
         // Arrowhead
@@ -716,13 +735,11 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const arr: f32 = 8.0;
             const half: f32 = 4.5;
             var pts_buf: [192]u8 = undefined;
-            const pts = try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{
-                    ptx - ux * arr - uy * half, pty - uy * arr + ux * half,
-                    ptx, pty,
-                    ptx - ux * arr + uy * half, pty - uy * arr - ux * half,
-                });
+            const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}", .{
+                ptx - ux * arr - uy * half, pty - uy * arr + ux * half,
+                ptx,                        pty,
+                ptx - ux * arr + uy * half, pty - uy * arr - ux * half,
+            });
             try svg.polygon(pts, stroke, stroke, 1.0);
         }
 
@@ -753,9 +770,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const hw: f32 = STATE_W * 0.35;
             const hh: f32 = STATE_H * 0.55;
             var pts_buf: [192]u8 = undefined;
-            const pts = try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{ cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy });
+            const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}", .{ cx, cy - hh, cx + hw, cy, cx, cy + hh, cx - hw, cy });
             try svg.polygon(pts, theme.node_fill, theme.node_stroke, 1.5);
         } else if (std.mem.eql(u8, s.shape, "history") or std.mem.eql(u8, s.shape, "deepHistory")) {
             const r: f32 = START_R + 4;
@@ -787,7 +802,9 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         try svg.rect(nx, sy - NOTE_H2 / 2, NOTE_W, NOTE_H2, 4.0, "#fffde7", "#f0c040", 1.2);
         const conn_x: f32 = if (std.mem.eql(u8, position, "left")) nx + NOTE_W else nx;
         const state_edge_x: f32 = if (std.mem.eql(u8, position, "left"))
-            sx - STATE_W / 2 else sx + STATE_W / 2;
+            sx - STATE_W / 2
+        else
+            sx + STATE_W / 2;
         try svg.dashedLine(conn_x, sy, state_edge_x, sy, "#aaaaaa", 1.0, "4,3");
         try svg.text(nx + NOTE_W / 2, sy + 5, text, theme.text_color, theme.font_size_small, .middle, "normal");
     }
