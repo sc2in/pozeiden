@@ -18,6 +18,7 @@
 //! The `H_GAP` and `V_GAP` constants are exported so that the flowchart
 //! renderer can derive Bezier control-point offsets that match the layout.
 const std = @import("std");
+const testing = std.testing;
 
 /// A 2-D point in SVG coordinate space.
 pub const Point = struct { x: f32, y: f32 };
@@ -75,7 +76,7 @@ pub const GraphEdge = struct {
     to: []const u8,
     label: ?[]const u8,
     style: EdgeStyle,
-    color: ?[]const u8 = null,   // from linkStyle override
+    color: ?[]const u8 = null, // from linkStyle override
     /// Set by `breakCycles`: edge points against the DAG flow and is treated
     /// as logically reversed (to→from) during layer assignment.
     reversed: bool = false,
@@ -623,8 +624,6 @@ pub fn svgHeight(nodes: []const GraphNode) u32 {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-const testing = std.testing;
-
 fn makeNode(id: []const u8) GraphNode {
     return .{ .id = id, .label = id, .shape = .rect };
 }
@@ -831,7 +830,9 @@ test "breakCycles: back edge marked reversed" {
     const resolved = [_]?ResolvedEdge{ .{ .from = 0, .to = 1 }, .{ .from = 1, .to = 0 } };
     try breakCycles(testing.allocator, &g, &resolved);
     var any_reversed = false;
-    for (edges) |e| if (e.reversed) { any_reversed = true; };
+    for (edges) |e| if (e.reversed) {
+        any_reversed = true;
+    };
     try testing.expect(any_reversed);
 }
 
@@ -895,7 +896,7 @@ test "layout wide layer: barycenter orders all 200 children" {
     var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
     try layout(testing.allocator, &g);
     // Orders within the child layer must be a permutation of 0..199 …
-    var seen = [_]bool{false} ** kids;
+    var seen: [kids]bool = @splat(false);
     for (nodes) |nd| {
         if (nd.layer != 1) continue;
         try testing.expect(nd.order < kids);
@@ -960,7 +961,7 @@ test "layout coordinate snapshot: fork/join with back edge" {
 }
 
 test "translateNodes: minimum coordinate shifted to MARGIN" {
-    var nodes = [_]GraphNode{ makeNode("A") };
+    var nodes = [_]GraphNode{makeNode("A")};
     var edges = [_]GraphEdge{};
     var g: Graph = .{ .nodes = &nodes, .edges = &edges, .direction = .tb };
     try layout(testing.allocator, &g);

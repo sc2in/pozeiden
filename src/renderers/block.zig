@@ -7,9 +7,10 @@
 //! with `from`, `to`, and optional `label`). Blocks are placed left-to-right wrapping
 //! at `cols`; edges are drawn as straight arrowed lines between block centers.
 const std = @import("std");
+
 const Value = @import("../diagram/value.zig").Value;
-const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 const theme = @import("../svg/theme.zig");
+const SvgWriter = @import("../svg/writer.zig").SvgWriter;
 
 const CELL_W: f32 = 140;
 const CELL_H: f32 = 60;
@@ -33,7 +34,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     const BlockEntry = struct {
         id: []const u8,
         label: []const u8,
-        width: usize,  // grid units wide
+        width: usize, // grid units wide
         grid_col: usize,
         grid_row: usize,
         x: f32,
@@ -67,25 +68,29 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
 
         try block_map.put(a, id, blocks.items.len);
         try blocks.append(a, BlockEntry{
-            .id = id, .label = label, .width = width,
-            .grid_col = cur_col, .grid_row = cur_row,
-            .x = x, .y = y, .w = w,
+            .id = id,
+            .label = label,
+            .width = width,
+            .grid_col = cur_col,
+            .grid_row = cur_row,
+            .x = x,
+            .y = y,
+            .w = w,
             .is_space = is_space,
         });
 
         cur_col += width;
-        if (cur_col >= cols) { cur_col = 0; cur_row += 1; }
+        if (cur_col >= cols) {
+            cur_col = 0;
+            cur_row += 1;
+        }
     }
 
     if (blocks.items.len == 0) return renderFallback(allocator);
 
     const n_rows = cur_row + (if (cur_col > 0) @as(usize, 1) else @as(usize, 0));
-    const total_w: u32 = @intFromFloat(
-        MARGIN * 2 + @as(f32, @floatFromInt(cols)) * CELL_W + @as(f32, @floatFromInt(cols - 1)) * GAP
-    );
-    const total_h: u32 = @intFromFloat(
-        MARGIN * 2 + @as(f32, @floatFromInt(n_rows)) * CELL_H + @as(f32, @floatFromInt(n_rows - 1)) * GAP
-    );
+    const total_w: u32 = @intFromFloat(MARGIN * 2 + @as(f32, @floatFromInt(cols)) * CELL_W + @as(f32, @floatFromInt(cols - 1)) * GAP);
+    const total_h: u32 = @intFromFloat(MARGIN * 2 + @as(f32, @floatFromInt(n_rows)) * CELL_H + @as(f32, @floatFromInt(n_rows - 1)) * GAP);
 
     var svg = SvgWriter.init(allocator);
     defer svg.deinit();
@@ -99,14 +104,16 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // gives each horizontal segment its own y track within the gap, preventing
     // paths from running on top of one another when they share the same gap.
     const ElbowRoute = struct {
-        src_x: f32, src_y: f32,
-        tgt_x: f32, tgt_y: f32,
+        src_x: f32,
+        src_y: f32,
+        tgt_x: f32,
+        tgt_y: f32,
         gap_row: usize,
         base_gap_y: f32,
-        gap_y: f32,        // filled after track assignment
-        horiz_min: f32,    // x interval of the horizontal segment
+        gap_y: f32, // filled after track assignment
+        horiz_min: f32, // x interval of the horizontal segment
         horiz_max: f32,
-        end_uy: f32,       // direction of last (vertical) segment for arrowhead
+        end_uy: f32, // direction of last (vertical) segment for arrowhead
         label: ?[]const u8,
         track: usize,
     };
@@ -149,8 +156,10 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             const base_gap_y = MARGIN +
                 @as(f32, @floatFromInt(row_min + 1)) * (CELL_H + GAP) - GAP / 2.0;
             try elbow_routes.append(a, .{
-                .src_x = src.x, .src_y = src.y,
-                .tgt_x = tgt.x, .tgt_y = tgt.y,
+                .src_x = src.x,
+                .src_y = src.y,
+                .tgt_x = tgt.x,
+                .tgt_y = tgt.y,
                 .gap_row = row_min,
                 .base_gap_y = base_gap_y,
                 .gap_y = base_gap_y,
@@ -164,17 +173,14 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
             // Same row or column: straight boundary-to-boundary line.
             try svg.line(src.x, src.y, tgt.x, tgt.y, theme.edge_color, 1.5);
             var pts_buf: [128]u8 = undefined;
-            const pts = try std.fmt.bufPrint(&pts_buf,
-                "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-                .{
-                    tgt.x - ux * arr - uy * half, tgt.y - uy * arr + ux * half,
-                    tgt.x, tgt.y,
-                    tgt.x - ux * arr + uy * half, tgt.y - uy * arr - ux * half,
-                });
+            const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}", .{
+                tgt.x - ux * arr - uy * half, tgt.y - uy * arr + ux * half,
+                tgt.x,                        tgt.y,
+                tgt.x - ux * arr + uy * half, tgt.y - uy * arr - ux * half,
+            });
             try svg.polygon(pts, theme.edge_color, theme.edge_color, 0);
             if (label) |lbl| {
-                try svg.text((src.x + tgt.x) / 2.0, (src.y + tgt.y) / 2.0 - 6, lbl,
-                    theme.text_color, theme.font_size_small, .middle, "normal");
+                try svg.text((src.x + tgt.x) / 2.0, (src.y + tgt.y) / 2.0 - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
             }
         }
     }
@@ -199,7 +205,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     }
     const track_end_x = try a.alloc([MAX_TRACKS]f32, max_gap_row + 1);
     const track_count = try a.alloc(usize, max_gap_row + 1);
-    @memset(track_end_x, .{0} ** MAX_TRACKS);
+    @memset(track_end_x, @splat(0));
     @memset(track_count, 0);
 
     for (elbow_routes.items) |*r| {
@@ -233,25 +239,20 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
     // Pass 3: render elbow routes with assigned gap_y values.
     for (elbow_routes.items) |r| {
         var path_buf: [256]u8 = undefined;
-        const path_d = try std.fmt.bufPrint(&path_buf,
-            "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}",
-            .{ r.src_x, r.src_y, r.src_x, r.gap_y, r.tgt_x, r.gap_y, r.tgt_x, r.tgt_y });
+        const path_d = try std.fmt.bufPrint(&path_buf, "M {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1} L {d:.1} {d:.1}", .{ r.src_x, r.src_y, r.src_x, r.gap_y, r.tgt_x, r.gap_y, r.tgt_x, r.tgt_y });
         try svg.path(path_d, "none", theme.edge_color, 1.5, "");
 
         const arr: f32 = 8.0;
         const half: f32 = 4.5;
         var pts_buf: [128]u8 = undefined;
-        const pts = try std.fmt.bufPrint(&pts_buf,
-            "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}",
-            .{
-                r.tgt_x - r.end_uy * half, r.tgt_y - r.end_uy * arr,
-                r.tgt_x, r.tgt_y,
-                r.tgt_x + r.end_uy * half, r.tgt_y - r.end_uy * arr,
-            });
+        const pts = try std.fmt.bufPrint(&pts_buf, "{d:.1},{d:.1} {d:.1},{d:.1} {d:.1},{d:.1}", .{
+            r.tgt_x - r.end_uy * half, r.tgt_y - r.end_uy * arr,
+            r.tgt_x,                   r.tgt_y,
+            r.tgt_x + r.end_uy * half, r.tgt_y - r.end_uy * arr,
+        });
         try svg.polygon(pts, theme.edge_color, theme.edge_color, 0);
         if (r.label) |lbl| {
-            try svg.text((r.src_x + r.tgt_x) / 2.0, r.gap_y - 6, lbl,
-                theme.text_color, theme.font_size_small, .middle, "normal");
+            try svg.text((r.src_x + r.tgt_x) / 2.0, r.gap_y - 6, lbl, theme.text_color, theme.font_size_small, .middle, "normal");
         }
     }
 
@@ -262,8 +263,7 @@ pub fn render(allocator: std.mem.Allocator, value: Value) ![]const u8 {
         const color = theme.pie_colors[color_idx % theme.pie_colors.len];
         color_idx += 1;
         try svg.rect(b.x, b.y, b.w, CELL_H, 6.0, theme.node_fill, color, 2.0);
-        try svg.textWrapped(b.x + b.w / 2, b.y + CELL_H / 2 + 4,
-            b.label, b.w - 8, theme.text_color, theme.font_size, .middle, "normal");
+        try svg.textWrapped(b.x + b.w / 2, b.y + CELL_H / 2 + 4, b.label, b.w - 8, theme.text_color, theme.font_size, .middle, "normal");
     }
 
     try svg.footer();
