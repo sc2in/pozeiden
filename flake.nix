@@ -2,27 +2,25 @@
   description = "pozeiden — pure-Zig mermaid diagram renderer";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/e7713b176c927fdab81a18801682bd2606491b0a";
-    zig2nix.url = "https://flakehub.com/f/Cloudef/zig2nix/0.1.990.tar.gz";
+    zig2nix.url = "github:Cloudef/zig2nix";
     zigmark.url = "github:sc2in/zigmark";
-    zigmark.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
     self,
-    nixpkgs,
     zig2nix,
     zigmark,
     ...
   }: let
-    supportedSystems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
-    forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems f;
     version = self.shortRev or self.dirtyShortRev or "dev";
-  in {
-    packages = forAllSystems (
-      system: let
-        env = zig2nix.outputs.zig-env.${system} {zig = nixpkgs.legacyPackages.${system}.zig;};
-        pkgs = nixpkgs.legacyPackages.${system};
+    flake-utils = zig2nix.inputs.flake-utils;
+  in (flake-utils.lib.eachDefaultSystem (system: let
+    env = zig2nix.outputs.zig-env.${system} {zig = zig2nix.outputs.packages.${system}.zig-0_17_0;};
+  in
+    with builtins;
+    with env.pkgs.lib; rec {
+      packages = let
+        pkgs = env.pkgs;
         lib = pkgs.lib;
 
         # Only hash files that affect the compiled output.
@@ -67,14 +65,12 @@
           drv.overrideAttrs (old: {
             meta = (old.meta or {}) // {description = desc;};
           });
-      in let
-        defaultPkg = withDesc (mkPozeiden null) "pozeiden — mermaid → SVG renderer";
-      in {
-        default = defaultPkg;
+      in rec {
+        default = withDesc (mkPozeiden null) "pozeiden — mermaid → SVG renderer";
         pozeiden-safe = withDesc (mkPozeiden "ReleaseSafe") "pozeiden (ReleaseSafe)";
         pozeiden-small = withDesc (mkPozeiden "ReleaseSmall") "pozeiden (ReleaseSmall)";
         pozeiden-fast = withDesc (mkPozeiden "ReleaseFast") "pozeiden (ReleaseFast)";
-        site = defaultPkg.overrideAttrs (_old: {
+        site = default.overrideAttrs (_old: {
           pname = "pozeiden-site";
           buildPhase = "zig build site";
           installPhase = ''
@@ -83,57 +79,54 @@
           '';
           meta.description = "Pozeiden static site (playground + docs)";
         });
-      }
-    );
+      };
 
-    # `nix flake check` / omnix ci — build/test gates run on every PR.
-    checks = forAllSystems (system: {
-      test = self.packages.${system}.default.overrideAttrs (old: {
-        pname = "pozeiden-test";
-        buildPhase = "zig build test";
-        installPhase = "touch $out";
-        meta = (old.meta or {}) // {description = "Run zig build test (Debug)";};
-      });
-      # Exercise the shipped optimisation path with safety checks on, so bugs
-      # that only appear under release optimisation are caught in CI.
-      test-release-safe = self.packages.${system}.default.overrideAttrs (old: {
-        pname = "pozeiden-test-release-safe";
-        buildPhase = "zig build test -Doptimize=ReleaseSafe";
-        installPhase = "touch $out";
-        meta = (old.meta or {}) // {description = "Run zig build test (ReleaseSafe)";};
-      });
-      # Smoke-run the fuzz targets once each (no coverage-guided search) so the
-      # byte-in render/detect paths are exercised on every PR.
-      fuzz-smoke = self.packages.${system}.default.overrideAttrs (old: {
-        pname = "pozeiden-fuzz-smoke";
-        buildPhase = "zig build fuzz";
-        installPhase = "touch $out";
-        meta = (old.meta or {}) // {description = "Smoke-run the fuzz targets";};
-      });
-      # Build the wasm32-wasi playground module AND instantiate it. A build-only
-      # check is not enough: issue #48 shipped a module that compiled fine but
-      # failed WebAssembly.instantiate with a LinkError (an unshimmed WASI
-      # import). The Node smoke test loads the module with the real playground
-      # shim and renders a diagram, so import-set and ABI drift fail every PR
-      # instead of surfacing after a deploy.
-      wasm = self.packages.${system}.default.overrideAttrs (old: {
-        pname = "pozeiden-wasm-check";
-        nativeBuildInputs =
-          (old.nativeBuildInputs or [])
-          ++ [nixpkgs.legacyPackages.${system}.nodejs];
-        buildPhase = ''
-          zig build playground
-          node tests/wasm_smoke.mjs
-        '';
-        installPhase = "install -Dm644 zig-out/playground/pozeiden.wasm $out/pozeiden.wasm";
-        meta = (old.meta or {}) // {description = "Build + instantiate the WASM playground module";};
-      });
-    });
+      # `nix flake check` / omnix ci — build/test gates run on every PR.
+      checks = {
+        test = self.packages.${system}.default.overrideAttrs (old: {
+          pname = "pozeiden-test";
+          buildPhase = "zig build test";
+          installPhase = "touch $out";
+          meta = (old.meta or {}) // {description = "Run zig build test (Debug)";};
+        });
+        # Exercise the shipped optimisation path with safety checks on, so bugs
+        # that only appear under release optimisation are caught in CI.
+        test-release-safe = self.packages.${system}.default.overrideAttrs (old: {
+          pname = "pozeiden-test-release-safe";
+          buildPhase = "zig build test -Doptimize=ReleaseSafe";
+          installPhase = "touch $out";
+          meta = (old.meta or {}) // {description = "Run zig build test (ReleaseSafe)";};
+        });
+        # Smoke-run the fuzz targets once each (no coverage-guided search) so the
+        # byte-in render/detect paths are exercised on every PR.
+        fuzz-smoke = self.packages.${system}.default.overrideAttrs (old: {
+          pname = "pozeiden-fuzz-smoke";
+          buildPhase = "zig build fuzz";
+          installPhase = "touch $out";
+          meta = (old.meta or {}) // {description = "Smoke-run the fuzz targets";};
+        });
+        # Build the wasm32-wasi playground module AND instantiate it. A build-only
+        # check is not enough: issue #48 shipped a module that compiled fine but
+        # failed WebAssembly.instantiate with a LinkError (an unshimmed WASI
+        # import). The Node smoke test loads the module with the real playground
+        # shim and renders a diagram, so import-set and ABI drift fail every PR
+        # instead of surfacing after a deploy.
+        wasm = self.packages.${system}.default.overrideAttrs (old: {
+          pname = "pozeiden-wasm-check";
+          nativeBuildInputs =
+            (old.nativeBuildInputs or [])
+            ++ [env.pkgs.nodejs];
+          buildPhase = ''
+            zig build playground
+            node tests/wasm_smoke.mjs
+          '';
+          installPhase = "install -Dm644 zig-out/playground/pozeiden.wasm $out/pozeiden.wasm";
+          meta = (old.meta or {}) // {description = "Build + instantiate the WASM playground module";};
+        });
+      };
 
-    devShells = forAllSystems (
-      system: let
-        pkgs = nixpkgs.legacyPackages.${system};
-        env = zig2nix.outputs.zig-env.${system} {zig = pkgs.zig;};
+      devShells = let
+        pkgs = env.pkgs;
 
         fuzz = pkgs.writeShellApplication {
           name = "fuzz";
@@ -146,40 +139,42 @@
         };
       in {
         default = env.mkShell {
-          nativeBuildInputs = [
-            pkgs.zls
-            pkgs.bash
-            fuzz
-            (pkgs.writeShellApplication {
-              name = "update-zon";
-              runtimeInputs = [pkgs.git pkgs.jq];
-              meta.description = "Regenerate build.zig.zon2json-lock atomically, validating the result";
-              text = ''
-                cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-                if ! command -v zig &>/dev/null; then
-                  echo "zig is not installed or not in PATH" >&2
-                  exit 1
-                fi
-                echo "Regenerating build.zig.zon2json-lock..."
-                # zon2lock truncates its destination before it starts
-                # fetching, so writing straight to the real lock risks
-                # leaving a 0-byte file behind on failure or ^C. Generate
-                # into a temp file, validate, then move into place.
-                tmp="$(mktemp .build.zig.zon2json-lock.XXXXXX)"
-                trap 'rm -f "$tmp"' EXIT
-                env -u ZIG_GLOBAL_CACHE_DIR zig2nix zon2lock build.zig.zon "$tmp"
-                if ! jq -e 'type == "object"' "$tmp" >/dev/null 2>&1; then
-                  echo "error: generated lock is empty or invalid JSON; keeping existing build.zig.zon2json-lock" >&2
-                  exit 1
-                fi
-                mv -f "$tmp" build.zig.zon2json-lock
-                echo "build.zig.zon2json-lock updated."
-              '';
-            })
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
-            pkgs.mermaid-cli
-            # bench compares against mmdc; gracefully skipped when not in PATH
-          ];
+          nativeBuildInputs =
+            [
+              pkgs.zls
+              pkgs.bash
+              fuzz
+              (pkgs.writeShellApplication {
+                name = "update-zon";
+                runtimeInputs = [pkgs.git pkgs.jq];
+                meta.description = "Regenerate build.zig.zon2json-lock atomically, validating the result";
+                text = ''
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+                  if ! command -v zig &>/dev/null; then
+                    echo "zig is not installed or not in PATH" >&2
+                    exit 1
+                  fi
+                  echo "Regenerating build.zig.zon2json-lock..."
+                  # zon2lock truncates its destination before it starts
+                  # fetching, so writing straight to the real lock risks
+                  # leaving a 0-byte file behind on failure or ^C. Generate
+                  # into a temp file, validate, then move into place.
+                  tmp="$(mktemp .build.zig.zon2json-lock.XXXXXX)"
+                  trap 'rm -f "$tmp"' EXIT
+                  env -u ZIG_GLOBAL_CACHE_DIR zig2nix zon2lock build.zig.zon "$tmp"
+                  if ! jq -e 'type == "object"' "$tmp" >/dev/null 2>&1; then
+                    echo "error: generated lock is empty or invalid JSON; keeping existing build.zig.zon2json-lock" >&2
+                    exit 1
+                  fi
+                  mv -f "$tmp" build.zig.zon2json-lock
+                  echo "build.zig.zon2json-lock updated."
+                '';
+              })
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              pkgs.mermaid-cli
+              # bench compares against mmdc; gracefully skipped when not in PATH
+            ];
 
           shellHook = ''
             export ZIG_GLOBAL_CACHE_DIR=.zig-cache
@@ -206,23 +201,23 @@
             fi
           '';
         };
-      }
-    );
+      };
 
-    apps = forAllSystems (
-      system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+      apps = let
+        pkgs = env.pkgs;
         lib = pkgs.lib;
       in {
         # `nix run .#bench` — run benchmarks and splice results into README.md
         bench = let
           benchApp = pkgs.writeShellApplication {
             name = "pozeiden-bench";
-            runtimeInputs = [
-              pkgs.zig
-              pkgs.git
-              zigmark.packages.${system}.default
-            ] ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.mermaid-cli ];
+            runtimeInputs =
+              [
+                pkgs.zig
+                pkgs.git
+                zigmark.packages.${system}.default
+              ]
+              ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.mermaid-cli];
             text = ''
               REPO="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
               cd "$REPO"
@@ -247,6 +242,7 @@
         in {
           type = "app";
           program = "${benchApp}/bin/pozeiden-bench";
+          meta.description = "Run benchmarks and splice results into README.md";
         };
 
         # `nix run .#check-release -- <tag>` — release-tag guards (CHANGELOG
@@ -417,7 +413,6 @@
           program = "${bump-app}/bin/pozeiden-bump";
           meta.description = "Bump version in build.zig.zon and roll the CHANGELOG for a release";
         };
-      }
-    );
-  };
+      };
+    }));
 }
