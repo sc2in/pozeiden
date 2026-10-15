@@ -16,6 +16,12 @@ Deprecated section of 0.4.0).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-15
+
+### Chores
+
+- **Update to Zig 0.17.0** (#54).
+
 ## [0.4.1] - 2026-08-07
 
 ### Fixed
